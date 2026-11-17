@@ -16,9 +16,9 @@
 - **Documentation precedence:**
   1. Explicit owner instructions for the current task.
   2. Canonical merged docs at `docs/00`–`docs/24` (`docs/START_HERE.md`, `docs/PACKAGE_MANIFEST.json`) and ADRs in `docs/20_Technical_Decision_Records.md`.
-  3. `docs/EcoWatch Agent Guide.md`, `CONTRIBUTING.md`, and user global rules (minimal, YAGNI, native capabilities first).
+  3. `docs/AGENT_GUIDE.md`, `CONTRIBUTING.md`, and user global rules (minimal, YAGNI, native capabilities first).
   4. `docs/files/22_Correlation_Engine_and_Offline_Collection.md` (secondary source; merged baseline wins on conflicts).
-  5. `docs/EcoWatch_Full_Project_Documentation_v0.1/` and `docs/SignalWeave_Documentation/` (historical context only).
+  5. `docs/archive/` (historical context only; never cited as authority).
 - **Subagent dispatch:** Delegate bounded research, implementation, verification, and documentation tasks to subagents where parallel or isolated context is beneficial.
 - **Safety boundaries (always enforced):**
   - No seeded, sample, or demo data in the product; tests create and clean up temporary records.
@@ -31,14 +31,14 @@
 ## 2. What Has Been Done
 
 1. **Full documentation audit across all documentation packages (no code written):**
-   - Read `docs/EcoWatch Agent Guide.md` (v1.0) and `docs/RULES_COMPARISON_AND_MERGE_REPORT.md`.
+   - Read `docs/AGENT_GUIDE.md` (v1.0) and `docs/RULES_COMPARISON_AND_MERGE_REPORT.md`.
    - Read all 26 canonical merged baseline files (`START_HERE.md`, `PACKAGE_MANIFEST.json`, `00`–`24`).
    - Read `docs/files/START_HERE.md`, `docs/files/22_Correlation_Engine_and_Offline_Collection.md` (v0.8), and `docs/files/23_SignalWeave_Merge_Record.md`.
    - Dispatched research subagents to read and summarize `docs/SignalWeave_Documentation/` (`PRD.md`, `TECHNICAL.md`) and `docs/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/` (`START_HERE.md`, `00`–`19`).
 2. **Repository & branch setup (`Fredprime/EcoWatch`):**
    - Cloned `Fredprime/EcoWatch` (baseline commit `88ca75d` on `master`, which already includes `compose.yaml` with PostGIS 16-3.4, `Makefile`, `scripts/compose.sh`, `.env.example`, `.github/workflows/ci.yml`, `CONTRIBUTING.md`, `LICENSE`, `NOTICE`, and the 26 canonical merged `docs/` files).
    - Created working branch `prime` from `master`.
-   - Added `docs/EcoWatch Agent Guide.md`, `docs/RULES_COMPARISON_AND_MERGE_REPORT.md`, `docs/PROJECT_TRACKING.md`, `docs/files/` (excluding `.zip`), `docs/SignalWeave_Documentation/`, and `docs/EcoWatch_Full_Project_Documentation_v0.1/` (without duplicating `docs/` or copying any `.zip` archives), committed as `e5d5dd6`, and pushed to `origin/prime`.
+   - Added `docs/AGENT_GUIDE.md` (then named `docs/EcoWatch Agent Guide.md`), `docs/RULES_COMPARISON_AND_MERGE_REPORT.md`, `docs/PROJECT_TRACKING.md`, `docs/files/` (excluding `.zip`), `docs/SignalWeave_Documentation/` and `docs/EcoWatch_Full_Project_Documentation_v0.1/` (later moved to `docs/archive/`), without duplicating `docs/` or copying any `.zip` archives, committed as `e5d5dd6`, and pushed to `origin/prime`.
 3. **Branch protection & governance docs:**
    - Switched to `main`, ran `scripts/protect-branches.sh` to enforce squash-only merges, `delete_branch_on_merge=false`, and branch protections on `main` and `master`, then switched back to `prime`.
    - Created `docs/REVIEW_SUMMARY.md` (single review summary) and `docs/OWNER_RULES.md` (separate living record of owner rules), committed as `ccea786`, and pushed to `origin/prime`.
@@ -46,6 +46,14 @@
    - Dispatched research subagent to audit coverage across all 26 logical tables (`docs/08`), 58 functional requirements + 10 non-functional requirements (`docs/06`), and 11 logical modules (`docs/07`).
    - Created `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` mapping the entire backend into 3 concrete phases (`Phase 1: Core/Intake/Cases`, `Phase 2: ECII Correlation/Worker/Offline Sync`, `Phase 3: Environmental Intelligence/Prioritisation/Interventions/Verification`).
    - Added `ADR-026` to `docs/20_Technical_Decision_Records.md` and updated `docs/OWNER_RULES.md`, `docs/REVIEW_SUMMARY.md`, and `docs/PROJECT_TRACKING.md`.
+5. **Documentation hygiene (`Tazor` branch, on top of `prime`), docs only:**
+   - Renamed `docs/EcoWatch Agent Guide.md` to `docs/AGENT_GUIDE.md` (no spaces in filenames) and updated every reference.
+   - Added root `AGENTS.md` as the shared agent entry point, per `AGENT_GUIDE` §18, which previously described this but had nothing configured.
+   - Removed the false claim in `AGENT_GUIDE` §4 that PostgreSQL/PostGIS/backend build prompts exist; `ADR-025` excludes them and none were present.
+   - Moved `EcoWatch_Full_Project_Documentation_v0.1/` and `SignalWeave_Documentation/` to `docs/archive/` with `docs/archive/SUPERSEDED.md` explaining why they are not canonical.
+   - Added `docs/files/DECISION_ID_CROSSWALK.md`: three competing decision-ID schemes exist (`DR-*` unresolved, canonical `ADR-001`–`027`, archived `ADR-001`–`017` with collisions) plus two surfaced contradictions (public accounts, FR renumbering).
+   - Added `docs/PERMISSIONS_MATRIX.md` (Proposed, `ADR-027`): eight roles, deny-by-default grants, separation of duties, case/intervention status authority, and the four data-model additions Phase 1 needs.
+   - Regenerated `docs/PACKAGE_MANIFEST.json` (v1.1) with canonical / governance / supplementary / archive sections and entry points.
 
 ---
 
@@ -106,4 +114,7 @@
 | 1.0 | 2026-11-17 | pre-repo (`docs/PROJECT_TRACKING.md`) | Initial tracking doc created after reading all documentation folders. |
 | 1.1 | 2026-11-17 | `prime` (`e5d5dd6`) | Cloned `Fredprime/EcoWatch`, created `prime` branch, added non-zip docs and tracking doc, pushed to `origin/prime`. |
 | 1.2 | 2026-11-17 | `prime` (`ccea786`) | Applied `scripts/protect-branches.sh` on `main`/`master`; added `docs/REVIEW_SUMMARY.md`, `docs/OWNER_RULES.md`, and change log. |
-| 1.3 | 2026-11-17 | `prime` (current) | Documented 3-phase backend architecture (`docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`), added `ADR-026`, updated rules/review/tracking docs (zero code written). |
+| 1.3 | 2026-11-17 | `prime` (`aa973a9`) | Documented 3-phase backend architecture (`docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`), added `ADR-026`, updated rules/review/tracking docs (zero code written). |
+| 1.4 | 2026-11-17 | `Tazor` | Docs hygiene: agent guide renamed to `docs/AGENT_GUIDE.md`, root `AGENTS.md` added, superseded packages archived, decision-ID crosswalk added, permission matrix proposed (`ADR-027`), package manifest regenerated (v1.1). Zero application code. |
+| 1.5 | 2026-11-17 | `Tazor` | Backend plan v1.1: FR/NFR traceability table, `jobs` moved to Phase 1, organisation scoping + five schema additions (`ADR-028`), Phase 2 evaluation acceptance made achievable, missing verification criteria / raster pipeline / prioritisation method named, eight pre-Phase-1 decisions listed. Zero application code. |
+| 1.6 | 2026-11-17 | `Tazor` (`e537b8b`) | Opened PR #4 (`prime` -> `master`). Squash-merging PR #2 left `prime` conflicting, so `master` was merged back in: five doc conflicts resolved in favour of `prime` (master's copies were byte-identical to `aa973a9`, so `prime` was a strict superset), then the three duplicate paths the merge resurrected (`EcoWatch Agent Guide.md`, `SignalWeave_Documentation/`, `EcoWatch_Full_Project_Documentation_v0.1/`) were removed. PR is `MERGEABLE`, `mergeStateStatus: BLOCKED` pending owner review, all three CI checks pass. Nothing merged, zero application code. |

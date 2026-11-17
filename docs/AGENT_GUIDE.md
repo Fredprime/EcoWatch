@@ -38,9 +38,11 @@ Global rules are defaults, not permission to contradict project documentation. A
 
 The merged documentation package (EcoWatch\_Merged\_Documentation\_v1), in this order: 00 guide, 01 product overview, 02 merger strategy, 03 problem and use cases, 04 scope and roadmap, 05 roles and workflows, 06 functional requirements, 07 architecture, 08 data architecture, 09 evidence and provenance, 10 correlation, 11 environmental intelligence, 12 investigation, 13 prioritisation, 14 intervention, 15 interface, 16 security and governance, 17 testing, 18 deployment, 19 operations, 20 decisions, 21 risks, 22 change history, 23 backlog and acceptance, 24 glossary.
 
-Also read the correlation and offline collection design (document 22, v0.8) as a secondary source. Where it differs from the merged baseline, the merged baseline wins. Older packages (EcoWatch v0.1, SignalWeave PRD and technical document) are history, not instructions.
+Also read the correlation and offline collection design (`docs/files/22_Correlation_Engine_and_Offline_Collection.md`, v0.8) as a secondary source. Where it differs from the merged baseline, the merged baseline wins. Its `DR-*` decision IDs are unresolved — see `docs/files/DECISION_ID_CROSSWALK.md`.
 
-Task-specific build prompts exist for PostgreSQL, PostGIS and the backend. They sit under this guide.
+Archived packages (`docs/archive/`) are history, not instructions.
+
+There are no build prompts, task prompts or code-generation prompts in this repository (`ADR-025`). The backend plan is `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`; it is a design document, not a prompt.
 
 ## 5. Safety and integrity boundaries (never weakened)
 
@@ -162,7 +164,9 @@ Provide, in this order: what was built; how it works; decisions made and records
 
 ## 18. Making every agent read this guide
 
-Different agents load instructions from different places, and placing this file in one location does not configure the others. Keep this guide as the master. For each agent in use, configure its own instruction mechanism to point to, import or copy this file, and refresh those copies whenever the master changes. Commonly used locations include AGENTS.md at the repository root, CLAUDE.md for Claude Code, GEMINI.md for Gemini tools, a rules folder for Cursor, and a copilot instructions file for GitHub Copilot. Check each tool’s current documentation, because these locations change.
+Different agents load instructions from different places, and placing this file in one location does not configure the others. Keep this guide as the master.
+
+`AGENTS.md` at the repository root is the shared entry point: it summarises the hard boundaries and links here. Any other tool-specific location (`CLAUDE.md`, `GEMINI.md`, a Cursor rules folder, `.github/copilot-instructions.md`) should point at `AGENTS.md` and this guide rather than holding a copy that drifts. Check each tool's current documentation, because these locations change.
 
 Uploading this file to a chat conversation or project does not configure local coding agents.
 
