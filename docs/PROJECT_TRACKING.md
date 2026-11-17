@@ -1,11 +1,11 @@
 # EcoWatch Project Tracking
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** 2026-11-17  
 **Project:** EcoWatch (Merged Project — canonical baseline in `docs/`, incorporating SignalWeave as the Evidence Correlation and Incident Intelligence subsystem)  
 **Repository:** `Fredprime/EcoWatch`  
 **Working Branch:** `prime` (branched from `master`; never push directly to `main` or `master`)  
-**Status:** Documentation baseline, owner rules, review summary, and branch protections applied; awaiting owner review to begin Phase 1 `backend/`.
+**Status:** Three-phase backend architecture documented (`docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`); zero code written yet; merging docs through `prime -> master -> main`.
 
 ---
 
@@ -41,14 +41,18 @@
    - Added `docs/EcoWatch Agent Guide.md`, `docs/RULES_COMPARISON_AND_MERGE_REPORT.md`, `docs/PROJECT_TRACKING.md`, `docs/files/` (excluding `.zip`), `docs/SignalWeave_Documentation/`, and `docs/EcoWatch_Full_Project_Documentation_v0.1/` (without duplicating `docs/` or copying any `.zip` archives), committed as `e5d5dd6`, and pushed to `origin/prime`.
 3. **Branch protection & governance docs:**
    - Switched to `main`, ran `scripts/protect-branches.sh` to enforce squash-only merges, `delete_branch_on_merge=false`, and branch protections on `main` and `master`, then switched back to `prime`.
-   - Created `docs/REVIEW_SUMMARY.md` (single review summary) and `docs/OWNER_RULES.md` (separate living record of owner rules).
+   - Created `docs/REVIEW_SUMMARY.md` (single review summary) and `docs/OWNER_RULES.md` (separate living record of owner rules), committed as `ccea786`, and pushed to `origin/prime`.
+4. **Three-phase backend architecture blueprint (docs only, zero code):**
+   - Dispatched research subagent to audit coverage across all 26 logical tables (`docs/08`), 58 functional requirements + 10 non-functional requirements (`docs/06`), and 11 logical modules (`docs/07`).
+   - Created `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` mapping the entire backend into 3 concrete phases (`Phase 1: Core/Intake/Cases`, `Phase 2: ECII Correlation/Worker/Offline Sync`, `Phase 3: Environmental Intelligence/Prioritisation/Interventions/Verification`).
+   - Added `ADR-026` to `docs/20_Technical_Decision_Records.md` and updated `docs/OWNER_RULES.md`, `docs/REVIEW_SUMMARY.md`, and `docs/PROJECT_TRACKING.md`.
 
 ---
 
 ## 3. What We Are Doing Now
 
-- Documenting all actions, rules, and repository changes on branch `prime`.
-- Holding before writing `backend/` or `frontend/` application code until you review `docs/REVIEW_SUMMARY.md` and give the go-ahead for Phase 1.
+- Pushing the completed docs-only update on `prime` and merging the docs cleanly through `master` and `main` (without deleting any branch).
+- Holding before writing `backend/` or `frontend/` application code until review/confirmations are settled.
 
 ---
 
@@ -61,9 +65,9 @@
 - [ ] Confirm Phase 1 auth/role scope (anonymous + registered contributors vs. staff/admin roles) and local dev interfaces for object storage and auth.
 - [ ] Confirm client vs. server image handling rule (uploading untouched originals vs. optional client compression marked as derivative).
 
-### Step B — Phase 1: Unified Evidence Foundation (`backend/` Modular Monolith)
+### Step B — Backend Phase 1: Core Platform, Intake, Provenance & Case Foundation (`backend/` Modular Monolith)
 - [ ] Initialize `backend/` (`pyproject.toml`, FastAPI app skeleton, settings, Ruff/Pytest config matching `.github/workflows/ci.yml` and `Makefile`).
-- [ ] PostgreSQL + PostGIS schema and Alembic migrations (`users`, `organisations`, `memberships`, `observations`, `observation_versions`, `observation_sources`, `evidence_assets`, `asset_derivatives`, `cases`, `case_observations`, `audit_events`, `processing_jobs`).
+- [ ] PostgreSQL + PostGIS schema and Alembic migrations (11 tables: `users`, `organisations`, `memberships`, `observations`, `observation_versions`, `observation_sources`, `evidence_assets`, `asset_derivatives`, `cases`, `case_observations`, `audit_events`).
 - [ ] Identity, RBAC, separation of duties, and anonymous submission boundary.
 - [ ] Idempotent Observation intake API (`event_start_at`, `observed_at`, `submitted_at`, `received_at`, precision fields, coordinate/unit validation).
 - [ ] Evidence upload pipeline (content-type validation, size limits, server-generated storage keys, checksums, restricted original storage, separate derivative generation).
@@ -71,27 +75,25 @@
 - [ ] Immutable/append-only audit logging for consequential actions.
 - [ ] Unit, integration, security, and idempotency tests (temporary test records cleaned up after runs; `make lint` and `make test` green).
 
-### Step C — Phase 2: Evidence Correlation & Offline Hardening (ECII)
+### Step C — Backend Phase 2: Evidence Correlation, Async Worker & Offline Sync Hardening (ECII)
 - [ ] Bounded database-backed worker (`processing_jobs` with `FOR UPDATE SKIP LOCKED` row claiming, retries, bounded concurrency).
 - [ ] Bounded PostGIS/temporal/category-aware candidate retrieval (excluding previously rejected relationships).
 - [ ] Task-specific correlation scoring (semantic, spatial, temporal, context; missing-signal denominator exclusion; deterministic fallback; `evidence_relationships` with component scores & plain-language reason codes).
 - [ ] Source-dependency / duplicate-repost tracking.
 - [ ] Reviewer workflow (accept, reject, mark ambiguous; merge/split with audit; no naive transitive clustering).
+- [ ] Split-phase offline sync contract hardening (text/coords first, media second) and optional thin `notifications` / WebSocket invalidation.
 - [ ] Labelled evaluation harness measuring precision, recall, false links, missed links, and ambiguity.
-- [ ] Offline-first PWA queue & sync support (when `frontend/` begins: IndexedDB, client UUIDs, split-phase text-then-media upload, explicit sync states).
 
-### Step D — Phase 3: Environmental Intelligence
+### Step D — Backend Phase 3: Environmental Intelligence, Prioritisation, Interventions & Verification
 - [ ] Dataset catalogue & versioning (`datasets`, `dataset_versions` with licence, attribution, coverage, limitations).
-- [ ] Reproducible analysis runs (`analysis_runs`, `analysis_outputs` with CRS, quality masks, seasonality context).
-- [ ] Environmental entities and typed `environmental_relationships` (upstream/downstream, source-pathway-receptor hypotheses with uncertainty).
-
-### Step E — Phase 4: Prioritisation & Intervention Management
+- [ ] Reproducible analysis runs (`analysis_runs`, `analysis_outputs` with CRS, quality masks, seasonality context) and environmental entities/relationships (`environmental_entities`, `environmental_relationships`).
 - [ ] Transparent prioritisation factor records (`prioritisation_assessments`) with human rationale.
 - [ ] Case assignment, referral records, interventions (`interventions`, `intervention_milestones`), and baseline definitions.
+- [ ] Indicator definitions/measurements (`indicator_definitions`, `indicator_measurements`) and `verification_assessments` (separating activity completion, output, outcome, and `"recovery verified"`).
+- [ ] Governance export/correction/deletion endpoints (`FR-057`) and approved public summaries (`FR-058`).
 
-### Step F — Phase 5: Verification, UI & Release Readiness
-- [ ] Indicator definitions/measurements and `verification_assessments` (separating activity completion, output, outcome, and `"recovery verified"`).
-- [ ] Multi-role `frontend/` (React + TypeScript + MapLibre GL JS; Overview, Report/Collect, Evidence Intelligence, Cases, Monitoring/Analysis, Prioritisation, Interventions, Verification, Admin) following light/clean UI rules.
+### Step E — Frontend PWA & Release Readiness
+- [ ] Offline-first PWA queue (IndexedDB, client UUIDs, split-phase text-then-media upload, explicit sync states) and multi-role `frontend/` (React + TypeScript + MapLibre GL JS) following light/clean UI rules.
 - [ ] End-to-end, offline, performance, usability, backup/restore, and legal/governance release-gate verification before any live pilot.
 
 
@@ -103,4 +105,5 @@
 |---|---|---|---|
 | 1.0 | 2026-11-17 | pre-repo (`docs/PROJECT_TRACKING.md`) | Initial tracking doc created after reading all documentation folders. |
 | 1.1 | 2026-11-17 | `prime` (`e5d5dd6`) | Cloned `Fredprime/EcoWatch`, created `prime` branch, added non-zip docs and tracking doc, pushed to `origin/prime`. |
-| 1.2 | 2026-11-17 | `prime` (current) | Applied `scripts/protect-branches.sh` on `main`/`master`; added `docs/REVIEW_SUMMARY.md`, `docs/OWNER_RULES.md`, and change log. |
+| 1.2 | 2026-11-17 | `prime` (`ccea786`) | Applied `scripts/protect-branches.sh` on `main`/`master`; added `docs/REVIEW_SUMMARY.md`, `docs/OWNER_RULES.md`, and change log. |
+| 1.3 | 2026-11-17 | `prime` (current) | Documented 3-phase backend architecture (`docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`), added `ADR-026`, updated rules/review/tracking docs (zero code written). |

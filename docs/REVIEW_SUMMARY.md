@@ -1,6 +1,6 @@
 # EcoWatch Review Summary
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Last Updated:** 2026-11-17  
 **Repository:** `Fredprime/EcoWatch`  
 **Active Branch:** `prime`  
@@ -33,7 +33,8 @@ This is the single review document for checking progress, recent changes, and de
 | 2026-11-17 | Doc audit | Read all docs across `EcoWatch_Merged_Documentation_v1`, `EcoWatch Agent Guide.md`, `RULES_COMPARISON_AND_MERGE_REPORT.md`, `docs/files/`, `SignalWeave_Documentation/` (via research subagent), and `EcoWatch_Full_Project_Documentation_v0.1/` (via research subagent; confirmed identical to `docs/EcoWatch/`). | — |
 | 2026-11-17 | `e5d5dd6` (`prime`) | Cloned `Fredprime/EcoWatch`, created branch `prime` off `master`, added non-zip docs (`EcoWatch Agent Guide.md`, `RULES_COMPARISON_AND_MERGE_REPORT.md`, `PROJECT_TRACKING.md`, `files/`, `SignalWeave_Documentation/`, `EcoWatch_Full_Project_Documentation_v0.1/`), verified zero `.zip` files, and pushed to `origin/prime`. | 29 files in `docs/` |
 | 2026-11-17 | GitHub API (`main`) | Switched to `main`, ran `scripts/protect-branches.sh` to enforce merge settings and branch protections on `main` and `master`, and switched back to `prime`. | Remote GitHub repo settings |
-| 2026-11-17 | Docs update (`prime`) | Created single review doc (`docs/REVIEW_SUMMARY.md`), separate owner rules doc (`docs/OWNER_RULES.md`), and updated `docs/PROJECT_TRACKING.md` with full change history. | `docs/REVIEW_SUMMARY.md`, `docs/OWNER_RULES.md`, `docs/PROJECT_TRACKING.md` |
+| 2026-11-17 | `ccea786` (`prime`) | Created single review doc (`docs/REVIEW_SUMMARY.md`), separate owner rules doc (`docs/OWNER_RULES.md`), and updated `docs/PROJECT_TRACKING.md` with full change history. | `docs/REVIEW_SUMMARY.md`, `docs/OWNER_RULES.md`, `docs/PROJECT_TRACKING.md` |
+| 2026-11-17 | Docs update (`prime`) | Added three-phase backend architecture blueprint (`docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`) covering all 26 tables, 58 FRs, 10 NFRs, and 11 modules; added `ADR-026`; updated `OWNER_RULES.md`, `PROJECT_TRACKING.md`, and `REVIEW_SUMMARY.md` (zero code written). | `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`, `docs/20_Technical_Decision_Records.md`, `docs/OWNER_RULES.md`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md` |
 
 ---
 
@@ -55,6 +56,7 @@ Please confirm or adjust any of the following before we start Phase 1 (`backend/
 
 ## 4. Reference Map
 
+- **Three-Phase Backend Blueprint:** [BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md](BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md)
 - **Progress & Backlog:** [PROJECT_TRACKING.md](PROJECT_TRACKING.md)
 - **Owner Rules:** [OWNER_RULES.md](OWNER_RULES.md)
 - **Agent Guide:** [EcoWatch Agent Guide.md](EcoWatch%20Agent%20Guide.md)

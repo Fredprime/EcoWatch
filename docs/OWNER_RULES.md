@@ -22,8 +22,9 @@ This document records the explicit rules given by the project owner across sessi
 
 1. **Merged project:** Work on the merged EcoWatch project (`docs/00`–`24` canonical baseline, where SignalWeave is integrated as EcoWatch's Evidence Correlation and Incident Intelligence subsystem). Historical packages (`docs/EcoWatch_Full_Project_Documentation_v0.1/`, `docs/SignalWeave_Documentation/`) are reference only.
 2. **Build from scratch:** Nothing in the application (`backend/`, `frontend/`) has been built yet; build cleanly from scratch against the merged documentation and repository infrastructure baseline.
-3. **Documentation-before-code discipline:** Do not write application code until documentation review and explicit go-ahead are given.
-4. **Architectural decisions first:** Record significant architectural/stack decisions as ADRs in `docs/20_Technical_Decision_Records.md` before landing code.
+3. **Three-phase backend structure:** Structure the backend build into 3 phases (`Phase 1: Core/Intake/Cases`, `Phase 2: ECII Correlation/Worker/Offline Sync`, `Phase 3: Environmental Intelligence/Prioritisation/Interventions/Verification`) and document the architecture in `docs/` before writing code.
+4. **Documentation-before-code discipline:** Do not write application code until documentation review and explicit go-ahead are given; when tasked with docs-only work, modify and push only `docs/` files.
+5. **Architectural decisions first:** Record significant architectural/stack decisions as ADRs in `docs/20_Technical_Decision_Records.md` before landing code.
 
 ---
 
@@ -80,3 +81,4 @@ This document records the explicit rules given by the project owner across sessi
 | Date | Rule / Update | Source |
 |---|---|---|
 | 2026-11-17 | Initial compilation of owner rules: merged project scope, build from scratch, no `.zip` files in repo, work on `prime` branch (never push to `main`), maintain `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md`, and `docs/OWNER_RULES.md`, document every change, follow agent rules, dispatch work to subagents. | Owner conversation instructions |
+| 2026-11-17 | Added 3-phase backend architecture documentation rule: structure backend into 3 phases in `docs/` with no code created yet, push docs only to `prime`, merge docs to `master` and `main` (via PR/branch rules), and never delete any branch. | Owner conversation instructions |
