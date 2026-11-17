@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Always runs. The only check required by branch protection.
+  infra:
+    name: infra / compose + postgis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose file
+        run: docker compose config -q
+      - name: Start database
+        run: docker compose up -d --wait db
+      - name: PostGIS reachable
+        run: |
+          docker compose exec -T db psql -U "${POSTGRES_USER:-ecowatch}" -d "${POSTGRES_DB:-ecowatch}" \
+            -c "SELECT postgis_version();"
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs db
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  # Skips itself until backend/ exists.
+  backend:
+    name: backend / lint + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        run: echo "present=$([ -f backend/pyproject.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        if: steps.detect.outputs.present == 'true'
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install, lint, test
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          pip install -e "backend[dev]"
+          ruff check backend
+          pytest backend
+      - name: Not present yet
+        if: steps.detect.outputs.present == 'false'
+        run: echo "backend/pyproject.toml not found — skipping."
+
+  # Skips itself until frontend/ exists.
+  frontend:
+    name: frontend / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        run: echo "present=$([ -f frontend/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.present == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install, lint, build
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint --if-present
+          npm run build --if-present
+      - name: Not present yet
+        if: steps.detect.outputs.present == 'false'
+        run: echo "frontend/package.json not found — skipping."

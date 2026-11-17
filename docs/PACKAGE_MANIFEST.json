@@ -1,0 +1,38 @@
+{
+  "package": "EcoWatch Merged Project Documentation",
+  "version": "1.0",
+  "date": "2026-11-16",
+  "source_packages": [
+    "SignalWeave_Documentation.zip",
+    "EcoWatch_Full_Project_Documentation_v0.1.zip"
+  ],
+  "documents": [
+    "00_README_and_Documentation_Guide.md",
+    "01_Product_Overview_and_Vision.md",
+    "02_Merger_Strategy_and_Product_Boundaries.md",
+    "03_Environmental_Problem_and_Use_Cases.md",
+    "04_Product_Scope_and_Roadmap.md",
+    "05_User_Roles_and_Workflows.md",
+    "06_Functional_Requirements.md",
+    "07_System_Architecture.md",
+    "08_Data_and_Database_Architecture.md",
+    "09_Evidence_Collection_and_Provenance.md",
+    "10_Evidence_Correlation_and_Incident_Intelligence.md",
+    "11_Environmental_Intelligence_and_AI.md",
+    "12_Investigation_and_Historical_Reconstruction.md",
+    "13_Prioritisation_and_Decision_Support.md",
+    "14_Intervention_and_Recovery_Management.md",
+    "15_User_Interface_and_Experience.md",
+    "16_Security_Privacy_and_Governance.md",
+    "17_Testing_and_Validation.md",
+    "18_Deployment_and_Infrastructure.md",
+    "19_Operations_and_Maintenance.md",
+    "20_Technical_Decision_Records.md",
+    "21_Risks_Assumptions_and_Open_Questions.md",
+    "22_Change_History_and_References.md",
+    "23_Implementation_Backlog_and_Acceptance.md",
+    "24_Glossary_and_Domain_Language.md",
+    "START_HERE.md"
+  ],
+  "status": "Merged design baseline; not implementation evidence"
+}

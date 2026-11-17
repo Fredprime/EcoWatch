@@ -1,0 +1,8 @@
+# Keep LF in the repo regardless of contributor OS; Windows teammates lose nothing.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.pdf binary
+*.zip binary
