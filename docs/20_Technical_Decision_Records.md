@@ -35,6 +35,7 @@ Approved = explicitly selected. Proposed = recommended. Deferred = postponed. Op
 | ADR-023 | Supabase evaluation | Deferred | Separate platform evaluation. |
 | ADR-024 | Firebase evaluation | Deferred | Separate platform evaluation. |
 | ADR-025 | No build/master prompts in this documentation package | Approved | Retained documentation instruction. |
+| ADR-026 | Three-phase backend build structure and modular monolith layout | Proposed | Organises backend delivery into Phase 1 (Core/Intake/Cases), Phase 2 (ECII Correlation/Worker/Offline Sync), and Phase 3 (Intelligence/Prioritisation/Interventions/Verification) in `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`. |
 
 ## 3. Required ADR template
 
