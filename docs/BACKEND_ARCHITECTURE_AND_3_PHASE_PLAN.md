@@ -9,17 +9,17 @@
 
 ## 1. Purpose and Architectural Principles
 
-This document translates EcoWatch's merged baseline (`docs/00`–`24`, `docs/files/22_Correlation_Engine_and_Offline_Collection.md`, `docs/EcoWatch Agent Guide.md`) and repository infrastructure (`compose.yaml`, `Makefile`, `.github/workflows/ci.yml`, `CONTRIBUTING.md`) into a concrete, **three-phase backend architecture**.
+This document translates EcoWatch's merged baseline (`docs/00`–`24`, `docs/files/22_Correlation_Engine_and_Offline_Collection.md`, `docs/AGENT_GUIDE.md`) and repository infrastructure (`compose.yaml`, `Makefile`, `.github/workflows/ci.yml`, `CONTRIBUTING.md`) into a concrete, **three-phase backend architecture**.
 
 ### Core Architectural Decisions
 1. **Modular Monolith First (`ADR-013`, `docs/07`):** One deployable FastAPI service (`backend/`) backed by one PostgreSQL 16 + PostGIS 3.4 database (`compose.yaml`). Domain modules communicate via explicit service/interface calls inside one process and share ACID transactions without premature microservices, Redis, Kafka, or Kubernetes.
 2. **Database-Backed Asynchronous Processing (`docs/07` §4, `docs/files/22` §13):** Slow or heavy tasks (media scanning/derivatives, ECII semantic embeddings and correlation, dataset imports, spatial/raster analysis) execute asynchronously via a `processing_jobs` table (`FOR UPDATE SKIP LOCKED` row claiming) in a bounded in-app worker loop. API intake returns durable receipt immediately (`NFR-001`).
-3. **Provider Interfaces for Open Choices (`docs/18`, `docs/EcoWatch Agent Guide.md` §7):** Authentication/identity verification and object storage (evidence originals and derivatives) sit behind narrow Python protocols/interfaces so local development (local disk + local token/session auth) swaps cleanly to chosen cloud/object-storage/IdP providers later.
-4. **Naming and Data Boundary (`docs/EcoWatch Agent Guide.md` §8):**
+3. **Provider Interfaces for Open Choices (`docs/18`, `docs/AGENT_GUIDE.md` §7):** Authentication/identity verification and object storage (evidence originals and derivatives) sit behind narrow Python protocols/interfaces so local development (local disk + local token/session auth) swaps cleanly to chosen cloud/object-storage/IdP providers later.
+4. **Naming and Data Boundary (`docs/AGENT_GUIDE.md` §8):**
    - PostgreSQL tables and columns: `lower snake_case`.
    - Python variables/attributes, configuration keys, and JSON API request/response payloads: `camelCase` (mapped cleanly at the Pydantic schema boundary).
    - Python classes/types: `PascalCase`; constants: `UPPER_SNAKE_CASE`.
-5. **Non-Negotiable Safety & Scientific Integrity Guardrails (`docs/EcoWatch Agent Guide.md` §5, `CONTRIBUTING.md` §7):**
+5. **Non-Negotiable Safety & Scientific Integrity Guardrails (`docs/AGENT_GUIDE.md` §5, `CONTRIBUTING.md` §7):**
    - Observations, evidence assets, and cases remain separate records; one observation can link to multiple cases (`case_observations`).
    - Four timestamps (`event_start_at`, `observed_at`, `submitted_at`, `received_at`) are stored separately with explicit precision; missing values are never fabricated.
    - Original uploaded evidence files are preserved untouched under restricted access; EXIF-stripped previews and analysis outputs are stored separately (`asset_derivatives`).
