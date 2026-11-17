@@ -1,11 +1,11 @@
 # EcoWatch Project Tracking
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Date:** 2026-11-17  
 **Project:** EcoWatch (Merged Project — canonical baseline in `docs/`, incorporating SignalWeave as the Evidence Correlation and Incident Intelligence subsystem)  
 **Repository:** `Fredprime/EcoWatch`  
 **Working Branch:** `prime` (branched from `master`; never push directly to `main` or `master`)  
-**Status:** Documentation baseline consolidated on branch `prime`; infrastructure baseline present; zero application code written yet.
+**Status:** Documentation baseline, owner rules, review summary, and branch protections applied; awaiting owner review to begin Phase 1 `backend/`.
 
 ---
 
@@ -38,14 +38,17 @@
 2. **Repository & branch setup (`Fredprime/EcoWatch`):**
    - Cloned `Fredprime/EcoWatch` (baseline commit `88ca75d` on `master`, which already includes `compose.yaml` with PostGIS 16-3.4, `Makefile`, `scripts/compose.sh`, `.env.example`, `.github/workflows/ci.yml`, `CONTRIBUTING.md`, `LICENSE`, `NOTICE`, and the 26 canonical merged `docs/` files).
    - Created working branch `prime` from `master`.
-   - Added `docs/EcoWatch Agent Guide.md`, `docs/RULES_COMPARISON_AND_MERGE_REPORT.md`, `docs/PROJECT_TRACKING.md`, `docs/files/` (excluding `.zip`), `docs/SignalWeave_Documentation/`, and `docs/EcoWatch_Full_Project_Documentation_v0.1/` (without duplicating `docs/` or copying any `.zip` archives).
+   - Added `docs/EcoWatch Agent Guide.md`, `docs/RULES_COMPARISON_AND_MERGE_REPORT.md`, `docs/PROJECT_TRACKING.md`, `docs/files/` (excluding `.zip`), `docs/SignalWeave_Documentation/`, and `docs/EcoWatch_Full_Project_Documentation_v0.1/` (without duplicating `docs/` or copying any `.zip` archives), committed as `e5d5dd6`, and pushed to `origin/prime`.
+3. **Branch protection & governance docs:**
+   - Switched to `main`, ran `scripts/protect-branches.sh` to enforce squash-only merges, `delete_branch_on_merge=false`, and branch protections on `main` and `master`, then switched back to `prime`.
+   - Created `docs/REVIEW_SUMMARY.md` (single review summary) and `docs/OWNER_RULES.md` (separate living record of owner rules).
 
 ---
 
 ## 3. What We Are Doing Now
 
-- Reviewing and pushing the consolidated documentation baseline on branch `prime`.
-- Holding before writing `backend/` or `frontend/` application code until review is complete and pre-build confirmations are settled.
+- Documenting all actions, rules, and repository changes on branch `prime`.
+- Holding before writing `backend/` or `frontend/` application code until you review `docs/REVIEW_SUMMARY.md` and give the go-ahead for Phase 1.
 
 ---
 
@@ -90,3 +93,14 @@
 - [ ] Indicator definitions/measurements and `verification_assessments` (separating activity completion, output, outcome, and `"recovery verified"`).
 - [ ] Multi-role `frontend/` (React + TypeScript + MapLibre GL JS; Overview, Report/Collect, Evidence Intelligence, Cases, Monitoring/Analysis, Prioritisation, Interventions, Verification, Admin) following light/clean UI rules.
 - [ ] End-to-end, offline, performance, usability, backup/restore, and legal/governance release-gate verification before any live pilot.
+
+
+---
+
+## 5. Change Log
+
+| Version | Date | Branch / Commit | Summary |
+|---|---|---|---|
+| 1.0 | 2026-11-17 | pre-repo (`docs/PROJECT_TRACKING.md`) | Initial tracking doc created after reading all documentation folders. |
+| 1.1 | 2026-11-17 | `prime` (`e5d5dd6`) | Cloned `Fredprime/EcoWatch`, created `prime` branch, added non-zip docs and tracking doc, pushed to `origin/prime`. |
+| 1.2 | 2026-11-17 | `prime` (current) | Applied `scripts/protect-branches.sh` on `main`/`master`; added `docs/REVIEW_SUMMARY.md`, `docs/OWNER_RULES.md`, and change log. |
