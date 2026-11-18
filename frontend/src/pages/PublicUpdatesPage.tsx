@@ -20,8 +20,8 @@ export function PublicUpdatesPage() {
       <header className="public-page-header">
         <h1>Public updates</h1>
         <p>
-          Approved public case summaries. Internal notes, contributor identities and exact locations are
-          not included. A recorded status is a human-reviewed record, not an automated finding.
+          Approved case summaries only. No internal notes, identities or exact locations. A recorded status
+          is a human-reviewed record, not an automated finding.
         </p>
       </header>
 

@@ -37,10 +37,7 @@ export function TrackPage() {
     <div className="public-page public-narrow">
       <header className="public-page-header">
         <h1>Track a report</h1>
-        <p>
-          Enter the tracking code from your submission receipt. The lookup returns only server receipt
-          details — no identity, exact location, or other reports.
-        </p>
+        <p>Enter the code from your receipt. You’ll see receipt details only — no identity or exact location.</p>
       </header>
 
       <form className="card form-grid" onSubmit={(event) => void submit(event)}>

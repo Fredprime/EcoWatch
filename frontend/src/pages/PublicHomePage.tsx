@@ -14,9 +14,8 @@ export function PublicHomePage() {
         <p className="public-eyebrow">Environmental observations, handled with care</p>
         <h1>Report what you saw. Follow what happens next.</h1>
         <p className="public-lede">
-          EcoWatch keeps an observation with its reported time and location precision, stores contributor
-          identity separately, and helps authorised reviewers examine evidence — without treating a report
-          as proof.
+          Report without an account. Your wording is kept as given, contact details are stored separately,
+          and authorised reviewers examine the evidence — a report is never treated as proof.
         </p>
         <div className="public-hero-actions">
           <Link to="/report" className="btn">Submit an observation</Link>
@@ -39,26 +38,17 @@ export function PublicHomePage() {
         <div className="public-cards">
           <article className="public-card">
             <h3>Report</h3>
-            <p>
-              Send an observation without an account. Describe what you observed and how certain you are
-              about the time and place.
-            </p>
+            <p>No account needed. Describe what you saw and how sure you are about when and where.</p>
             <Link to="/report">Open the report form</Link>
           </article>
           <article className="public-card">
             <h3>Track</h3>
-            <p>
-              If you were given a tracking code, check the server receipt for your report. No identity or
-              exact location is returned.
-            </p>
+            <p>Use your tracking code to confirm the server receipt. No identity or exact location is returned.</p>
             <Link to="/track">Look up a receipt</Link>
           </article>
           <article className="public-card">
             <h3>Read public updates</h3>
-            <p>
-              Approved, redacted case summaries show recorded status and public context. They are reviewed
-              records, not automated findings.
-            </p>
+            <p>Approved, redacted case summaries — reviewed records, not automated findings.</p>
             <Link to="/updates">See public updates</Link>
           </article>
         </div>

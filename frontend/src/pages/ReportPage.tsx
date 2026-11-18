@@ -121,48 +121,47 @@ export function ReportPage() {
     <div className="public-page public-narrow">
       <header className="public-page-header">
         <h1>Report an observation</h1>
-        <p>
-          No account is needed. Describe what you observed and how certain you are about the time and place;
-          uncertainty is explicit rather than filled in for you.
-        </p>
+        <p>No account is needed. Tell us what you saw and how certain you are about when and where.</p>
       </header>
 
-      <div className="card notice notice-warn" role="note">
-        <strong>Privacy and safety:</strong> Share only what is safe to share. Avoid identifying people unnecessarily. Sensitive locations may be restricted or generalised in later views. Submission goes directly to the server; there is no local queue.
+      <div className="notice notice-warn" role="note">
+        <strong>Before you submit:</strong> Share only what is safe to share. Sensitive locations may be
+        generalised in later views. Nothing is stored on this device — submission goes straight to the server.
       </div>
 
-      <div className="card">
-        <h2>Submission state</h2>
-        <p role="status">
-          <strong>
-            {submitState === 'draft' && 'Draft — not submitted.'}
-            {submitState === 'submitting' && 'Submitting…'}
-            {submitState === 'received' && 'Received by server.'}
-            {submitState === 'error' && 'Submission failed.'}
-          </strong>
-        </p>
-        {submitState === 'submitting' && <p className="muted">Waiting for a durable server receipt.</p>}
-        {submitState === 'error' && submitError && <p className="notice notice-danger" role="alert">{submitError}</p>}
-        {submitState === 'error' && (
-          <button type="button" className="btn btn-secondary" onClick={() => void submitForm()}>
-            Retry with the same idempotency key
-          </button>
-        )}
-        {receipt && (
-          <div>
-            <p>
-              <strong>Tracking reference:</strong>{' '}
-              {receipt.trackingCode ?? 'No reference was returned for this replay.'}
-            </p>
-            <p className="muted">
-              Observation {receipt.observationId} · server receipt {formatTime(receipt.receivedAt)} ·
-              version {receipt.currentVersion} · time precision {receipt.timePrecision} ·
-              location precision {receipt.locationPrecision}
-              {receipt.idempotentReplay ? ' · server receipt already recorded' : ''}
-            </p>
-          </div>
-        )}
-      </div>
+      {submitState !== 'draft' && (
+        <div className="card">
+          <h2>Submission state</h2>
+          <p role="status">
+            <strong>
+              {submitState === 'submitting' && 'Submitting…'}
+              {submitState === 'received' && 'Received by server.'}
+              {submitState === 'error' && 'Submission failed.'}
+            </strong>
+          </p>
+          {submitState === 'submitting' && <p className="muted">Waiting for a durable server receipt.</p>}
+          {submitState === 'error' && submitError && <p className="notice notice-danger" role="alert">{submitError}</p>}
+          {submitState === 'error' && (
+            <button type="button" className="btn btn-secondary" onClick={() => void submitForm()}>
+              Retry with the same idempotency key
+            </button>
+          )}
+          {receipt && (
+            <div>
+              <p>
+                <strong>Tracking reference:</strong>{' '}
+                {receipt.trackingCode ?? 'No reference was returned for this replay.'}
+              </p>
+              <p className="muted">
+                Observation {receipt.observationId} · server receipt {formatTime(receipt.receivedAt)} ·
+                version {receipt.currentVersion} · time precision {receipt.timePrecision} ·
+                location precision {receipt.locationPrecision}
+                {receipt.idempotentReplay ? ' · server receipt already recorded' : ''}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <form className="card form-grid" onSubmit={onSubmit} noValidate>
         <h2>Observation details</h2>
@@ -208,7 +207,7 @@ export function ReportPage() {
             <option value="not_sure">Not sure</option>
           </select>
           {errors.obsType && <p id="obs-type-error" className="field-error">{errors.obsType}</p>}
-          <p id="obs-type-hint" className="field-hint">Broad categories help routing; contributors can be unsure.</p>
+          <p id="obs-type-hint" className="field-hint">Choose the closest category. “Not sure” is fine.</p>
         </div>
 
         <div className="field">
@@ -225,7 +224,7 @@ export function ReportPage() {
             aria-describedby={errors.description ? 'description-error description-hint' : 'description-hint'}
           />
           {errors.description && <p id="description-error" className="field-error">{errors.description}</p>}
-          <p id="description-hint" className="field-hint">Provide as much detail as is safe and known. Uncertainty is acceptable.</p>
+          <p id="description-hint" className="field-hint">Plain language is fine. Include only what is safe and known.</p>
         </div>
 
         <div className="grid grid-2">
@@ -240,7 +239,7 @@ export function ReportPage() {
               placeholder="e.g. near bridge, community name, or an approximate area"
               aria-describedby="location-hint"
             />
-            <p id="location-hint" className="field-hint">Use a non-map description if coordinates are unavailable or unsafe to share.</p>
+            <p id="location-hint" className="field-hint">An area description is enough; exact coordinates are not needed.</p>
           </div>
           <div className="field">
             <label htmlFor="location-precision">Location precision</label>
@@ -270,7 +269,7 @@ export function ReportPage() {
               placeholder="Exact date/time, approximate period, or unknown"
               aria-describedby="time-hint"
             />
-            <p id="time-hint" className="field-hint">Recorded as reported wording. Event, observed, submitted and server receipt times stay separate.</p>
+            <p id="time-hint" className="field-hint">Approximate or unknown is fine. Your wording is kept as given.</p>
           </div>
           <div className="field">
             <label htmlFor="time-precision">Time precision</label>
@@ -298,7 +297,7 @@ export function ReportPage() {
         </div>
 
         <p className="muted">
-          Supporting media upload is not available here. Original files must be preserved with provenance before upload is offered.
+          File uploads are not available here. Originals must be preserved with provenance before upload is offered.
         </p>
 
         <div>
@@ -309,8 +308,7 @@ export function ReportPage() {
       </form>
 
       <p className="muted public-after-form">
-        After a successful submission you will see a tracking reference. Keep it private so you can look up
-        the server receipt later.
+        After submitting, keep the tracking reference private — you’ll use it to look up the server receipt.
       </p>
     </div>
   );
