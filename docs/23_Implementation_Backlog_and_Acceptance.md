@@ -1,6 +1,8 @@
 # 23 — Implementation Backlog and Acceptance
 
-**Status:** Phase 1 backend code implemented (`backend/`); Phases 2–5 and release readiness remain planned/unimplemented.
+**Status:** Phase 1 backend code implemented (`backend/`); a Phase 2 correlation slice and Phase 3 backend modules are present. `frontend/` has core backend read/intake integration; the remaining workspaces, offline PWA and release readiness remain planned/unimplemented.
+
+**Frontend slice (2026-11-18):** auth (`login`, `auth/me`), health, observation intake and list, case list/detail/timeline, and correlation suggestions with human decisions use hand-written typed DTOs, one `fetch` wrapper and a memory-only bearer token (reload requires signing in again; 401 clears auth) through a same-origin Vite dev proxy to `127.0.0.1:8000` (no backend CORS middleware). Analysis, Monitoring, Prioritisation, Interventions, Verification and Administration remain shells without API integration; no fake receipts, queued/demo state or example rows remain in product source. Logout and 401 clearing are client-only: the stateless HMAC token is not server-side revocable and stays valid until expiry (default 12h), although deactivated users are rejected on every request; immediate revocation is deferred. A correlation score is a ranking signal only; `token_similarity` is the labelled fallback, not a validated semantic model.
 
 ## 1. Before coding: pilot definition
 
@@ -16,7 +18,7 @@ Deliverables:
 
 Acceptance: environmental specialist and project owner review the problem, indicators, source suitability and limits. The pilot is bounded and operationally credible.
 
-## 2. Phase 1 — Unified evidence foundation (`backend/` implemented; live DB/lint checks in progress)
+## 2. Phase 1 — Unified evidence foundation (`backend/` implemented; verification recorded in `docs/REVIEW_SUMMARY.md`)
 
 Backlog:
 - [x] Repository and development environment (`backend/pyproject.toml`, `compose.yaml`, `Makefile`).
@@ -38,11 +40,11 @@ Acceptance:
 
 ## 3. Phase 2 — Evidence correlation
 
-**Status (2026-11-18):** implemented on `phase2-correlation` — category-aware bounded retrieval with `ST_DWithin` on PostgreSQL, scoring with missing-signal handling, `evidence_relationships` with canonical-pair constraints and a persisted tie flag, detector differentiation (`source_dependency`, `duplicate`, `same_event`), reviewer accept/reject/ambiguous/reopen with audit, provisional clusters, and background scanning. Not built: semantic similarity, `cross_case`, promote/merge/split, and the scored evaluation run. Per-item status: `docs/PHASE2_TODO.md`; what exists and its limits: `docs/PHASE2_CORRELATION.md`.
+**Status (2026-11-18):** implemented on `phase2-correlation` — category-aware bounded retrieval with `ST_DWithin` on PostgreSQL, scoring with missing-signal handling, `evidence_relationships` with canonical-pair constraints and a persisted tie flag, detector differentiation (`source_dependency`, `duplicate`, `same_event`), reviewer accept/reject/ambiguous/reopen with audit, provisional clusters, and background scanning. Not built: a validated semantic model (pgvector hashed-word vectors only narrow the candidate set and `token_similarity` remains the labelled fallback), `cross_case`, promote/merge/split, and the scored evaluation run. Per-item status: `docs/PHASE2_TODO.md`; what exists and its limits: `docs/PHASE2_CORRELATION.md`.
 
 Backlog:
 - Candidate retrieval. — *built, distance filtered in Python rather than `ST_DWithin` (upgrade tracked as T4b)*
-- Semantic baseline model or deterministic fallback. — *deterministic keyword/token fallback built; model not built, gated on the pgvector decision*
+- Semantic baseline model or deterministic fallback. — *deterministic `token_similarity` fallback built; pgvector hashed-word vectors narrow the candidate set (ADR-030); no validated semantic model*
 - Spatial and temporal compatibility signals. — *built*
 - Source-dependency checks. — *built for explicitly recorded `source_ref`; no inference of shared origin*
 - Relationship types and explanations. — *`same_event` only; duplicate / repost / cross-case not differentiated yet*

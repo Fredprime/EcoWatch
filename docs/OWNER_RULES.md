@@ -1,7 +1,7 @@
 # EcoWatch Owner Rules
 
-**Version:** 1.0  
-**Last Updated:** 2026-11-17  
+**Version:** 1.1  
+**Last Updated:** 2026-11-18  
 **Maintainer / Owner:** Fredprime  
 **Scope:** Explicit working rules given by the project owner for all agents and contributors working on EcoWatch.
 
@@ -26,6 +26,8 @@ This document records the explicit rules given by the project owner across sessi
 4. **Documentation-before-code discipline:** Do not write application code until documentation review and explicit go-ahead are given; when tasked with docs-only work, modify and push only `docs/` files.
 5. **Architectural decisions first:** Record significant architectural/stack decisions as ADRs in `docs/20_Technical_Decision_Records.md` before landing code.
 
+> **Note (2026-11-18):** Item 2 records the original initial-build direction. The "nothing has been built yet" wording is historical, not the current state: the Phase 1 backend, a Phase 2 correlation slice, Phase 3 backend modules and a frontend core read/intake integration now exist. This note does not change the rule.
+
 ---
 
 ## 3. Repository, Git, and Branching Rules
@@ -37,6 +39,7 @@ This document records the explicit rules given by the project owner across sessi
    - `master` is the integration branch (PR target; `infra / compose + postgis` CI + approval required).
    - Keep the GitHub protections applied via `scripts/protect-branches.sh` active.
 4. **Work on branch `prime`:** Make changes on branch `prime` (branched from `master`), review, and push to `prime` (then PR into `master` when ready for integration).
+   - **Task-specific override (2026-11-18):** The current frontend/backend integration task was explicitly directed to `feat/SandyFrontend`, with `master` merged into that branch (merge commit `290f386`) rather than rebasing. Per §1 this current-task instruction takes precedence for this task only; the standing rule above is unchanged. See the §7 change log.
 5. **Preserve branches:** Do not delete branches after merging unless the owner explicitly asks (`delete_branch_on_merge=false`).
 6. **Commit format:** Use conventional commits `type(scope): summary` (imperative, <= 72 chars) per `CONTRIBUTING.md`.
 
@@ -82,3 +85,4 @@ This document records the explicit rules given by the project owner across sessi
 |---|---|---|
 | 2026-11-17 | Initial compilation of owner rules: merged project scope, build from scratch, no `.zip` files in repo, work on `prime` branch (never push to `main`), maintain `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md`, and `docs/OWNER_RULES.md`, document every change, follow agent rules, dispatch work to subagents. | Owner conversation instructions |
 | 2026-11-17 | Added 3-phase backend architecture documentation rule: structure backend into 3 phases in `docs/` with no code created yet, push docs only to `prime`, merge docs to `master` and `main` (via PR/branch rules), and never delete any branch. | Owner conversation instructions |
+| 2026-11-18 | Current integration task runs on `feat/SandyFrontend`; the owner explicitly chose merging `master` into the branch (merge commit `290f386`) rather than rebasing. This current-task instruction overrides the standing "work on `prime`" rule in §3 for this task only; the rule itself is unchanged. A note near §2 records that the "nothing built yet" wording is historical initial-build direction, not current state. | Owner instruction for the current task |

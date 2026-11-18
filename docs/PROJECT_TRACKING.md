@@ -1,17 +1,17 @@
 # EcoWatch Project Tracking
 
-**Version:** 1.5  
+**Version:** 1.6  
 **Date:** 2026-11-18  
 **Project:** EcoWatch (Merged Project — canonical baseline in `docs/`, incorporating SignalWeave as the Evidence Correlation and Incident Intelligence subsystem)  
 **Repository:** `Fredprime/EcoWatch`  
-**Working Branch:** `prime` (branched from `master`; never push directly to `main` or `master`). Phase 2 pgvector work is on `Tazor` pending PR into `prime`.  
-**Status:** Phase 1 backend plus Phase 2 evidence correlation (incl. approved pgvector storage and semantic candidate prefilter) implemented in `camelCase` (Python/JSON) mapped to `lower snake_case` PostgreSQL/PostGIS schema. Ruff clean; `pytest` 106 passed against live PostgreSQL 16 + PostGIS 3.7 + pgvector, 102 passed / 4 skipped without a live DB. Database image is built locally from the root `Dockerfile`.
+**Working Branch:** `feat/SandyFrontend` for the current frontend/backend integration task. The owner chose merging `master` into the branch (merge commit `290f386`) rather than rebasing; this task-specific instruction overrides the standing `prime` rule in `docs/OWNER_RULES.md` §3 for this task only. `prime` remains the general working branch and `Tazor` held the Phase 2 pgvector work pending PR into `prime`. Never push directly to `main` or `master`.  
+**Status:** Phase 1 backend plus Phase 2 evidence correlation (incl. approved pgvector storage and semantic candidate prefilter) implemented in `camelCase` (Python/JSON) mapped to `lower snake_case` PostgreSQL/PostGIS schema; Phase 3 backend modules are present. Ruff clean; `pytest` 110 passed against live PostgreSQL 16 + PostGIS 3.7 + pgvector (worker stopped), 106 passed / 4 skipped without a live DB. Database image is built locally from the root `Dockerfile`. `frontend/` is integrated with the backend for auth, health, observation intake/list, case list/detail/timeline and correlation suggestions/decisions; the other workspaces remain shells and the offline PWA is absent. Nothing is validated, certified or live.
 
 ---
 
 ## 1. Working Rules and Git Workflow
 
-- **Branching rule:** Work on branch `prime` (branched from `master`), review changes, and push to `prime`. Never commit or push directly to `main` (sacred release branch) or `master` (integration branch receiving reviewed PRs). Do not delete branches after merging unless explicitly asked by the maintainer.
+- **Branching rule:** Work on branch `prime` (branched from `master`), review changes, and push to `prime`. Never commit or push directly to `main` (sacred release branch) or `master` (integration branch receiving reviewed PRs). Do not delete branches after merging unless explicitly asked by the maintainer. For the current task the owner explicitly directed work on `feat/SandyFrontend`, merging `master` into it (merge `290f386`) rather than rebasing; that dated override applies to this task only and is recorded in `docs/OWNER_RULES.md` §7. This standing rule is unchanged.
 - **Commit style:** Conventional commits `type(scope): summary` (imperative, <= 72 chars), per `CONTRIBUTING.md`.
 - **Documentation precedence:**
   1. Explicit owner instructions for the current task.
@@ -99,8 +99,12 @@
 - [ ] Governance export/correction/deletion endpoints (`FR-057`) and approved public summaries (`FR-058`).
 
 ### Step E — Frontend PWA & Release Readiness
-- [ ] Offline-first PWA queue (IndexedDB, client UUIDs, split-phase text-then-media upload, explicit sync states) and multi-role `frontend/` (React + TypeScript + MapLibre GL JS) following light/clean UI rules.
-- [ ] End-to-end, offline, performance, usability, backup/restore, and legal/governance release-gate verification before any live pilot.
+- [x] Multi-role `frontend/` shell (React + TypeScript + Vite, router-based workspace navigation) following the light/clean UI rules.
+- [x] Core read + intake integration with the backend: auth (`login`, `auth/me`), health, observations (intake + list), cases (list/detail/timeline) and correlation suggestions with human decisions. Hand-written typed DTOs and a single `fetch` wrapper (no React Query/Axios/Zod); memory-only bearer token (reload requires signing in again; 401 clears auth); same-origin Vite dev proxy to `127.0.0.1:8000` with no backend CORS middleware added.
+- [x] Removal of fake receipts, queued-local/demo state, hardcoded example observations/cases/suggestions and example monitoring/prioritisation rows; no seeded/sample/demo data remains in product source.
+- [ ] Offline-first PWA queue (IndexedDB, client UUIDs, split-phase text-then-media upload, explicit sync states). Not implemented.
+- [ ] MapLibre GL JS rendering and API integration for the Analysis, Monitoring, Prioritisation, Interventions, Verification and Administration workspaces, which remain honest shells with no API integration.
+- [ ] End-to-end, offline, performance, usability, backup/restore, and legal/governance release-gate verification before any live pilot. Manual end-to-end checks through the Vite proxy covered the integrated read/intake flows and auth/permission errors; this is not release-gate sign-off.
 
 
 ---
@@ -131,3 +135,4 @@
 | 2.8 | 2026-11-18 | `feat/correlation-rescan-triggers` | Implemented the approved re-scan triggers: observation corrections and evidence uploads enqueue `correlation.scan` in the same transaction as the change. Added two integration tests. Ruff clean; 96 passed with PostGIS, 93 passed / 3 skipped without. |
 | 2.9 | 2026-11-18 | `test/correlation-evaluation-smoke` | Ran the evaluation harness under the owner's smoke-test-only route with temporary synthetic fixtures. Counts assert scoring-to-evaluation wiring only; no accuracy claim. Ruff clean; 97 passed with PostGIS, 94 passed / 3 skipped without. |
 | 2.10 | 2026-11-18 | `Tazor` | Implemented ADR-030 pgvector support: migration `0005_phase2_embeddings` (`correlation_embeddings` with `vector(384)`, HNSW cosine index on PostgreSQL, JSON fallback on SQLite, unique per observation/model/input hash, skip-on-unchanged); deterministic hashed-word vectors (`hashed-words-v1`, not a semantic model — ADR-019 open, no accuracy claim); `semantic_similarity` uses vector cosine with `token_similarity` fallback; nearest-vector query narrows the org/time/space candidate set. Combined DB image from new root `Dockerfile` (pgvector base + PostGIS 3.7); compose and both CI DB jobs use it and prove both extensions. Ruff clean; 106 passed with live PostgreSQL, 102 passed / 4 skipped without. |
+| 2.11 | 2026-11-18 | `feat/SandyFrontend` (merge `290f386`) | Owner chose merging `master` into the branch rather than rebasing (task-specific override of the standing `prime` rule, recorded in `OWNER_RULES.md` §7). Frontend integrated with the backend for auth, health, observation intake/list, case list/detail/timeline and correlation suggestions/decisions via hand-written typed DTOs, a single `fetch` wrapper, a memory-only bearer token and a same-origin Vite dev proxy (no CORS middleware added). Fake receipts, queued/demo state and example rows removed. Vite 6.2.7 -> 6.4.6 via lockfile only; `npm audit` 0; no new runtime dependencies. Security: DB-backed login rate limiting (5 attempts / 300 s window, 900 s lockout, SHA-256 email+IP bucket key), public DTO no longer exposes `originalLocationWording`, production rejects `debug=true`, worker-startup regression test. Logout/401 clearing client-only; stateless token not server-revocable (deferred). Frontend lint/build clean; backend Ruff clean; pytest 106 passed / 4 skipped without DB, 110 passed with live DB and worker stopped. |

@@ -1,102 +1,153 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { WorkspacePage } from './WorkspacePage';
 import { Notice } from '../components/Notice';
 import { EmptyState } from '../components/EmptyState';
-import { StatusPill } from '../components/StatusPill';
+import { ResourceState } from '../components/ResourceState';
+import { SignInPrompt } from '../components/SignInPrompt';
+import { useAuth } from '../auth/authContext';
+import { useApiResource } from '../hooks/useApiResource';
+import { decideSuggestion, listSuggestions } from '../api/correlation';
+import { errorMessage } from '../api/client';
+import type { CorrelationDecision, CorrelationSuggestion } from '../api/types';
 
-const exampleSuggestions = [
-  {
-    id: 'REL-EX-01',
-    left: 'OBS-1042 (Community report)',
-    right: 'OBS-1041 (Field contributor)',
-    signal: 'Spatial + temporal proximity (explainable)',
-    confidence: 'Ranking signal — not truth/severity',
-    state: 'Pending review',
-  },
-  {
-    id: 'REL-EX-02',
-    left: 'OBS-1038 (Registered contributor)',
-    right: 'OBS-1042 (Community report)',
-    signal: 'Semantic similarity (candidate)',
-    confidence: 'Ambiguous — possible shared context',
-    state: 'Pending review',
-  },
-];
+function SuggestionRow({
+  suggestion,
+  onDecided,
+}: {
+  suggestion: CorrelationSuggestion;
+  onDecided: (suggestionId: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function decide(decision: CorrelationDecision) {
+    setBusy(true);
+    setError(null);
+    try {
+      await decideSuggestion(suggestion.id, decision, reason.trim() || undefined);
+      setReason('');
+      onDecided(suggestion.id);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <tr>
+        <th scope="row">{suggestion.id}</th>
+        <td>
+          <div>{suggestion.observationAId}</div>
+          <div className="muted">↔ {suggestion.observationBId}</div>
+        </td>
+        <td>
+          <div><strong>{suggestion.task.replaceAll('_', ' ')}</strong></div>
+          <div className="muted">Ranking signal: {suggestion.score.toFixed(2)}</div>
+          <div className="muted">Method: {suggestion.methodVersion}</div>
+        </td>
+        <td>
+          <ul className="compact-list">
+            {suggestion.reasons.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+          {suggestion.missingSignals.length > 0 && (
+            <p className="muted">Missing signals: {suggestion.missingSignals.join(', ')}</p>
+          )}
+          <p className="muted">Not a probability, severity, source or causation claim.</p>
+        </td>
+        <td>{suggestion.status.replaceAll('_', ' ')}</td>
+        <td>
+          <label className="sr-only" htmlFor={`reason-${suggestion.id}`}>Reason for decision on {suggestion.id}</label>
+          <input
+            id={`reason-${suggestion.id}`}
+            type="text"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Optional rationale"
+            maxLength={2000}
+          />
+          <div className="row-actions">
+            <button type="button" className="btn btn-secondary" disabled={busy} aria-busy={busy} onClick={() => void decide('accepted')}>Accept</button>
+            <button type="button" className="btn btn-secondary" disabled={busy} aria-busy={busy} onClick={() => void decide('rejected')}>Reject</button>
+            <button type="button" className="btn btn-secondary" disabled={busy} aria-busy={busy} onClick={() => void decide('ambiguous')}>Ambiguous</button>
+          </div>
+          {error && <p className="field-error" role="alert">{error}</p>}
+        </td>
+      </tr>
+    </>
+  );
+}
 
 export function EvidencePage() {
-  const [showExamples, setShowExamples] = useState(false);
+  const { status } = useAuth();
+  const [announcement, setAnnouncement] = useState('');
+  const queueHeadingRef = useRef<HTMLHeadingElement>(null);
+  const loadSuggestions = useCallback(() => listSuggestions(), []);
+  const suggestions = useApiResource(loadSuggestions, 'suggestions', status === 'authenticated');
+  const { reload: reloadSuggestions } = suggestions;
+
+  const handleDecided = useCallback(
+    (suggestionId: string) => {
+      setAnnouncement(`Decision recorded for suggestion ${suggestionId}. The queue has been refreshed.`);
+      reloadSuggestions();
+      window.requestAnimationFrame(() => queueHeadingRef.current?.focus());
+    },
+    [reloadSuggestions],
+  );
 
   return (
     <WorkspacePage
       title="Evidence Intelligence"
-      description="Candidate relationships, duplicate review and evidence context. Suggestions must be explainable, reversible, and reviewed by authorised humans. Correlation is a ranking signal, not proof."
+      description="Candidate relationships awaiting review by authorised staff. Suggestions are explainable and reversible; correlation is a ranking signal, not proof."
     >
       <Notice variant="info" role="note" title="Review principle:">
-        Machine suggestions support review; they do not declare sources, causation, illegality, or harm. Similar reports are not independent corroboration without source checks.
+        Machine suggestions do not declare sources, causation, illegality or harm. Similar reports are not independent corroboration without source checks.
       </Notice>
 
-      <div className="grid grid-3" style={{ marginTop: '1rem' }}>
-        <div className="card"><h3>Candidate relationships</h3><p className="muted">Explainable suggestions awaiting human review (accept / reject / ambiguous).</p></div>
-        <div className="card"><h3>Duplicate review</h3><p className="muted">Identify repeats and dependent sources without deleting original observations.</p></div>
-        <div className="card"><h3>Evidence context</h3><p className="muted">Preserve provenance, time/location precision, and source relationships.</p></div>
-      </div>
-
       <div className="card">
-        <h2>Relationship review queue</h2>
-        <p className="muted">No live suggestions loaded. In production this queue is populated by asynchronous, explainable correlation jobs and scoped by permissions.</p>
-        <div style={{ marginBottom: '1rem' }}>
-          <Notice variant="warn" role="note" title="Scaffold example rows only:">
-            Example suggestions are UI preview content, not real correlation outputs or product records.
-            <div style={{ marginTop: '0.5rem' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setShowExamples((v) => !v)}>
-                {showExamples ? 'Hide example rows' : 'Show example rows (UI preview)'}
-              </button>
-            </div>
-          </Notice>
-        </div>
-
-        {!showExamples ? (
-          <EmptyState title="No candidate relationships to review." detail="When correlation results are available, explainable suggestions will appear here for authorised review." />
+        <h2 ref={queueHeadingRef} tabIndex={-1}>Relationship review queue</h2>
+        <p className="sr-only" role="status">{announcement}</p>
+        {status !== 'authenticated' ? (
+          <SignInPrompt what="Candidate relationships require an authenticated reviewer account." />
         ) : (
-          <div className="table-wrap" role="region" aria-label="Candidate relationships table" tabIndex={0}>
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Suggestion</th>
-                  <th scope="col">Evidence pair</th>
-                  <th scope="col">Why suggested (explanation)</th>
-                  <th scope="col">Interpretation note</th>
-                  <th scope="col">State</th>
-                </tr>
-              </thead>
-              <tbody>
-                {exampleSuggestions.map((s) => (
-                  <tr key={s.id}>
-                    <th scope="row">{s.id}</th>
-                    <td>
-                      <div>{s.left}</div>
-                      <div className="muted">↔ {s.right} <em>(example)</em></div>
-                    </td>
-                    <td>{s.signal}</td>
-                    <td className="muted">{s.confidence}</td>
-                    <td><StatusPill label={s.state} tone="review" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResourceState state={suggestions.state}>
+            {(items) =>
+              items.length === 0 ? (
+                <EmptyState
+                  title="No candidate relationships to review."
+                  detail="Explainable suggestions appear here when correlation jobs produce them."
+                />
+              ) : (
+                <div className="table-wrap" role="region" aria-label="Candidate relationships table" tabIndex={0}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Suggestion</th>
+                        <th scope="col">Observation pair</th>
+                        <th scope="col">Ranking signal</th>
+                        <th scope="col">Explanation</th>
+                        <th scope="col">State</th>
+                        <th scope="col">Decision</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item) => (
+                        <SuggestionRow key={item.id} suggestion={item} onDecided={handleDecided} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            }
+          </ResourceState>
         )}
       </div>
 
-      <div className="card">
-        <h2>Reviewer actions (placeholder)</h2>
-        <p className="muted">Accept, reject, or mark ambiguous with a reason. Decisions are audited and reversible through new actions; original records remain unchanged. UI actions will be wired to backend endpoints when available.</p>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-secondary" disabled>Accept (requires backend)</button>
-          <button type="button" className="btn btn-secondary" disabled>Reject (requires backend)</button>
-          <button type="button" className="btn btn-secondary" disabled>Mark ambiguous (requires backend)</button>
-        </div>
-      </div>
+      <p className="muted">
+        Decisions are recorded and audited by the server. Original observations are never overwritten.
+      </p>
     </WorkspacePage>
   );
 }

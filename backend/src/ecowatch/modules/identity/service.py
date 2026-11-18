@@ -1,11 +1,14 @@
 """Identity service handling authentication, users, organisations, and memberships."""
 
+import hashlib
 import uuid
 
 from fastapi import status
 from sqlalchemy.orm import Session
 
+from ecowatch.core.config import Settings, get_settings
 from ecowatch.core.errors import DomainError, ErrorCode
+from ecowatch.core.rate_limit import check_and_increment_limit, reset_limit
 from ecowatch.core.schemas import CursorPage
 from ecowatch.core.security import AuthProvider, hash_password, verify_password
 from ecowatch.modules.audit.service import record_audit_event
@@ -24,27 +27,58 @@ from ecowatch.modules.identity.schemas import (
 )
 
 
+def login_bucket_key(email: str, clientIp: str) -> str:
+    """Build a stable login throttle key without storing the email or IP in plaintext."""
+    fingerprint = f"{email.strip().lower()}|{clientIp}".encode()
+    return f"login:{hashlib.sha256(fingerprint).hexdigest()}"
+
+
 class IdentityService:
     """Application service for local auth, tenant organisations, and RBAC memberships."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, settings: Settings | None = None) -> None:
         self._session = session
+        self._settings = settings or get_settings()
         self._repo = IdentityRepository(session)
 
-    def login(self, payload: LoginRequest, authProvider: AuthProvider) -> LoginResponse:
-        """Authenticate user credentials and issue a signed bearer token."""
+    def login(
+        self,
+        payload: LoginRequest,
+        authProvider: AuthProvider,
+        *,
+        clientIp: str = "unknown",
+    ) -> LoginResponse:
+        """Authenticate credentials and issue a token, throttling repeated failures."""
+        bucketKey = login_bucket_key(payload.email, clientIp)
+        settings = self._settings
+        try:
+            check_and_increment_limit(
+                self._session,
+                bucketKey,
+                maxAttempts=settings.loginMaxAttempts,
+                windowSeconds=settings.loginWindowSeconds,
+                lockoutSeconds=settings.loginLockoutSeconds,
+            )
+        except DomainError:
+            self._session.commit()
+            raise
+
         user = self._repo.get_user_by_email(payload.email)
         if (
             user is None
             or not user.isActive
             or not verify_password(payload.password, user.passwordHash)
         ):
+            self._session.commit()
             raise DomainError(
                 ErrorCode.UNAUTHORIZED,
                 "Invalid email or password",
                 statusCode=status.HTTP_401_UNAUTHORIZED,
             )
+
+        reset_limit(self._session, bucketKey)
         token = authProvider.issue_token(user.id)
+        self._session.commit()
         return LoginResponse(
             accessToken=token,
             user=UserResponse.model_validate(user),

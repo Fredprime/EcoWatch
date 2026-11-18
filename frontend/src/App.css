@@ -13,6 +13,10 @@
   gap: var(--space-4);
 }
 
+.sidebar :focus-visible {
+  outline-color: #8ecbdf;
+}
+
 .sidebar-header {
   display: flex;
   align-items: flex-start;
@@ -97,9 +101,26 @@
   font-size: 0.9rem;
   color: var(--color-text-muted);
 }
-.topbar-role {
+.topbar-account {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: var(--space-3);
+}
+.topbar-name {
+  font-weight: 600;
+}
+
+.compact-list {
   margin: 0;
-  min-width: 260px;
+  padding-left: 1.25rem;
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
 }
 
 .icon-button {
@@ -306,13 +327,15 @@ th { font-size: 0.9rem; color: var(--color-text-muted); font-weight: 600; }
     height: 100dvh;
     padding: var(--space-4);
     transform: translateX(-100%);
-    transition: transform 180ms ease;
+    visibility: hidden;
+    transition: transform 180ms ease, visibility 180ms;
     z-index: 60;
     overflow-y: auto;
     box-shadow: var(--shadow-md);
   }
   .sidebar.open {
     transform: translateX(0);
+    visibility: visible;
   }
   .sidebar-backdrop {
     display: block;
@@ -334,9 +357,8 @@ th { font-size: 0.9rem; color: var(--color-text-muted); font-weight: 600; }
     width: 100%;
     align-items: flex-start;
   }
-  .topbar-role {
+  .topbar-account {
     width: 100%;
-    min-width: 0;
   }
 
   .content { padding: var(--space-4); }

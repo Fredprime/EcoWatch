@@ -10,8 +10,6 @@ export type WorkspaceId =
   | 'verification'
   | 'admin';
 
-export type SubmissionState = 'draft' | 'queued' | 'submitted' | 'received';
-
 export interface Workspace {
   id: WorkspaceId;
   label: string;

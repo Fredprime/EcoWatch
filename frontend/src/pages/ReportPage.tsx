@@ -1,114 +1,163 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { SubmissionState } from '../types';
 import { WorkspacePage } from './WorkspacePage';
+import { ApiError, errorMessage } from '../api/client';
+import { createObservation } from '../api/observations';
+import type { IntakeReceiptResponse, LocationPrecision, TimePrecision } from '../api/types';
 
 type FieldName = 'obsType' | 'description';
+type SubmitState = 'draft' | 'submitting' | 'received' | 'error';
 
 type FormValues = {
   obsType: string;
   description: string;
-  location: string;
-  locationPrecision: string;
-  observedDate: string;
+  locationWording: string;
+  locationPrecision: LocationPrecision;
+  timeWording: string;
+  timePrecision: TimePrecision;
   firsthand: string;
 };
 
 const initialValues: FormValues = {
   obsType: '',
   description: '',
-  location: '',
+  locationWording: '',
   locationPrecision: 'approximate',
-  observedDate: '',
+  timeWording: '',
+  timePrecision: 'unknown',
   firsthand: 'unsure',
-};
-
-const stateMeta: Record<SubmissionState, { label: string; description: string; className: string }> = {
-  draft: { label: 'Local draft', description: 'Saved on this device only. Not submitted to EcoWatch.', className: 'status-draft' },
-  queued: { label: 'Queued locally', description: 'Stored on this device and waiting to sync. Not yet received by EcoWatch.', className: 'status-queued' },
-  submitted: { label: 'Submitting…', description: 'Sending to the server and awaiting durable receipt confirmation.', className: 'status-submitted' },
-  received: { label: 'Received by server', description: 'Durable server receipt confirmed. A reference can be shown after this state.', className: 'status-received' },
 };
 
 function validate(values: FormValues): Partial<Record<FieldName, string>> {
   const errors: Partial<Record<FieldName, string>> = {};
-  if (!values.obsType) errors.obsType = 'Select an observation type, or choose “Not sure”.';
+  if (!values.obsType) errors.obsType = 'Select an observation type, or choose "Not sure".';
   if (!values.description.trim()) errors.description = 'Describe what you observed in plain language.';
   return errors;
 }
 
+function formatTime(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 export function ReportPage() {
   const [values, setValues] = useState<FormValues>(initialValues);
-  const [state, setState] = useState<SubmissionState>('draft');
-  const [reference, setReference] = useState<string | null>(null);
+  const [submitState, setSubmitState] = useState<SubmitState>('draft');
+  const [receipt, setReceipt] = useState<IntakeReceiptResponse | null>(null);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const summaryRef = useRef<HTMLDivElement | null>(null);
-  const meta = useMemo(() => stateMeta[state], [state]);
+  const idempotencyRef = useRef<string | null>(null);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
-    setValues((prev) => ({ ...prev, [key]: value }));
+    setValues((previous) => ({ ...previous, [key]: value }));
     if (submitAttempted && (key === 'obsType' || key === 'description')) {
-      const next = { ...values, [key]: value } as FormValues;
-      const nextErrors = validate(next);
-      setErrors((prevErrors) => ({ ...prevErrors, [key]: nextErrors[key as FieldName] }));
+      const nextErrors = validate({ ...values, [key]: value } as FormValues);
+      setErrors((previous) => ({ ...previous, [key]: nextErrors[key as FieldName] }));
     }
   }
 
   function onBlurField(field: FieldName) {
     const nextErrors = validate(values);
-    setErrors((prev) => ({ ...prev, [field]: nextErrors[field] }));
+    setErrors((previous) => ({ ...previous, [field]: nextErrors[field] }));
   }
 
-  function markQueued() {
-    setState('queued');
-    setReference(null);
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSubmitAttempted(true);
+  async function submitForm() {
     const nextErrors = validate(values);
     setErrors(nextErrors);
     const keys = Object.keys(nextErrors) as FieldName[];
     if (keys.length > 0) {
-      setState('draft');
-      setReference(null);
+      setSubmitState('draft');
+      setSubmitError(null);
       window.setTimeout(() => summaryRef.current?.focus(), 0);
       return;
     }
 
-    setIsSubmitting(true);
-    setState('submitted');
-    setReference(null);
-    // Demo only: simulate durable receipt after submit. Real implementation must wait for server confirmation.
-    window.setTimeout(() => {
-      setIsSubmitting(false);
-      setState('received');
-      setReference('ECO-DEMO-RECEIPT');
-    }, 900);
+    if (!idempotencyRef.current) idempotencyRef.current = crypto.randomUUID();
+    setSubmitState('submitting');
+    setSubmitError(null);
+    setReceipt(null);
+
+    try {
+      const result = await createObservation({
+        idempotencyKey: idempotencyRef.current,
+        observationType: values.obsType,
+        description: values.description.trim(),
+        timePrecision: values.timePrecision,
+        ...(values.timeWording.trim() ? { originalTimeWording: values.timeWording.trim() } : {}),
+        locationPrecision: values.locationPrecision,
+        ...(values.locationWording.trim() ? { originalLocationWording: values.locationWording.trim() } : {}),
+        accessClass: 'restricted',
+        ...(values.firsthand === 'yes' ? { isFirsthand: true } : values.firsthand === 'no' ? { isFirsthand: false } : {}),
+      });
+      setReceipt(result);
+      setSubmitState('received');
+      setValues(initialValues);
+      setSubmitAttempted(false);
+      idempotencyRef.current = null;
+    } catch (cause) {
+      setSubmitState('error');
+      setSubmitError(errorMessage(cause));
+      if (cause instanceof ApiError) {
+        const fieldErrors: Partial<Record<FieldName, string>> = {};
+        for (const detail of cause.details) {
+          if (detail.field === 'observationType') fieldErrors.obsType = detail.message;
+          if (detail.field === 'description') fieldErrors.description = detail.message;
+        }
+        if (Object.keys(fieldErrors).length > 0) setErrors(fieldErrors);
+      }
+    }
   }
 
-  const errorEntries = Object.entries(errors).filter(([, msg]) => Boolean(msg)) as [FieldName, string][];
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setSubmitAttempted(true);
+    void submitForm();
+  }
+
+  const errorEntries = Object.entries(errors).filter(([, message]) => Boolean(message)) as [FieldName, string][];
 
   return (
     <WorkspacePage
       title="Report / Collect"
-      description="Mobile-first reporting for communities and field contributors. Do not require specialist knowledge to submit an observation. Support uncertain dates/locations and make states explicit."
+      description="Mobile-first reporting for communities and field contributors. Uncertainty about time and location is explicit."
     >
       <div className="card notice notice-warn" role="note">
-        <strong>Privacy and safety:</strong> Share only what is safe to share. Avoid identifying people unnecessarily. Sensitive locations may be restricted or generalised in later views. This is a scaffold — no data is sent to a backend.
+        <strong>Privacy and safety:</strong> Share only what is safe to share. Avoid identifying people unnecessarily. Sensitive locations may be restricted or generalised in later views. Submission goes directly to the server; there is no local queue.
       </div>
 
-      <div className="card" aria-live="polite">
+      <div className="card">
         <h2>Submission state</h2>
-        <p>
-          <span className={`status-pill ${meta.className}`}>{meta.label}</span>
+        <p role="status">
+          <strong>
+            {submitState === 'draft' && 'Draft — not submitted.'}
+            {submitState === 'submitting' && 'Submitting…'}
+            {submitState === 'received' && 'Received by server.'}
+            {submitState === 'error' && 'Submission failed.'}
+          </strong>
         </p>
-        <p className="muted">{meta.description}</p>
-        {state === 'received' && reference && <p><strong>Reference (after receipt):</strong> {reference}</p>}
-        {state === 'queued' && <p className="muted">A queued item must not be described as received by EcoWatch.</p>}
+        {submitState === 'submitting' && <p className="muted">Waiting for a durable server receipt.</p>}
+        {submitState === 'error' && submitError && <p className="notice notice-danger" role="alert">{submitError}</p>}
+        {submitState === 'error' && (
+          <button type="button" className="btn btn-secondary" onClick={() => void submitForm()}>
+            Retry with the same idempotency key
+          </button>
+        )}
+        {receipt && (
+          <div>
+            <p>
+              <strong>Tracking reference:</strong>{' '}
+              {receipt.trackingCode ?? 'No reference was returned for this replay.'}
+            </p>
+            <p className="muted">
+              Observation {receipt.observationId} · server receipt {formatTime(receipt.receivedAt)} ·
+              version {receipt.currentVersion} · time precision {receipt.timePrecision} ·
+              location precision {receipt.locationPrecision}
+              {receipt.idempotentReplay ? ' · server receipt already recorded' : ''}
+            </p>
+          </div>
+        )}
       </div>
 
       <form className="card form-grid" onSubmit={onSubmit} noValidate>
@@ -140,18 +189,19 @@ export function ReportPage() {
             id="obs-type"
             name="obsType"
             value={values.obsType}
-            onChange={(e) => update('obsType', e.target.value)}
+            onChange={(event) => update('obsType', event.target.value)}
             onBlur={() => onBlurField('obsType')}
+            aria-required="true"
             aria-invalid={Boolean(errors.obsType)}
             aria-describedby={errors.obsType ? 'obs-type-error obs-type-hint' : 'obs-type-hint'}
           >
             <option value="">Select an option</option>
-            <option value="land">Land or soil concern</option>
+            <option value="land_or_soil">Land or soil concern</option>
             <option value="water">Water concern</option>
-            <option value="vegetation">Vegetation or habitat concern</option>
-            <option value="pollution">Possible pollution or dumping</option>
+            <option value="vegetation_or_habitat">Vegetation or habitat concern</option>
+            <option value="possible_pollution">Possible pollution or dumping</option>
             <option value="other">Other</option>
-            <option value="unsure">Not sure</option>
+            <option value="not_sure">Not sure</option>
           </select>
           {errors.obsType && <p id="obs-type-error" className="field-error">{errors.obsType}</p>}
           <p id="obs-type-hint" className="field-hint">Broad categories help routing; contributors can be unsure.</p>
@@ -163,9 +213,10 @@ export function ReportPage() {
             id="description"
             name="description"
             value={values.description}
-            onChange={(e) => update('description', e.target.value)}
+            onChange={(event) => update('description', event.target.value)}
             onBlur={() => onBlurField('description')}
             placeholder="Describe what you saw, heard, smelled, or measured in plain language."
+            aria-required="true"
             aria-invalid={Boolean(errors.description)}
             aria-describedby={errors.description ? 'description-error description-hint' : 'description-hint'}
           />
@@ -175,17 +226,17 @@ export function ReportPage() {
 
         <div className="grid grid-2">
           <div className="field">
-            <label htmlFor="location">Location (exact, approximate, or description)</label>
+            <label htmlFor="location-wording">Location description</label>
             <input
-              id="location"
-              name="location"
+              id="location-wording"
+              name="locationWording"
               type="text"
-              value={values.location}
-              onChange={(e) => update('location', e.target.value)}
-              placeholder="e.g. near bridge, community name, coordinates if known"
+              value={values.locationWording}
+              onChange={(event) => update('locationWording', event.target.value)}
+              placeholder="e.g. near bridge, community name, or an approximate area"
               aria-describedby="location-hint"
             />
-            <p id="location-hint" className="field-hint">Map-based location is optional where appropriate; provide non-map alternatives. Unknown/approximate is allowed.</p>
+            <p id="location-hint" className="field-hint">Use a non-map description if coordinates are unavailable or unsafe to share.</p>
           </div>
           <div className="field">
             <label htmlFor="location-precision">Location precision</label>
@@ -193,55 +244,62 @@ export function ReportPage() {
               id="location-precision"
               name="locationPrecision"
               value={values.locationPrecision}
-              onChange={(e) => update('locationPrecision', e.target.value)}
+              onChange={(event) => update('locationPrecision', event.target.value as LocationPrecision)}
             >
               <option value="exact">Exact</option>
               <option value="approximate">Approximate</option>
-              <option value="unknown">Unknown / not provided</option>
+              <option value="area">Area only</option>
+              <option value="unknown">Not provided</option>
             </select>
           </div>
         </div>
 
         <div className="grid grid-2">
           <div className="field">
-            <label htmlFor="observed-date">When was it observed?</label>
+            <label htmlFor="time-wording">When was it observed?</label>
             <input
-              id="observed-date"
-              name="observedDate"
+              id="time-wording"
+              name="timeWording"
               type="text"
-              value={values.observedDate}
-              onChange={(e) => update('observedDate', e.target.value)}
+              value={values.timeWording}
+              onChange={(event) => update('timeWording', event.target.value)}
               placeholder="Exact date/time, approximate period, or unknown"
-              aria-describedby="observed-date-hint"
+              aria-describedby="time-hint"
             />
-            <p id="observed-date-hint" className="field-hint">Event/observed/submitted/received times are recorded separately in the full system. Unknown is allowed.</p>
+            <p id="time-hint" className="field-hint">Recorded as reported wording. Event, observed, submitted and server receipt times stay separate.</p>
           </div>
           <div className="field">
-            <label htmlFor="firsthand">Was this firsthand?</label>
-            <select id="firsthand" name="firsthand" value={values.firsthand} onChange={(e) => update('firsthand', e.target.value)}>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-              <option value="unsure">Not sure / prefer not to say</option>
+            <label htmlFor="time-precision">Time precision</label>
+            <select
+              id="time-precision"
+              name="timePrecision"
+              value={values.timePrecision}
+              onChange={(event) => update('timePrecision', event.target.value as TimePrecision)}
+            >
+              <option value="exact">Exact</option>
+              <option value="approximate">Approximate</option>
+              <option value="range">Range</option>
+              <option value="unknown">Unknown</option>
             </select>
           </div>
         </div>
 
         <div className="field">
-          <label htmlFor="media">Supporting media (optional)</label>
-          <input id="media" name="media" type="file" multiple aria-describedby="media-hint" />
-          <p id="media-hint" className="field-hint">Original files must be preserved with provenance in the full implementation. Upload handling is not wired in this scaffold.</p>
+          <label htmlFor="firsthand">Was this firsthand?</label>
+          <select id="firsthand" name="firsthand" value={values.firsthand} onChange={(event) => update('firsthand', event.target.value)}>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="unsure">Not sure / prefer not to say</option>
+          </select>
         </div>
 
-        <div className="notice notice-info" role="note">
-          <strong>Why we ask:</strong> source, time, place, and method details help reviewers understand evidence without treating all observations as equivalent.
-        </div>
+        <p className="muted">
+          Supporting media upload is not available here. Original files must be preserved with provenance before upload is offered.
+        </p>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-secondary" onClick={markQueued} disabled={isSubmitting}>
-            Save as queued locally (demo)
-          </button>
-          <button type="submit" className="btn" disabled={isSubmitting} aria-busy={isSubmitting}>
-            {isSubmitting ? 'Submitting…' : 'Submit observation (demo)'}
+        <div>
+          <button type="submit" className="btn" disabled={submitState === 'submitting'} aria-busy={submitState === 'submitting'}>
+            {submitState === 'submitting' ? 'Submitting…' : 'Submit observation'}
           </button>
         </div>
       </form>

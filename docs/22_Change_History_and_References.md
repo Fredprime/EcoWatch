@@ -13,6 +13,7 @@ Package version 1.0. Stable document identifiers are used. Each material revisio
 | 0.1 | 9 Nov 2026 | Initial EcoWatch documentation baseline. |
 | 1.0 | 16 Nov 2026 | Merged SignalWeave PRD and technical design into EcoWatch; incorporated six owner decisions; added subsystem boundaries, revised evidence model, phased roadmap and merged requirements. |
 | 1.1 | 18 Nov 2026 | Implemented Phase 1 backend (`backend/` core platform, intake, provenance, jobs, and case foundation) per `ADR-026`–`ADR-029`, added `PERMISSIONS_MATRIX.md`, `BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`, and updated `docs/08` for Phase 1. |
+| 1.2 | 2026-11-18 | Frontend core read/intake integration on `feat/SandyFrontend` (merge `290f386`): hand-written typed DTOs and a single `fetch` wrapper, memory-only bearer token, same-origin Vite dev proxy (no backend CORS middleware), and removal of fake receipts, queued/demo state and example rows. Vite 6.2.7 -> 6.4.6 via lockfile only. Security changes: DB-backed login rate limiting, public DTO field removal, production `debug=true` rejection and a worker-startup regression test. Other frontend workspaces remain shells; offline PWA absent. |
 
 ## 3. Source packages reviewed
 
@@ -40,4 +41,4 @@ Prefer primary datasets, official technical documentation, peer-reviewed researc
 
 ## 7. Verification note
 
-Canonical docs `00`–`24` describe the overall design baseline; Phase 1 backend code in `backend/` implements the Phase 1 foundation per `ADR-029`, and a first Phase 2 correlation slice exists on `phase2-correlation` (see `docs/PHASE2_CORRELATION.md`). Phase 3, `frontend/`, legal/privacy governance sign-off, and live pilot deployment remain unimplemented.
+Canonical docs `00`–`24` describe the overall design baseline; Phase 1 backend code in `backend/` implements the Phase 1 foundation per `ADR-029`, a Phase 2 correlation slice exists (see `docs/PHASE2_CORRELATION.md`), and Phase 3 backend modules are present. `frontend/` is integrated with the backend for core read and intake flows (auth, health, observations, cases, correlation suggestions and human decisions); the remaining workspaces are shells with no API integration and the offline-first PWA is not implemented. Legal/privacy governance sign-off and live pilot deployment remain unimplemented. Nothing is validated, certified or live; a correlation score is a ranking signal only.

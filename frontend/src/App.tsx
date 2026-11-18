@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 import { WORKSPACES } from './types';
+import { useAuth } from './auth/authContext';
+import { AuthProvider } from './auth/AuthProvider';
 import { OverviewPage } from './pages/OverviewPage';
+import { LoginPage } from './pages/LoginPage';
 import { ReportPage } from './pages/ReportPage';
 import { CasesPage } from './pages/CasesPage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
@@ -14,70 +17,108 @@ import { InterventionsPage } from './pages/InterventionsPage';
 import { VerificationPage } from './pages/VerificationPage';
 import { AdminPage } from './pages/AdminPage';
 
-type RoleView = 'all' | 'contributor' | 'reviewer' | 'investigator' | 'specialist' | 'manager' | 'admin';
-
-const ROLE_OPTIONS: { id: RoleView; label: string }[] = [
-  { id: 'all', label: 'Demo: all workspaces' },
-  { id: 'contributor', label: 'Community / field contributor' },
-  { id: 'reviewer', label: 'Reviewer' },
-  { id: 'investigator', label: 'Investigator' },
-  { id: 'specialist', label: 'Environmental specialist' },
-  { id: 'manager', label: 'Intervention manager' },
-  { id: 'admin', label: 'Administrator' },
-];
-
 function NotFoundPage() {
   return (
     <section>
       <header className="page-header">
         <h1>Page not found</h1>
-        <p>The page you requested does not exist in this scaffold. Use the workspace navigation to continue.</p>
+        <p>The page you requested does not exist. Use the workspace navigation to continue.</p>
       </header>
-      <div className="card notice notice-info" role="note">
-        In the full product, access to workspaces and records is role-scoped and enforced server-side.
-      </div>
+      <p className="muted">Access to workspaces and records is role-scoped and enforced server-side.</p>
     </section>
   );
 }
 
 function Layout() {
-  const [roleView, setRoleView] = useState<RoleView>('all');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authAnnouncement, setAuthAnnouncement] = useState('');
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { status, me, logout } = useAuth();
+  const previousStatus = useRef(status);
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => setMenuOpen(false));
     return () => window.cancelAnimationFrame(id);
   }, [location.pathname]);
 
-  const visibleWorkspaces = useMemo(() => {
-    if (roleView === 'all') return WORKSPACES;
-    return WORKSPACES.filter((ws) => ws.roles.includes('all') || ws.roles.includes(roleView));
-  }, [roleView]);
+  useEffect(() => {
+    if (previousStatus.current !== status) {
+      setAuthAnnouncement(
+        status === 'authenticated'
+          ? `Signed in${me ? ` as ${me.displayName}` : ''}.`
+          : 'Signed out.',
+      );
+      previousStatus.current = status;
+    }
+  }, [status, me]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
+
+  function focusMain() {
+    window.requestAnimationFrame(() => document.getElementById('main-content')?.focus());
+  }
+
+  function openMenu() {
+    setMenuOpen(true);
+    window.requestAnimationFrame(() => {
+      navRef.current?.querySelector<HTMLAnchorElement>('.nav-link')?.focus();
+    });
+  }
+
+  function closeMenu() {
+    setMenuOpen(false);
+    menuButtonRef.current?.focus();
+  }
+
+  function navigateFromMenu() {
+    setMenuOpen(false);
+    focusMain();
+  }
+
+  function signOut() {
+    logout();
+    setAuthAnnouncement('Signed out.');
+    navigate('/login');
+    focusMain();
+  }
 
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
+      <p className="sr-only" role="status">{authAnnouncement}</p>
+      {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Close menu" onClick={closeMenu} />}
       <aside className={`sidebar${menuOpen ? ' open' : ''}`} aria-label="Workspace navigation">
         <div className="sidebar-header">
           <div className="brand">
             <p className="brand-title">EcoWatch</p>
             <p className="brand-subtitle">Evidence-led environmental intelligence</p>
           </div>
-          <button type="button" className="btn btn-secondary menu-close" onClick={() => setMenuOpen(false)}>
+          <button type="button" className="btn btn-secondary menu-close" onClick={closeMenu}>
             Close
           </button>
         </div>
-        <nav id="primary-nav" aria-label="Primary">
+        <nav id="primary-nav" ref={navRef} aria-label="Primary">
           <ul className="nav-list">
-            {visibleWorkspaces.map((ws) => (
+            {WORKSPACES.map((ws) => (
               <li key={ws.id}>
                 <NavLink
                   to={ws.path}
                   end={ws.path === '/'}
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={navigateFromMenu}
                 >
                   {ws.label}
                 </NavLink>
@@ -86,7 +127,7 @@ function Layout() {
           </ul>
         </nav>
         <p className="sidebar-note">
-          Navigation is role-scoped in production. This selector is a UI demo only; permissions must be enforced server-side.
+          Navigation lists the documented workspaces. Record access and reviewer actions are enforced server-side.
         </p>
       </aside>
 
@@ -95,34 +136,41 @@ function Layout() {
           <div className="topbar-left">
             <button
               type="button"
+              ref={menuButtonRef}
               className="btn btn-secondary menu-button icon-button"
               aria-expanded={menuOpen}
               aria-controls="primary-nav"
               aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
               title={menuOpen ? 'Close menu' : 'Open menu'}
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={() => (menuOpen ? closeMenu() : openMenu())}
             >
               <span aria-hidden="true" className="menu-dots">
                 <span></span><span></span><span></span>
               </span>
             </button>
             <div>
-              <strong>Prototype frontend scaffold</strong>
-              <div className="topbar-meta">Design baseline — no backend integration, no live data.</div>
+              <strong>EcoWatch</strong>
+              <div className="topbar-meta">Evidence-led environmental intelligence</div>
             </div>
           </div>
-          <div className="field topbar-role">
-            <label htmlFor="role-view">Role view (UI demo)</label>
-            <select id="role-view" value={roleView} onChange={(e) => setRoleView(e.target.value as RoleView)}>
-              {ROLE_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>{opt.label}</option>
-              ))}
-            </select>
+          <div className="topbar-account">
+            {status === 'authenticated' && me ? (
+              <>
+                <div>
+                  <span className="topbar-name">{me.displayName}</span>
+                  <div className="topbar-meta">Signed in</div>
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={signOut}>Sign out</button>
+              </>
+            ) : (
+              <NavLink to="/login" className="btn btn-secondary">Sign in</NavLink>
+            )}
           </div>
         </header>
         <main id="main-content" className="content" tabIndex={-1}>
           <Routes>
             <Route path="/" element={<OverviewPage />} />
+            <Route path="/login" element={<LoginPage />} />
             <Route path="/report" element={<ReportPage />} />
             <Route path="/evidence" element={<EvidencePage />} />
             <Route path="/monitoring" element={<MonitoringPage />} />
@@ -144,7 +192,9 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout />
+      <AuthProvider>
+        <Layout />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

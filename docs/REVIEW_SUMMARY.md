@@ -1,10 +1,12 @@
 # EcoWatch Review Summary
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Last Updated:** 2026-11-18  
 **Repository:** `Fredprime/EcoWatch`  
-**Active Branch:** `prime`  
-**Code Written:** Phase 1 Backend (`EcoWatch/backend/`) implemented (`frontend/` not started)
+**Active Branch:** `feat/SandyFrontend`  
+**Code Written:** Phase 1 backend, the Phase 2 correlation slice and Phase 3 backend modules are present; `frontend/` has core backend read/intake integration (remaining workspaces are shells)
+
+**Task context (2026-11-18):** The owner directed this task to `feat/SandyFrontend` and chose merging `master` into the branch (merge commit `290f386`) rather than rebasing. This current-task instruction overrides the standing `prime`-branch rule for this task only (see `docs/OWNER_RULES.md` §7).
 
 This is the single review document for checking progress, recent changes, and verification items for review.
 
@@ -16,13 +18,13 @@ This is the single review document for checking progress, recent changes, and ve
 - **Repository & branches:**
   - `main`: Protected release branch (`infra / compose + postgis` required, 1 code-owner approval, `enforce_admins: true`, linear history).
   - `master`: Protected integration branch (`infra / compose + postgis` required, 1 approval).
-  - `prime`: Active working branch created from `master`; all current documentation updates live here.
+  - `prime`: Working branch created from `master` holding the earlier documentation updates. The current integration task is on `feat/SandyFrontend` (see task context above).
 - **Existing infrastructure baseline (from `master` commit `88ca75d`):**
   - `compose.yaml`: PostgreSQL 16 + PostGIS 3.4 (`ecowatch-db`, port `5433`, named volume `db-data`).
   - `Makefile` & `scripts/compose.sh`: `venv`, `up`, `down`, `reset`, `psql`, `logs`, `lint` (`ruff check backend`), `test` (`pytest backend`).
-  - `.github/workflows/ci.yml`: `infra / compose + postgis` (active), `backend / lint + test` (Python 3.14, activates once `backend/pyproject.toml` exists), `frontend / build` (Node 22, activates once `frontend/package.json` exists).
+  - `.github/workflows/ci.yml`: `infra / compose + postgis` (active), `backend / lint + test` (Python 3.14, live DB with PostGIS + pgvector, `ruff check backend` and `pytest backend`), `frontend / build` (Node 22, `npm ci`, `npm run lint` and `npm run build`). Both folder jobs retain a presence check as a guard.
   - `CONTRIBUTING.md`, `.env.example`, `LICENSE` (Apache-2.0), `NOTICE`, `scripts/protect-branches.sh`.
-- **Application folders:** Phase 1 `backend/` (`core/`, `api/`, 8 modules, Alembic `0001_phase1_initial_schema.py`, and unit/integration/security tests) plus Phase 2 evidence correlation are implemented on `prime`; `frontend/` does not exist yet.
+- **Application folders:** Phase 1 `backend/` (core platform, intake, provenance, jobs, cases, identity, audit and notifications, with Alembic `0001_phase1_initial_schema.py` and unit/integration/security tests), the Phase 2 correlation slice and Phase 3 backend modules are present. `frontend/` is integrated with the backend for auth, health, observation intake/list, case list/detail/timeline and correlation suggestions/decisions; Analysis, Monitoring, Prioritisation, Interventions, Verification and Administration remain shells with no API integration. There is no seeded, sample or demo data in product source.
 - **Current DB image (supersedes the `88ca75d` baseline above):** built locally from the root `Dockerfile` — `pgvector/pgvector:pg16` base + PostGIS 3.7. Both `vector` and `postgis` extensions are created by migrations/CI and proven in the `infra / compose + postgis` check. `compose.yaml` still exposes `ecowatch-db` on port `5433` with named volume `db-data`.
 
 ---
@@ -51,6 +53,7 @@ This is the single review document for checking progress, recent changes, and ve
 | 2026-11-18 | Re-scan hooks (`feat/correlation-rescan-triggers`) | Corrections and evidence uploads now enqueue another `correlation.scan` in the same transaction as the change, so a rescore follows changed comparison evidence. Two integration tests cover the triggers. Ruff clean; 96 passed with PostGIS, 93 passed / 3 skipped without. | `backend/src/ecowatch/modules/observations/service.py`, `backend/src/ecowatch/modules/observations/router.py`, `backend/src/ecowatch/modules/evidence/service.py`, `backend/tests/integration/test_correlation_rescan_hooks.py`, docs |
 | 2026-11-18 | Evaluation smoke test (`test/correlation-evaluation-smoke`) | Ran the scoring-to-evaluation harness on temporary synthetic fixtures under the owner's smoke-test-only route. Counts assert mechanics only; no accuracy claim and no real-report result. Ruff clean; 97 passed with PostGIS, 94 passed / 3 skipped without. | `backend/tests/evaluation/test_correlation_smoke.py`, `docs/PHASE2_TODO.md`, `docs/PHASE2_CORRELATION.md`, `docs/REVIEW_SUMMARY.md`, `docs/PROJECT_TRACKING.md` |
 | 2026-11-18 | Phase 2 pgvector (`Tazor`) | Implemented ADR-030: `correlation_embeddings` (`vector(384)` + HNSW cosine index on PostgreSQL, JSON fallback on SQLite; unique per observation/model/input hash; unchanged inputs skip the write) via migration `0005_phase2_embeddings`. Vectors come from deterministic word hashing (`hashed-words-v1`) — **not** a validated semantic model (ADR-019 open), no accuracy claim. `semantic_similarity` uses vector cosine with `token_similarity` as the labelled fallback; a nearest-vector query only narrows the org/time/space candidate set. Combined DB image (pgvector base + PostGIS 3.7) built from a new root `Dockerfile`; compose and both CI DB jobs use it and prove both extensions. Ruff clean; 106 passed with live PostgreSQL (pgvector + PostGIS), 102 passed / 4 skipped without. | `Dockerfile`, `compose.yaml`, `.github/workflows/ci.yml`, `backend/src/ecowatch/core/vector.py`, `backend/src/ecowatch/modules/correlation/` (`embeddings.py`, `models.py`, `repository.py`, `scoring.py`, `service.py`, `features.py`), `backend/alembic/versions/0005_phase2_embeddings.py`, `backend/tests/`, `README.md`, `CONTRIBUTING.md`, `backend/README.md`, Phase 2 docs |
+| 2026-11-18 | Frontend/backend integration (`feat/SandyFrontend`, merge `290f386`) | Owner chose merging `master` into the branch rather than rebasing. Frontend now uses hand-written typed DTOs and a single `fetch` wrapper (no React Query/Axios/Zod), a memory-only bearer token (reload requires signing in again; 401 clears auth), and a same-origin Vite dev proxy to `127.0.0.1:8000`; no backend CORS middleware was added. Integrated flows: auth, health, observation intake/list, case list/detail/timeline, correlation suggestions and human decisions. Fake receipts, queued-local/demo state and all example rows were removed. Vite 6.2.7 -> 6.4.6 via lockfile only (high-severity dev-server advisory; `npm audit` now 0 vulnerabilities, no new runtime dependencies). Security: DB-backed login rate limiting reusing the existing `rate_limit` helper, keyed by SHA-256 of normalised email + client IP (no raw PII in the bucket key), default 5 attempts per 300 s window and 900 s lockout, settings `loginMaxAttempts` / `loginWindowSeconds` / `loginLockoutSeconds` (env `ECOWATCH_LOGIN_MAX_ATTEMPTS` / `ECOWATCH_LOGIN_WINDOW_SECONDS` / `ECOWATCH_LOGIN_LOCKOUT_SECONDS`); public `ObservationPublicSummaryResponse` no longer exposes `originalLocationWording` (restricted staff/owner DTO still does); production config rejects `debug=true`; regression test for `workerEnabled=True` startup and keyword-only `worker_loop` signature. Verification: frontend `npm run lint` clean, `npm run build` passes, `npm audit` 0; backend `ruff check backend` clean; pytest 106 passed / 4 skipped without live DB, 110 passed with live PostgreSQL + pgvector + PostGIS with the worker stopped. End-to-end through the Vite proxy covered health, login, intake 201 then replay 200, observations list, auth/me, cases create/list/detail/timeline, correlation scan/suggestions, decision 200 then repeat 409, unauthenticated 401 and forbidden jobs 403. Throwaway verification artefacts only: Vite `127.0.0.1:5173`, backend `127.0.0.1:8000`, local DB container `ecowatch-verify-db` on port `5434` with temporary dev users. | `README.md`, `frontend/README.md`, `docs/REVIEW_SUMMARY.md`, `docs/PROJECT_TRACKING.md`, `docs/OWNER_RULES.md`, `docs/22_Change_History_and_References.md`, `docs/23_Implementation_Backlog_and_Acceptance.md` (docs); frontend and backend sources (concurrent worker) |
 
 ---
 
@@ -68,6 +71,11 @@ This is the single review document for checking progress, recent changes, and ve
    - **Re-scan triggers: corrections and evidence uploads** — both now enqueue another `correlation.scan` in the same transaction as the change, implemented in the Phase 1-owned modules on their own branch.
 4. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
    - `ADR-029` is `Approved 2026-11-18`; optionally promote `ADR-014`–`ADR-016` and `ADR-026`–`ADR-028` statuses from `Proposed` to `Approved` during review.
+5. **Security decisions and accepted limitation (2026-11-18, owner-approved for this slice):**
+   - **Login rate limiting (ADR-032):** DB-backed reuse of the existing `rate_limit` helper, bucketed by SHA-256 of normalised email + client IP (no raw PII in the key); default 5 attempts per 300 s window and 900 s lockout, configurable through `ECOWATCH_LOGIN_MAX_ATTEMPTS`, `ECOWATCH_LOGIN_WINDOW_SECONDS` and `ECOWATCH_LOGIN_LOCKOUT_SECONDS`.
+   - **Public DTO field removal (ADR-033):** `originalLocationWording` is no longer returned by `ObservationPublicSummaryResponse`; the restricted staff/owner DTO still includes it.
+   - **Accepted limitation (ADR-032):** logout and 401 clearing are client-only. The stateless HMAC bearer token is not server-side revocable and remains valid until expiry (default 12h), although deactivated users are rejected on every request. Immediate server-side revocation is deferred, not implemented.
+   - **No validation claim:** a correlation score remains a ranking signal only; `token_similarity` is the labelled fallback, not a validated semantic model. No source, causation, harm or verification claims.
 
 ---
 
