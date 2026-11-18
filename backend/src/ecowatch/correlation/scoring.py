@@ -45,9 +45,13 @@ DEFAULT_TEMPORAL_WINDOW_HOURS = 72.0
 DEFAULT_RADIUS_KM = 25.0
 
 _WORD = re.compile(r"[a-z0-9']+")
-_STOPWORDS = frozenset(
-    ["the", "and", "for", "was", "were", "are", "been", "being", "with", "that", "this", "these", "those", "from", "have", "has", "had", "not", "but", "you", "your", "they", "them", "there", "here", "what", "when", "where", "which", "who", "whom", "how", "all", "any", "can", "could", "would", "should", "will", "shall", "may", "might", "must", "its", "into", "out", "over", "under", "again", "further", "then", "once", "about", "above", "below", "between", "during", "before", "after"]
+_STOPWORDS_TEXT = (
+    "the and for was were are been being with that this these those from have has had "
+    "not but you your they them there here what when where which who whom how all any "
+    "can could would should will shall may might must its into out over under again "
+    "further then once about above below between during before after"
 )
+_STOPWORDS = frozenset(_STOPWORDS_TEXT.split())
 
 
 def token_similarity(text_a: str | None, text_b: str | None) -> float | None:
@@ -83,7 +87,9 @@ def haversine_km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> floa
 
 
 def temporal_proximity(
-    first: datetime | None, second: datetime | None, window_hours: float = DEFAULT_TEMPORAL_WINDOW_HOURS
+    first: datetime | None,
+    second: datetime | None,
+    window_hours: float = DEFAULT_TEMPORAL_WINDOW_HOURS,
 ) -> float | None:
     """1.0 at the same instant, falling linearly to 0.0 at `window_hours`.
 

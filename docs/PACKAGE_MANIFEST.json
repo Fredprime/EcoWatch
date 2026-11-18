@@ -41,11 +41,11 @@
   "governance": [
     "AGENT_GUIDE.md",
     "BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md",
+    "GLOBAL_AGENT_RULES_MERGED.md",
     "OWNER_RULES.md",
     "PERMISSIONS_MATRIX.md",
     "PROJECT_TRACKING.md",
-    "REVIEW_SUMMARY.md",
-    "RULES_COMPARISON_AND_MERGE_REPORT.md"
+    "REVIEW_SUMMARY.md"
   ],
   "supplementary": [
     "files/22_Correlation_Engine_and_Offline_Collection.md",

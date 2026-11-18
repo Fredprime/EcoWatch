@@ -89,6 +89,8 @@ def evaluate(
         else:
             false_positives += 1
 
-    false_negatives = sum(1 for key, same_event in truth.items() if same_event and key not in predicted)
+    false_negatives = sum(
+        1 for key, same_event in truth.items() if same_event and key not in predicted
+    )
 
     return Evaluation(threshold, true_positives, false_positives, false_negatives, unlabelled)
