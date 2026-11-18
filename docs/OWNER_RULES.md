@@ -13,14 +13,14 @@ This document records the explicit rules given by the project owner across sessi
 
 1. Explicit instructions from the owner for the current task (recorded here as they are given).
 2. Canonical merged documentation in `docs/00`–`docs/24` (`docs/START_HERE.md`) and approved records in `docs/20_Technical_Decision_Records.md`.
-3. `docs/EcoWatch Agent Guide.md` and `CONTRIBUTING.md`.
+3. `docs/AGENT_GUIDE.md` and `CONTRIBUTING.md`.
 4. General engineering defaults (YAGNI, minimal structured code paths, native platform capabilities first).
 
 ---
 
 ## 2. Project Scope and Build Rules
 
-1. **Merged project:** Work on the merged EcoWatch project (`docs/00`–`24` canonical baseline, where SignalWeave is integrated as EcoWatch's Evidence Correlation and Incident Intelligence subsystem). Historical packages (`docs/EcoWatch_Full_Project_Documentation_v0.1/`, `docs/SignalWeave_Documentation/`) are reference only.
+1. **Merged project:** Work on the merged EcoWatch project (`docs/00`–`24` canonical baseline, where SignalWeave is integrated as EcoWatch's Evidence Correlation and Incident Intelligence subsystem). Historical packages (`docs/archive/EcoWatch_Full_Project_Documentation_v0.1/`, `docs/archive/SignalWeave_Documentation/`) are reference only and are never cited as authority (`docs/archive/SUPERSEDED.md`).
 2. **Build from scratch:** Nothing in the application (`backend/`, `frontend/`) has been built yet; build cleanly from scratch against the merged documentation and repository infrastructure baseline.
 3. **Three-phase backend structure:** Structure the backend build into 3 phases (`Phase 1: Core/Intake/Cases`, `Phase 2: ECII Correlation/Worker/Offline Sync`, `Phase 3: Environmental Intelligence/Prioritisation/Interventions/Verification`) and document the architecture in `docs/` before writing code.
 4. **Documentation-before-code discipline:** Do not write application code until documentation review and explicit go-ahead are given; when tasked with docs-only work, modify and push only `docs/` files.
@@ -61,7 +61,7 @@ This document records the explicit rules given by the project owner across sessi
    - Write minimal, highly structured code paths.
 3. **Formatting and style:**
    - No emojis in code, documents, or interfaces unless explicitly required by project documentation.
-   - Follow `docs/EcoWatch Agent Guide.md` naming and interface conventions (confirming DB-to-API boundary rules before coding).
+   - Follow `docs/AGENT_GUIDE.md` naming and interface conventions (confirming DB-to-API boundary rules before coding).
 
 ---
 

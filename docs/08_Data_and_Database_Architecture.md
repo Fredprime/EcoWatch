@@ -1,6 +1,6 @@
 # 08 — Data and Database Architecture
 
-**Status:** PostgreSQL approved. PostGIS and detailed schema are proposed and require review.
+**Status:** PostgreSQL approved (`ADR-005`). Phase 1 schema (17 PostgreSQL + PostGIS tables in `backend/alembic/versions/0001_phase1_initial_schema.py`) implemented per `ADR-028` and `ADR-029`; Phases 2–3 logical tables remain proposed until their respective phases.
 
 ## 1. Design principles
 
@@ -45,34 +45,40 @@ An immutable or append-only record of sensitive actions and status changes.
 
 | Table | Purpose |
 |---|---|
-| `users` | Account identity and authentication reference |
-| `organisations` | Participating organisations |
-| `memberships` | User-to-organisation roles |
-| `observations` | Core observation records |
-| `observation_versions` | Controlled corrections/version history |
-| `observation_sources` | Source and contributor metadata with restricted access |
-| `evidence_assets` | Original and derivative file metadata |
-| `asset_derivatives` | Original-to-preview/analysis derivative links |
-| `datasets` | External/imported dataset catalogue |
-| `dataset_versions` | Source version, licence, coverage and acquisition details |
-| `cases` | Environmental investigation/response cases |
-| `case_observations` | Many-to-many observation/case links |
-| `evidence_relationships` | Suggested/reviewed evidence links and explanations |
-| `environmental_entities` | Optional sites, waterbodies, catchments, habitats or monitored assets |
-| `environmental_relationships` | Domain relationships between entities/observations |
-| `analysis_runs` | Reproducible analysis metadata |
-| `analysis_outputs` | Derived maps, metrics, rasters, tables and reports |
-| `prioritisation_assessments` | Factors, method, score/rank and human decision |
-| `interventions` | Planned and actual response actions |
-| `intervention_milestones` | Activity milestones and supporting evidence |
-| `indicator_definitions` | Approved indicator metadata and units |
-| `indicator_measurements` | Measurements with method, quality and source |
-| `verification_assessments` | Outcome assessment records |
-| `audit_events` | Security and workflow audit |
-| `processing_jobs` | Durable asynchronous job state |
-| `notifications` | Optional user notifications |
+| `users` | Account identity and authentication reference (Phase 1) |
+| `organisations` | Participating organisations (Phase 1) |
+| `memberships` | User-to-organisation roles (Phase 1) |
+| `methods` | Controlled field/lab measurement protocols (`ADR-028`, Phase 1) |
+| `units` | Controlled measurement units (`ADR-028`, Phase 1) |
+| `observations` | Core org-scoped observation records (Phase 1; Phase 2 adds nullable `source_ref` for repost/shared-origin detection, `FR-027`) |
+| `observation_versions` | Controlled corrections/version history (Phase 1) |
+| `observation_sources` | Source and contributor metadata with restricted access (Phase 1) |
+| `evidence_assets` | Original and derivative file metadata (Phase 1) |
+| `asset_derivatives` | Original-to-preview/analysis derivative links (Phase 1) |
+| `clarification_requests` | Reviewer/investigator clarification prompts (`ADR-028`, Phase 1) |
+| `datasets` | External/imported dataset catalogue (Phase 3) |
+| `dataset_versions` | Source version, licence, coverage and acquisition details (Phase 3) |
+| `cases` | Org-scoped environmental investigation/response cases (Phase 1) |
+| `case_observations` | Many-to-many observation/case links (Phase 1) |
+| `evidence_relationships` | Suggested/reviewed evidence links and explanations (Phase 2; migration `0002`, canonical `observation_a_id < observation_b_id` ordering enforced by `CHECK`, unique per pair and task) |
+| `correlation_embeddings` | Semantic vector representations for correlation retrieval (`ADR-028`, Phase 2) |
+| `environmental_entities` | Optional sites, waterbodies, catchments, habitats or monitored assets (Phase 3) |
+| `environmental_relationships` | Domain relationships between entities/observations (Phase 3) |
+| `analysis_runs` | Reproducible analysis metadata (Phase 3) |
+| `analysis_outputs` | Derived maps, metrics, rasters, tables and reports (Phase 3) |
+| `prioritisation_assessments` | Factors, method, score/rank and human decision (Phase 3) |
+| `interventions` | Planned and actual response actions (Phase 3) |
+| `intervention_milestones` | Activity milestones and supporting evidence (Phase 3) |
+| `indicator_definitions` | Approved indicator metadata and units (Phase 3) |
+| `indicator_measurements` | Measurements with method, quality and source (Phase 3) |
+| `verification_assessments` | Outcome assessment records (Phase 3) |
+| `publications` | Versioned public release snapshots (`ADR-028`, Phase 3) |
+| `audit_events` | Security and workflow audit (Phase 1) |
+| `processing_jobs` | Durable asynchronous job state (`FOR UPDATE SKIP LOCKED`, Phase 1) |
+| `notifications` | User notifications and clarification delivery (Phase 1) |
+| `rate_limit_buckets` | DB-backed intake/tracking-lookup rate limiting and lockouts (Phase 1) |
 
-This is a conceptual model, not a final migration-ready schema.
+Phase 1 tables are migration-backed in `backend/alembic/versions/0001_phase1_initial_schema.py` using `lower snake_case` SQL names mapped to `camelCase` Python/JSON DTO attributes (`ADR-029`). Phases 2–3 tables remain logical specifications until built.
 
 ## 4. Observation fields
 
@@ -108,7 +114,7 @@ A reported or estimated time must carry precision and source. Do not infer exact
 
 ## 6. Spatial model
 
-PostGIS is recommended for points, lines, polygons and spatial indexes, but its inclusion is not yet approved. If adopted, define coordinate reference systems and units explicitly. Store source geometry and any generalised public geometry separately where necessary.
+Phase 1 uses PostGIS `GEOGRAPHY(POINT, 4326)` and `GEOGRAPHY(GEOMETRY, 4326)` columns with `GiST` spatial indexes (`ADR-029`) and stores source geometry separately from generalised `public_location` / `public_geometry` columns. Coordinate reference systems and units remain explicit.
 
 Environmental relationships may require network or catchment data. A straight-line distance query is not a substitute for flow direction, river connectivity or ecological connectivity.
 
