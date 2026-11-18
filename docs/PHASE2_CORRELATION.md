@@ -44,6 +44,7 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 | T9 | `correlation_clusters` + members, one cluster per report, provisional and staff-only — never a case | migration `0003_phase2_clusters` |
 | T10 | RBAC: `correlation:read` / `correlation:review`, deny-by-default; review implies read, enforced by a test | `identity/permissions.py` |
 | T12 | Corrections and evidence uploads enqueue another `correlation.scan` in the same transaction as the change | `observations/service.py`, `evidence/service.py` |
+| T11 | Evaluation harness smoke test on temporary synthetic fixtures; counts assert wiring, not accuracy | `backend/tests/evaluation/test_correlation_smoke.py` |
 
 ### Deliberate deviations from the plan, and why
 
@@ -60,7 +61,7 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 | Semantic similarity | same approval; `token_similarity` remains the labelled keyword fallback, not the model |
 | `cross_case` detector | case-side rules and authority owner decided 2026-11-18 (`ADR-031`); not built |
 | `promote_to_case`, `merge`, `split` | owned by the Phase 1 cases module under `ADR-031`; correlation keeps suggestions and provisional clusters only |
-| Scored harness run | smoke-test only approved 2026-11-18; temporary fixtures prove mechanics, no accuracy claim |
+| Scored harness run on real labelled reports | needs a consented, human-reviewed set; smoke test approved and run on temporary fixtures only, no accuracy claim |
 | Split-phase intake, notification push | plan §2.1 lists them under Phase 2, but they live in `collection` and `notifications`, which Phase 1 owns |
 
 ## 4. Honest limits
