@@ -38,7 +38,7 @@ Acceptance:
 
 ## 3. Phase 2 — Evidence correlation
 
-**Status (2026-11-18):** a first slice is implemented on `phase2-correlation` — bounded org-scoped retrieval, scoring with missing-signal handling, `evidence_relationships` storage with canonical-pair constraints, reviewer accept/reject/ambiguous with audit, and background scanning. Semantic similarity, the remaining detectors, merge/split and the scored evaluation run are not built. Per-item status: `docs/PHASE2_TODO.md`; what exists and its limits: `docs/PHASE2_CORRELATION.md`.
+**Status (2026-11-18):** implemented on `phase2-correlation` — category-aware bounded retrieval with `ST_DWithin` on PostgreSQL, scoring with missing-signal handling, `evidence_relationships` with canonical-pair constraints and a persisted tie flag, detector differentiation (`source_dependency`, `duplicate`, `same_event`), reviewer accept/reject/ambiguous/reopen with audit, provisional clusters, and background scanning. Not built: semantic similarity, `cross_case`, promote/merge/split, and the scored evaluation run. Per-item status: `docs/PHASE2_TODO.md`; what exists and its limits: `docs/PHASE2_CORRELATION.md`.
 
 Backlog:
 - Candidate retrieval. — *built, distance filtered in Python rather than `ST_DWithin` (upgrade tracked as T4b)*
@@ -46,15 +46,15 @@ Backlog:
 - Spatial and temporal compatibility signals. — *built*
 - Source-dependency checks. — *built for explicitly recorded `source_ref`; no inference of shared origin*
 - Relationship types and explanations. — *`same_event` only; duplicate / repost / cross-case not differentiated yet*
-- Reviewer accept/reject/ambiguous workflow. — *built, audited, one-way*
-- Merge/split audit behaviour. — *not built*
+- Reviewer accept/reject/ambiguous workflow. — *built, audited; reversal is a separate `reopen` action with a required reason*
+- Merge/split audit behaviour. — *not built; the cluster container they need exists*
 - Offline queue and sync states. — *not built (intake side, Phase 1 module)*
 
 Acceptance:
 - Labelled evaluation set exists. — *not yet; harness and metrics exist, the run is gated on the evaluation-route decision*
 - False links and missed links are measured. — *metrics implemented, no result claimed*
 - Missing data is not fabricated. — *enforced: a missing signal leaves the score, it is not imputed*
-- Suggestions are explainable and reversible. — *explainable (components, missing signals, reasons); reversal needs a designed action, not built*
+- Suggestions are explainable and reversible. — *explainable (components, missing signals, reasons, task wording); reversible by `reopen` with a reason, audited*
 - Reviewer actions are audited. — *enforced in the same transaction as the decision*
 - Offline retries are idempotent. — *not applicable yet, intake is Phase 1*
 
