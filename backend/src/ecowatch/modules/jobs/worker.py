@@ -18,6 +18,12 @@ _logger = logging.getLogger("ecowatch.worker")
 
 def _execute_job(session: Session, storage: StorageProvider, job: ProcessingJob) -> None:
     """Dispatch a single claimed job to its domain handler."""
+    if job.jobType == "correlation.scan":
+        from ecowatch.modules.correlation.service import CorrelationService
+
+        observationId = uuid.UUID(str(job.payload["observationId"]))
+        CorrelationService(session).scan_observation(observationId)
+        return
     if job.jobType == "evidence.scan_and_derive":
         from ecowatch.modules.evidence.service import EvidenceService
 

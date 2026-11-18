@@ -10,6 +10,7 @@ from ecowatch.core.schemas import CamelModel
 from ecowatch.modules.audit.router import router as auditRouter
 from ecowatch.modules.cases.router import router as casesRouter
 from ecowatch.modules.collection.router import router as collectionRouter
+from ecowatch.modules.correlation.router import router as correlationRouter
 from ecowatch.modules.evidence.router import router as evidenceRouter
 from ecowatch.modules.identity.router import router as identityRouter
 from ecowatch.modules.jobs.router import router as jobsRouter
@@ -62,6 +63,7 @@ v1Router.include_router(collectionRouter)
 v1Router.include_router(observationsRouter)
 v1Router.include_router(evidenceRouter)
 v1Router.include_router(casesRouter)
+v1Router.include_router(correlationRouter)
 v1Router.include_router(notificationsRouter)
 v1Router.include_router(auditRouter)
 v1Router.include_router(jobsRouter)

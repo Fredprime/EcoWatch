@@ -38,6 +38,23 @@ jobs:
   backend:
     name: backend / lint + test
     runs-on: ubuntu-latest
+    # A real PostGIS instance, so the migrations are exercised instead of only
+    # modelled. Without this the migration tests skip and a broken revision
+    # reaches a deploy before anyone notices.
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ecowatch
+          POSTGRES_PASSWORD: ecowatch_dev
+          POSTGRES_DB: ecowatch
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ecowatch -d ecowatch"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - id: detect
@@ -49,6 +66,9 @@ jobs:
           cache: pip
       - name: Install, lint, test
         if: steps.detect.outputs.present == 'true'
+        env:
+          DATABASE_URL: postgresql+psycopg://ecowatch:ecowatch_dev@localhost:5433/ecowatch
+          ECOWATCH_RUN_POSTGIS_TESTS: "1"
         run: |
           pip install -e "backend[dev]"
           ruff check backend

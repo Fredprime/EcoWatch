@@ -116,6 +116,9 @@ class Observation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         "source_type", String(64), nullable=False, index=True
     )
     description: Mapped[str] = mapped_column("description", Text, nullable=False)
+    sourceRef: Mapped[str | None] = mapped_column(
+        "source_ref", String(512), nullable=True, index=True
+    )
     isFirsthand: Mapped[bool | None] = mapped_column("is_firsthand", Boolean, nullable=True)
     structuredData: Mapped[dict[str, Any] | None] = mapped_column(
         "structured_data", JSON, nullable=True

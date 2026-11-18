@@ -9,8 +9,9 @@ from ecowatch.core.config import get_settings
 from ecowatch.core.models import Base
 from ecowatch.core.rate_limit import RateLimitBucket  # noqa: F401
 from ecowatch.modules.audit.models import AuditEvent  # noqa: F401
-from ecowatch.modules.catalogue.models import Dataset, DatasetVersion  # noqa: F401
 from ecowatch.modules.cases.models import Case, CaseObservation  # noqa: F401
+from ecowatch.modules.catalogue.models import Dataset, DatasetVersion  # noqa: F401
+from ecowatch.modules.correlation.models import EvidenceRelationship  # noqa: F401
 from ecowatch.modules.evidence.models import AssetDerivative, EvidenceAsset  # noqa: F401
 from ecowatch.modules.identity.models import Membership, Organisation, User  # noqa: F401
 from ecowatch.modules.intelligence.models import (  # noqa: F401

@@ -174,9 +174,13 @@ def upgrade() -> None:
     op.create_index("ix_observations_unit_id", "observations", ["unit_id"])
     op.create_index("ix_observations_observed_at", "observations", ["observed_at"])
     op.create_index("ix_observations_received_at", "observations", ["received_at"])
-    op.create_index("ix_observations_submitted_by_user_id", "observations", ["submitted_by_user_id"])
+    op.create_index(
+        "ix_observations_submitted_by_user_id", "observations", ["submitted_by_user_id"]
+    )
     if isPostgres:
-        op.execute("CREATE INDEX ix_observations_location_gist ON observations USING GIST (location)")
+        op.execute(
+            "CREATE INDEX ix_observations_location_gist ON observations USING GIST (location)"
+        )
         op.execute(
             "CREATE INDEX ix_observations_public_location_gist "
             "ON observations USING GIST (public_location)"

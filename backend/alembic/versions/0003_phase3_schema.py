@@ -3,8 +3,8 @@
 Rollback note: downgrade drops Phase 3 tables in reverse dependency order and leaves
 Phase 1 tables, shared extensions, and existing data untouched.
 
-Revision ID: 0002_phase3_schema
-Revises: 0001_phase1_initial_schema
+Revision ID: 0003_phase3_schema
+Revises: 0002_phase2_correlation
 Create Date: 2026-11-18
 """
 
@@ -15,8 +15,8 @@ from alembic import op
 
 from ecowatch.core.spatial import GeographyType
 
-revision: str = "0002_phase3_schema"
-down_revision: str | Sequence[str] | None = "0001_phase1_initial_schema"
+revision: str = "0003_phase3_schema"
+down_revision: str | Sequence[str] | None = "0002_phase2_correlation"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

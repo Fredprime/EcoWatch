@@ -29,7 +29,7 @@ class SystemRole(StrEnum):
 
 
 class Permission(StrEnum):
-    """Fine-grained resource permissions across all phases."""
+    """Fine-grained Phase 1 resource permissions."""
 
     OBS_CREATE = "obs:create"
     OBS_READ_OWN = "obs:read_own"
@@ -53,6 +53,8 @@ class Permission(StrEnum):
     CASE_TRANSITION_FIELD_VERIFIED = "case:transition_field_verified"
     CASE_TRANSITION_REFER = "case:transition_refer"
     CASE_TRANSITION_CLOSE = "case:transition_close"
+    CORRELATION_READ = "correlation:read"
+    CORRELATION_REVIEW = "correlation:review"
     AUDIT_READ = "audit:read"
     ORG_MANAGE_USERS = "org:manage_users"
     ADMIN_MANAGE_SYSTEM = "admin:manage_system"
@@ -98,6 +100,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_UPDATE,
             Permission.CASE_LINK_OBS,
             Permission.CASE_TRANSITION_BASIC,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
             Permission.INTELLIGENCE_REVIEW,
         }
     ),
@@ -118,6 +122,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_BASIC,
             Permission.CASE_TRANSITION_REFER,
             Permission.CASE_TRANSITION_CLOSE,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
             Permission.PRIORITISATION_WRITE,
@@ -136,6 +142,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_READ,
             Permission.CASE_UPDATE,
             Permission.CASE_TRANSITION_FIELD_VERIFIED,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
             Permission.CATALOGUE_WRITE,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
@@ -176,6 +184,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_CLOSE,
             Permission.AUDIT_READ,
             Permission.ORG_MANAGE_USERS,
+            Permission.CORRELATION_READ,
             Permission.CATALOGUE_WRITE,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
@@ -210,6 +219,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ORG_MANAGE_USERS,
             Permission.ADMIN_MANAGE_SYSTEM,
             Permission.JOBS_READ,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
             Permission.CATALOGUE_WRITE,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
