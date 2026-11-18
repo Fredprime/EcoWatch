@@ -24,6 +24,7 @@ from ecowatch.modules.correlation.models import (
     EvidenceRelationship,
     RelationshipStatus,
 )
+from ecowatch.modules.correlation.policy import policy_for
 from ecowatch.modules.correlation.repository import (
     MAX_CANDIDATES,
     CorrelationRepository,
@@ -89,6 +90,12 @@ class CorrelationService:
             dialectName=dialectName,
         )
 
+        # One policy for retrieval and scoring, so a candidate cannot be
+        # retrieved on a wide window and then scored to zero on a narrow one.
+        bounds = policy_for(
+            subject.observationType, has_location=subjectFeatures.location is not None
+        )
+
         candidateFeatures = [
             features_for(
                 candidate,
@@ -97,13 +104,18 @@ class CorrelationService:
                 dialectName=dialectName,
             )
             for candidate, candidateWkt in self._repo.candidate_rows(
-                subject, limit=MAX_CANDIDATES
+                subject, limit=MAX_CANDIDATES, policy=bounds
             )
         ]
 
         decided = self._repo.decided_partner_ids(subject.id)
         written = 0
-        for suggestion in rank(subjectFeatures, candidateFeatures).suggestions:
+        for suggestion in rank(
+            subjectFeatures,
+            candidateFeatures,
+            temporal_window_hours=bounds.window_hours,
+            radius_km=bounds.radius_km,
+        ).suggestions:
             partnerId = uuid.UUID(suggestion.observation_b_id)
             if partnerId in decided:
                 continue

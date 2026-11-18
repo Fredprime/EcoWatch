@@ -88,6 +88,58 @@ def test_scan_creates_one_suggestion_and_repeated_scans_do_not_duplicate(
     assert suggestion.reasons
 
 
+def test_time_window_comes_from_the_category(dbSession: Session) -> None:
+    """A noise complaint 15h old must not match one a week old; a dump can."""
+    org = create_temp_org(dbSession)
+    now = datetime.now(UTC)
+
+    noiseRecent = make_observation(
+        dbSession, org, observationType="noise", description="generator running all night",
+        observedAt=now - timedelta(hours=1),
+    )
+    make_observation(
+        dbSession, org, observationType="noise", description="generator running all night",
+        observedAt=now - timedelta(hours=15),
+    )
+    # noise window is 12h, so the 15h-old neighbour is outside it
+    assert CorrelationService(dbSession).scan_observation(noiseRecent.id) == 0
+
+    # A separate organisation, so the noise reports above cannot be candidates
+    # here: this half is about the waste window, not about scope.
+    wasteOrg = create_temp_org(dbSession, name="Waste Org")
+    wasteOld = make_observation(
+        dbSession, wasteOrg, observationType="waste",
+        description="dumped drums behind the clinic",
+        observedAt=now - timedelta(hours=100),
+    )
+    make_observation(
+        dbSession, wasteOrg, observationType="waste",
+        description="dumped drums behind the clinic",
+        observedAt=now - timedelta(hours=60),
+    )
+    # waste window is a week, so a 40h gap is still a candidate
+    assert CorrelationService(dbSession).scan_observation(wasteOld.id) == 1
+
+
+def test_a_report_without_a_location_is_still_scanned(dbSession: Session) -> None:
+    """No point means no distance test, not a skipped comparison."""
+    org = create_temp_org(dbSession)
+    now = datetime.now(UTC)
+    first = make_observation(
+        dbSession, org, description="smoke from the tyre dump", observedAt=now - timedelta(hours=1),
+        lat=None, lon=None,
+    )
+    make_observation(
+        dbSession, org, description="smoke from the tyre dump", observedAt=now - timedelta(hours=2),
+        lat=None, lon=None,
+    )
+
+    assert CorrelationService(dbSession).scan_observation(first.id) == 1
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    assert any("no location" in signal for signal in suggestion.missingSignals)
+    assert "spatial_proximity" not in suggestion.components
+
+
 def test_candidates_never_cross_organisation_boundaries(dbSession: Session) -> None:
     ours = create_temp_org(dbSession, name="Our Org")
     theirs = create_temp_org(dbSession, name="Their Org")

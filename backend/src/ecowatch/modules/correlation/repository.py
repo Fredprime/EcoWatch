@@ -2,7 +2,8 @@
 
 Retrieval is deliberately dialect-agnostic: a cheap SQL prefilter (organisation,
 not hidden, time window) that runs on both SQLite and PostgreSQL, then an exact
-distance test in Python over that bounded set.
+distance test in Python over that bounded set. The bounds themselves come from
+`policy.py`, so retrieval and scoring cannot disagree about how wide a scan is.
 
 `shortcut: distance is filtered in Python, not with ST_DWithin, so it is bounded
 by the prefilter limit rather than by a GiST index. Replace with an ST_DWithin
@@ -22,11 +23,8 @@ from ecowatch.modules.correlation.models import (
     EvidenceRelationship,
     RelationshipStatus,
 )
-from ecowatch.modules.correlation.scoring import (
-    DEFAULT_RADIUS_KM,
-    DEFAULT_TEMPORAL_WINDOW_HOURS,
-    haversine_km,
-)
+from ecowatch.modules.correlation.policy import RetrievalPolicy, policy_for
+from ecowatch.modules.correlation.scoring import haversine_km
 from ecowatch.modules.identity.models import Organisation
 from ecowatch.modules.observations.models import Observation
 
@@ -96,14 +94,19 @@ class CorrelationRepository:
         subject: Observation,
         *,
         limit: int = MAX_CANDIDATES,
-        temporal_window_hours: float = DEFAULT_TEMPORAL_WINDOW_HOURS,
-        radius_km: float = DEFAULT_RADIUS_KM,
+        policy: RetrievalPolicy | None = None,
     ) -> list[tuple[Observation, Any]]:
         """Return bounded candidates for `subject` as (observation, location WKT).
 
         Organisation scoping and the hidden flag are applied here, so a caller
-        cannot accidentally retrieve across tenants.
+        cannot accidentally retrieve across tenants. The bounds come from the
+        subject's category, and tighten when it has no point to measure from.
         """
+        subjectPoint = parse_point_wkt(self.location_wkt(subject.id))
+        bounds = policy or policy_for(
+            subject.observationType, has_location=subjectPoint is not None
+        )
+
         statement: Select[Any] = select(
             Observation,
             geography_to_text_expr(Observation.location, self.dialect_name),
@@ -115,7 +118,7 @@ class CorrelationRepository:
 
         subjectObservedAt = require_aware(subject.observedAt, dialectName=self.dialect_name)
         if subjectObservedAt is not None:
-            window = timedelta(hours=temporal_window_hours)
+            window = timedelta(hours=bounds.window_hours)
             statement = statement.where(
                 Observation.observedAt.is_not(None),
                 Observation.observedAt >= subjectObservedAt - window,
@@ -124,7 +127,6 @@ class CorrelationRepository:
 
         statement = statement.order_by(Observation.receivedAt.desc()).limit(limit)
 
-        subjectPoint = parse_point_wkt(self.location_wkt(subject.id))
         rows: list[tuple[Observation, Any]] = []
         for row in self._session.execute(statement).all():
             candidate, candidateWkt = row[0], row[1]
@@ -134,7 +136,7 @@ class CorrelationRepository:
                     distance = haversine_km(
                         subjectPoint[1], subjectPoint[0], point[1], point[0]
                     )
-                    if distance > radius_km:
+                    if distance > bounds.radius_km:
                         continue
             rows.append((candidate, candidateWkt))
         return rows
