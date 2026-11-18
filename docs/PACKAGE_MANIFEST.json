@@ -1,12 +1,17 @@
 {
-  "package": "EcoWatch Merged Project Documentation",
-  "version": "1.0",
-  "date": "2026-11-16",
+  "package": "EcoWatch merged project documentation",
+  "version": "1.1",
+  "date": "2026-11-17",
   "source_packages": [
-    "SignalWeave_Documentation.zip",
-    "EcoWatch_Full_Project_Documentation_v0.1.zip"
+    "SignalWeave_Documentation (PRD.md, TECHNICAL.md v1.0)",
+    "EcoWatch_Full_Project_Documentation_v0.1 (documents 00-19)"
   ],
-  "documents": [
+  "entry_points": {
+    "agents": "AGENTS.md",
+    "canonical_index": "docs/START_HERE.md",
+    "decisions": "docs/20_Technical_Decision_Records.md"
+  },
+  "canonical": [
     "00_README_and_Documentation_Guide.md",
     "01_Product_Overview_and_Vision.md",
     "02_Merger_Strategy_and_Product_Boundaries.md",
@@ -31,8 +36,48 @@
     "21_Risks_Assumptions_and_Open_Questions.md",
     "22_Change_History_and_References.md",
     "23_Implementation_Backlog_and_Acceptance.md",
-    "24_Glossary_and_Domain_Language.md",
-    "START_HERE.md"
+    "24_Glossary_and_Domain_Language.md"
   ],
-  "status": "Merged design baseline; not implementation evidence"
+  "governance": [
+    "AGENT_GUIDE.md",
+    "BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md",
+    "OWNER_RULES.md",
+    "PERMISSIONS_MATRIX.md",
+    "PROJECT_TRACKING.md",
+    "REVIEW_SUMMARY.md",
+    "RULES_COMPARISON_AND_MERGE_REPORT.md"
+  ],
+  "supplementary": [
+    "files/22_Correlation_Engine_and_Offline_Collection.md",
+    "files/23_SignalWeave_Merge_Record.md",
+    "files/DECISION_ID_CROSSWALK.md",
+    "files/START_HERE.md"
+  ],
+  "archive": [
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/00_README_and_Documentation_Guide.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/01_Project_Overview_and_Vision.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/02_Environmental_Problem_Analysis.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/03_Scope_and_Objectives.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/04_Requirements_Specification.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/05_System_Architecture.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/06_Database_and_Data_Architecture.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/07_Data_Collection_and_Evidence_Management.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/08_Environmental_Intelligence_and_AI.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/09_Incident_Investigation_and_Historical_Reconstruction.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/10_Intervention_and_Recovery_Management.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/11_User_Interface_and_User_Experience.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/12_Security_Privacy_and_Governance.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/13_Testing_and_Quality_Assurance.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/14_Deployment_and_Infrastructure.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/15_Maintenance_and_Future_Expansion.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/16_Technical_Decision_Records.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/17_Change_History_and_References.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/18_Deferred_Platform_Evaluation_Brief.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/19_Documentation_Standards_and_Review_Checklist.md",
+    "archive/EcoWatch_Full_Project_Documentation_v0.1/EcoWatch_Documentation/START_HERE.md",
+    "archive/SUPERSEDED.md",
+    "archive/SignalWeave_Documentation/PRD.md",
+    "archive/SignalWeave_Documentation/TECHNICAL.md"
+  ],
+  "status": "Merged design baseline moving into prototype. No application code exists. Canonical = docs/00-24. docs/files/ is a secondary source; docs/archive/ is history and is never cited as authority (see docs/archive/SUPERSEDED.md and docs/files/DECISION_ID_CROSSWALK.md)."
 }

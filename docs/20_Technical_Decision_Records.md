@@ -35,6 +35,9 @@ Approved = explicitly selected. Proposed = recommended. Deferred = postponed. Op
 | ADR-023 | Supabase evaluation | Deferred | Separate platform evaluation. |
 | ADR-024 | Firebase evaluation | Deferred | Separate platform evaluation. |
 | ADR-025 | No build/master prompts in this documentation package | Approved | Retained documentation instruction. |
+| ADR-026 | Three-phase backend build structure and modular monolith layout | Proposed | Organises backend delivery into Phase 1 (Core/Intake/Cases), Phase 2 (ECII Correlation/Worker/Offline Sync), and Phase 3 (Intelligence/Prioritisation/Interventions/Verification) in `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`. |
+| ADR-027 | Role permission matrix and status-transition authority | Proposed | Defines deny-by-default grants for the eight roles, separation-of-duties rules, two-key `field_verified`/`recovery_verified`, and who may set each case/intervention status, in `docs/PERMISSIONS_MATRIX.md`. Required to implement `FR-053`; approval unblocks Phase 1 RBAC. |
+| ADR-028 | Schema additions to `docs/08` before Phase 1 | Proposed | Adds `organisation_id` scoping on seven aggregates, plus `methods`, `units`, `clarification_requests`, `publications`, and (Phase 2) `correlation_embeddings`. Rationale and the "deliberately not added" list are in `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` §5. `docs/08` must be amended to match on approval. |
 
 ## 3. Required ADR template
 

@@ -43,6 +43,8 @@ Branch naming:
 
 Keep the slug short and specific: `feat/observation-intake`, not `feat/work`.
 
+Your working branch stays **local**. Do not push personal, scratch or integration branches to `origin` — it goes to `origin` only when you open a PR from it.
+
 ## 3. Commit messages
 
 `type(scope): summary` — imperative, ≤ 72 chars.
