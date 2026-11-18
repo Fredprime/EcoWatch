@@ -8,7 +8,11 @@ import { CasesPage } from './pages/CasesPage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
 import { MonitoringPage } from './pages/MonitoringPage';
 import { EvidencePage } from './pages/EvidencePage';
-import { SimpleWorkspace } from './pages/SimpleWorkspace';
+import { AnalysisPage } from './pages/AnalysisPage';
+import { PrioritisationPage } from './pages/PrioritisationPage';
+import { InterventionsPage } from './pages/InterventionsPage';
+import { VerificationPage } from './pages/VerificationPage';
+import { AdminPage } from './pages/AdminPage';
 
 type RoleView = 'all' | 'contributor' | 'reviewer' | 'investigator' | 'specialist' | 'manager' | 'admin';
 
@@ -95,11 +99,11 @@ function Layout() {
             <Route path="/monitoring" element={<MonitoringPage />} />
             <Route path="/cases" element={<CasesPage />} />
             <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-            <Route path="/analysis" element={<SimpleWorkspace title="Analysis" description="Datasets, methods, outputs and interpretation. Derived artefacts are linked to source data and versions; interpretations are separate reviewed records." />} />
-            <Route path="/prioritisation" element={<SimpleWorkspace title="Prioritisation" description="Transparent factors and human review decisions. The system supports prioritisation; it does not independently decide enforcement or public-safety action." />} />
-            <Route path="/interventions" element={<SimpleWorkspace title="Interventions" description="Approved actions, owners, milestones and records. Activity completion is distinct from environmental outcome." />} />
-            <Route path="/verification" element={<SimpleWorkspace title="Verification" description="Baselines, follow-up measurements and outcome assessments. Recovery claims require suitable evidence, comparison, and qualified review." />} />
-            <Route path="/admin" element={<SimpleWorkspace title="Administration" description="Users, organisations, vocabularies, imports, audit and configuration. Access is restricted and audited in production." />} />
+            <Route path="/analysis" element={<AnalysisPage />} />
+            <Route path="/prioritisation" element={<PrioritisationPage />} />
+            <Route path="/interventions" element={<InterventionsPage />} />
+            <Route path="/verification" element={<VerificationPage />} />
+            <Route path="/admin" element={<AdminPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
