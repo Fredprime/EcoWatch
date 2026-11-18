@@ -39,7 +39,7 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 | T4 | Per-category retrieval policy; a report without a location gets a tighter time window instead of a wider scan | `policy.py` |
 | T5 | Detector differentiation: `source_dependency` > `duplicate` > `same_event`, one task per pair, and nothing below the review threshold | `detectors.py` |
 | T6 | `CorrelationService.scan_observation` — scores, persists, never overwrites a decision; `decide` and `reopen` record reviewer actions | `service.py` |
-| T7 | Worker job type `correlation.scan`, so intake latency never includes scoring | `jobs/worker.py` |
+| T7 | Worker job type `correlation.scan`, queued automatically on observation intake and also available on demand; scoring never runs in the intake request | `jobs/worker.py`, `collection/service.py` |
 | T8 | API: `GET /correlation/suggestions`, `POST /correlation/observations/{id}/scan`, `POST /correlation/suggestions/{id}/decision`, `POST /correlation/suggestions/{id}/reopen`, `GET /correlation/clusters` | `router.py` |
 | T9 | `correlation_clusters` + members, one cluster per report, provisional and staff-only — never a case | migration `0003_phase2_clusters` |
 | T10 | RBAC: `correlation:read` / `correlation:review`, deny-by-default; review implies read, enforced by a test | `identity/permissions.py` |

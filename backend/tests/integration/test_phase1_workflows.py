@@ -15,6 +15,7 @@ from ecowatch.modules.audit.models import AuditEvent
 from ecowatch.modules.evidence.models import AssetDerivative, EvidenceAsset, ScanStatus
 from ecowatch.modules.evidence.service import EvidenceService
 from ecowatch.modules.identity.permissions import Principal, Role, SystemRole
+from ecowatch.modules.jobs.models import JobStatus, ProcessingJob
 from ecowatch.modules.jobs.worker import run_once
 from ecowatch.modules.observations.models import AccessClass
 from tests.conftest import (
@@ -274,8 +275,15 @@ def test_registered_observation_versions_clarifications_and_evidence_worker(
     assert asset.scanStatus == ScanStatus.PENDING.value
     assert asset.sha256Checksum == expectedSha
 
+    # Intake now also queues a correlation scan, so assert on the job this test
+    # cares about rather than on how many jobs happen to be pending.
     processedCount = run_once(dbSession, storageProvider, maxAttempts=3)
-    assert processedCount == 1
+    assert processedCount >= 1
+    evidenceJob = dbSession.scalar(
+        select(ProcessingJob).where(ProcessingJob.jobType == "evidence.scan_and_derive")
+    )
+    assert evidenceJob is not None
+    assert evidenceJob.status == JobStatus.PROCESSED.value
     dbSession.expire_all()
     updatedAsset = dbSession.execute(
         select(EvidenceAsset).where(EvidenceAsset.id == asset.id)

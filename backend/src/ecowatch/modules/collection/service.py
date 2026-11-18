@@ -21,6 +21,7 @@ from ecowatch.modules.collection.schemas import (
     ReceiptLookupRequest,
     ReceiptLookupResponse,
 )
+from ecowatch.modules.correlation.service import enqueue_scan
 from ecowatch.modules.identity.models import Organisation
 from ecowatch.modules.identity.permissions import Principal
 from ecowatch.modules.observations.models import (
@@ -270,6 +271,13 @@ class CollectionService:
             },
             requestId=requestId,
         )
+
+        # New reports are scanned in the background, never in this request:
+        # intake latency must not include model work (`NFR-001`). The enqueue
+        # shares this transaction, so a rolled-back submission leaves no job,
+        # and an idempotent replay returns above without queueing a second one.
+        enqueue_scan(self._session, obs.id, maxAttempts=settings.workerMaxAttempts)
+
         self._session.commit()
         self._session.refresh(obs)
 
