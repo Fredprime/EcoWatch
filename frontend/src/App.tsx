@@ -95,12 +95,16 @@ function Layout() {
           <div className="topbar-left">
             <button
               type="button"
-              className="btn btn-secondary menu-button"
+              className="btn btn-secondary menu-button icon-button"
               aria-expanded={menuOpen}
               aria-controls="primary-nav"
+              aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              title={menuOpen ? 'Close menu' : 'Open menu'}
               onClick={() => setMenuOpen((v) => !v)}
             >
-              Menu
+              <span aria-hidden="true" className="menu-dots">
+                <span></span><span></span><span></span>
+              </span>
             </button>
             <div>
               <strong>Prototype frontend scaffold</strong>
