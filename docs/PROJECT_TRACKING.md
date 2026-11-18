@@ -1,11 +1,11 @@
 # EcoWatch Project Tracking
 
-**Version:** 1.3  
-**Date:** 2026-11-17  
+**Version:** 1.4  
+**Date:** 2026-11-18  
 **Project:** EcoWatch (Merged Project — canonical baseline in `docs/`, incorporating SignalWeave as the Evidence Correlation and Incident Intelligence subsystem)  
 **Repository:** `Fredprime/EcoWatch`  
 **Working Branch:** `prime` (branched from `master`; never push directly to `main` or `master`)  
-**Status:** Three-phase backend architecture documented (`docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`); zero code written yet; merging docs through `prime -> master -> main`.
+**Status:** Phase 1 backend (`EcoWatch/backend/`) implemented in `camelCase` (Python/JSON) mapped to `lower snake_case` PostgreSQL/PostGIS schema, Ponytail-audited, and verified with `pytest` (`16 passed, 1 skipped`) + `compileall`; pending `ruff` lint, `python-multipart` install, and live PostGIS migration verification.
 
 ---
 
@@ -59,29 +59,28 @@
 
 ## 3. What We Are Doing Now
 
-- Pushing the completed docs-only update on `prime` and merging the docs cleanly through `master` and `main` (without deleting any branch).
-- Holding before writing `backend/` or `frontend/` application code until review/confirmations are settled.
+- Finalized Phase 1 (`Core Platform, Intake, Provenance & Case Foundation`) inside `backend/` with `camelCase` Python/JSON naming mapped to `lower snake_case` PostgreSQL/PostGIS columns, Ponytail audit cleanup, and unit/integration/security tests (`16 passed, 1 skipped`).
+- Next for owner review & environment setup: install `backend[dev]` (`ruff`, `python-multipart`) and run `make up`, `alembic upgrade head`, `ECOWATCH_RUN_POSTGIS_TESTS=1 pytest -m postgis`, and `make lint`.
 
 ---
 
 ## 4. What Is Left To Be Done
 
-### Step A — Review & Pre-Build Confirmations (Before Writing Code)
-- [ ] Review documentation baseline on branch `prime`.
-- [ ] Record ADRs in `docs/20_Technical_Decision_Records.md` for confirmed stack decisions already reflected in repo infra (`Python 3.14 + FastAPI`, `PostgreSQL 16 + PostGIS 3.4`, `React + TypeScript`, local dev containers via Podman/Docker Compose).
-- [ ] Confirm naming convention boundary (`lower snake_case` DB tables/columns mapped to `camelCase` API/code fields; `UPPER_SNAKE_CASE` constants).
-- [ ] Confirm Phase 1 auth/role scope (anonymous + registered contributors vs. staff/admin roles) and local dev interfaces for object storage and auth.
-- [ ] Confirm client vs. server image handling rule (uploading untouched originals vs. optional client compression marked as derivative).
+### Step A — Review & Pre-Build Confirmations
+- [x] Document baseline architecture, permissions matrix, and schema additions on branch `prime` (`ADR-026`, `ADR-027`, `ADR-028`).
+- [x] Record `ADR-029` approving Phase 1 backend build with `camelCase` Python/JSON <-> `lower snake_case` SQL boundary and native stdlib/SQLAlchemy stack.
+- [ ] Complete formal team sign-off of `ADR-014`–`ADR-016` and `ADR-026`–`ADR-028` statuses in `docs/20_Technical_Decision_Records.md` / `docs/08` during PR review.
 
 ### Step B — Backend Phase 1: Core Platform, Intake, Provenance & Case Foundation (`backend/` Modular Monolith)
-- [ ] Initialize `backend/` (`pyproject.toml`, FastAPI app skeleton, settings, Ruff/Pytest config matching `.github/workflows/ci.yml` and `Makefile`).
-- [ ] PostgreSQL + PostGIS schema and Alembic migrations (11 tables: `users`, `organisations`, `memberships`, `observations`, `observation_versions`, `observation_sources`, `evidence_assets`, `asset_derivatives`, `cases`, `case_observations`, `audit_events`).
-- [ ] Identity, RBAC, separation of duties, and anonymous submission boundary.
-- [ ] Idempotent Observation intake API (`event_start_at`, `observed_at`, `submitted_at`, `received_at`, precision fields, coordinate/unit validation).
-- [ ] Evidence upload pipeline (content-type validation, size limits, server-generated storage keys, checksums, restricted original storage, separate derivative generation).
-- [ ] Case management & many-to-many case-observation links (preserving original observations).
-- [ ] Immutable/append-only audit logging for consequential actions.
-- [ ] Unit, integration, security, and idempotency tests (temporary test records cleaned up after runs; `make lint` and `make test` green).
+- [x] Initialize `backend/` (`pyproject.toml`, FastAPI app skeleton with 34 API routes, stdlib/env settings, Ruff/Pytest config matching `.github/workflows/ci.yml` and `Makefile`).
+- [x] PostgreSQL + PostGIS schema and Alembic initial migration (`0001_phase1_initial_schema.py` covering all 17 Phase 1 tables with GiST spatial indexes and Variant SQLite support for unit/integration tests).
+- [x] Identity, 8-role deny-by-default RBAC (`PERMISSIONS_MATRIX.md`), separation of duties, cross-organisation `404` isolation, and anonymous tracking-code lockout.
+- [x] Idempotent Observation intake API (`event_start_at`, `observed_at`, `submitted_at`, `received_at`, precision fields, coordinate/unit/method validation, immutable versions & `observation_sources` isolation).
+- [x] Evidence upload pipeline, background job worker (`processing_jobs` with `FOR UPDATE SKIP LOCKED` on PostgreSQL), content/magic-byte validation, size limits, server-generated storage keys, SHA-256 checksums, restricted original storage, and EXIF-stripped derivatives.
+- [x] Case management, many-to-many case-observation links, two-key `field_verified` approval (`ES` + `OA`), unified timeline, and governed public case summaries.
+- [x] Immutable/append-only `audit_events` logging for consequential actions and reads.
+- [x] Unit, integration, and security test suite implemented and passing in-memory (`16 passed`, `1` PostGIS test skipped pending DB container).
+- [ ] Owner/CI environment verification: install `python-multipart` + `ruff`, start PostgreSQL/PostGIS (`make up`), run `alembic upgrade head`, run `ECOWATCH_RUN_POSTGIS_TESTS=1 pytest -m postgis`, and verify `make lint`.
 
 ### Step C — Backend Phase 2: Evidence Correlation, Async Worker & Offline Sync Hardening (ECII)
 - [ ] Bounded database-backed worker (`processing_jobs` with `FOR UPDATE SKIP LOCKED` row claiming, retries, bounded concurrency).
@@ -119,4 +118,5 @@
 | 1.5 | 2026-11-17 | `Tazor` | Backend plan v1.1: FR/NFR traceability table, `jobs` moved to Phase 1, organisation scoping + five schema additions (`ADR-028`), Phase 2 evaluation acceptance made achievable, missing verification criteria / raster pipeline / prioritisation method named, eight pre-Phase-1 decisions listed. Zero application code. |
 | 1.6 | 2026-11-17 | `Tazor` (`e537b8b`) | Opened PR #4 (`prime` -> `master`). Squash-merging PR #2 left `prime` conflicting, so `master` was merged back in: five doc conflicts resolved in favour of `prime` (master's copies were byte-identical to `aa973a9`, so `prime` was a strict superset), then the three duplicate paths the merge resurrected (`EcoWatch Agent Guide.md`, `SignalWeave_Documentation/`, `EcoWatch_Full_Project_Documentation_v0.1/`) were removed. PR is `MERGEABLE`, `mergeStateStatus: BLOCKED` pending owner review, all three CI checks pass. Nothing merged, zero application code. |
 | 1.7 | 2026-11-18 | `prime` (`cd1c74b`) | Added `docs/GLOBAL_AGENT_RULES_MERGED.md` and pushed only that file to `origin/prime`. |
-| 1.8 | 2026-11-18 | `prime` (local) | Removed `RULES_COMPARISON_AND_MERGE_REPORT.md` from repo and local `docs/`, updated `PACKAGE_MANIFEST.json`, `REVIEW_SUMMARY.md`, and `PROJECT_TRACKING.md` (local commit only; not pushed). |
+| 1.8 | 2026-11-18 | `prime` (`068070f`) | Removed `RULES_COMPARISON_AND_MERGE_REPORT.md` from repo and local `docs/`, updated `PACKAGE_MANIFEST.json`, `REVIEW_SUMMARY.md`, and `PROJECT_TRACKING.md`. |
+| 1.9 | 2026-11-18 | `prime` | Implemented full Phase 1 backend (`backend/`) in `camelCase` mapped to `lower snake_case` DB columns, ran Ponytail audit (dropped `pydantic-settings`/`geoalchemy2`/`shapely` in favor of native stdlib/SQLAlchemy, extracted shared `paginate_descending`), recorded `ADR-029`, and verified `pytest` (`16 passed, 1 skipped`) + `compileall`. |
