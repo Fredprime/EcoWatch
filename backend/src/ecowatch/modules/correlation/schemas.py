@@ -37,6 +37,13 @@ class CorrelationDecisionRequest(CamelModel):
     reason: str | None = Field(default=None, max_length=2000)
 
 
+class CorrelationReopenRequest(CamelModel):
+    """Reopening a decision. The reason is required: an unexplained reversal is
+    an edit by another name."""
+
+    reason: str = Field(min_length=1, max_length=2000)
+
+
 class CorrelationScanResponse(CamelModel):
     """Identifier of the queued scan, so the caller can poll instead of waiting."""
 

@@ -155,17 +155,7 @@ class CorrelationService:
                 statusCode=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        relationship = self._repo.get_relationship(relationshipId)
-        # A caller without permission gets the same answer as one asking about a
-        # record that does not exist, so existence does not leak across tenants.
-        if relationship is None or not principal.has_permission(
-            Permission.CORRELATION_REVIEW, relationship.organisationId
-        ):
-            raise DomainError(
-                ErrorCode.NOT_FOUND,
-                "Suggestion not found",
-                statusCode=status.HTTP_404_NOT_FOUND,
-            )
+        relationship = self._require_reviewable(principal, relationshipId)
 
         for observationId in (relationship.observationAId, relationship.observationBId):
             observation = self._repo.get_observation(observationId)
@@ -226,6 +216,76 @@ class CorrelationService:
         jobId = enqueue_scan(self._session, observationId)
         self._session.commit()
         return jobId
+
+    def _require_reviewable(
+        self, principal: Principal, relationshipId: uuid.UUID
+    ) -> EvidenceRelationship:
+        """Load a suggestion the caller may act on, or raise the same 404.
+
+        A caller without permission gets the same answer as one asking about a
+        record that does not exist, so existence does not leak across tenants.
+        """
+        relationship = self._repo.get_relationship(relationshipId)
+        if relationship is None or not principal.has_permission(
+            Permission.CORRELATION_REVIEW, relationship.organisationId
+        ):
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Suggestion not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+            )
+        return relationship
+
+    def reopen(
+        self,
+        principal: Principal,
+        relationshipId: uuid.UUID,
+        *,
+        reason: str,
+        requestId: str | None = None,
+    ) -> EvidenceRelationship:
+        """Return a decided suggestion to the queue, so it can be decided again.
+
+        The row holds current state only: the decision fields are cleared, and the
+        previous decision stays in `audit_events`, which is append-only. That is
+        what makes reversal an action rather than an edit.
+
+        A reason is required. Reopening silently is how a decision gets undone
+        without anyone being able to say why.
+        """
+        relationship = self._require_reviewable(principal, relationshipId)
+        previous = relationship.status
+        if previous == RelationshipStatus.SUGGESTED.value:
+            raise DomainError(
+                ErrorCode.INVALID_STATUS_TRANSITION,
+                "Suggestion is already open; there is no decision to reopen",
+                statusCode=status.HTTP_409_CONFLICT,
+            )
+
+        relationship.status = RelationshipStatus.SUGGESTED.value
+        relationship.decidedByUserId = None
+        relationship.decidedAt = None
+        relationship.decisionReason = None
+
+        record_audit_event(
+            self._session,
+            actorUserId=principal.userId,
+            actorRole=principal.primary_role_label,
+            action="correlation.reopened",
+            targetType="evidence_relationship",
+            targetId=relationship.id,
+            organisationId=relationship.organisationId,
+            reason=reason,
+            details={
+                "previousStatus": previous,
+                "observationAId": str(relationship.observationAId),
+                "observationBId": str(relationship.observationBId),
+                "task": relationship.task,
+            },
+            requestId=requestId,
+        )
+        self._session.commit()
+        return relationship
 
     def list_suggestions(
         self, principal: Principal, *, limit: int = 50

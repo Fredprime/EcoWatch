@@ -9,6 +9,7 @@ from ecowatch.api.dependencies import get_request_id, require_permission
 from ecowatch.core.database import get_db
 from ecowatch.modules.correlation.schemas import (
     CorrelationDecisionRequest,
+    CorrelationReopenRequest,
     CorrelationScanResponse,
     CorrelationSuggestionResponse,
 )
@@ -64,6 +65,27 @@ def decide_suggestion(
         principal,
         relationshipId,
         payload.decision,
+        reason=payload.reason,
+        requestId=get_request_id(request),
+    )
+    return CorrelationSuggestionResponse.model_validate(relationship)
+
+
+@router.post(
+    "/suggestions/{relationshipId}/reopen",
+    response_model=CorrelationSuggestionResponse,
+)
+def reopen_suggestion(
+    relationshipId: uuid.UUID,
+    payload: CorrelationReopenRequest,
+    request: Request,
+    principal: Principal = Depends(require_permission(Permission.CORRELATION_REVIEW)),
+    db: Session = Depends(get_db),
+) -> CorrelationSuggestionResponse:
+    """Return a decided suggestion to the queue, with the reason audited."""
+    relationship = CorrelationService(db).reopen(
+        principal,
+        relationshipId,
         reason=payload.reason,
         requestId=get_request_id(request),
     )

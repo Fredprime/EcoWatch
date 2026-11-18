@@ -204,6 +204,84 @@ def test_decision_is_audited_and_cannot_be_overwritten(dbSession: Session) -> No
     assert dbSession.get(EvidenceRelationship, suggestion.id).status == "accepted"
 
 
+def test_reopening_returns_a_decided_pair_to_the_queue(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    viewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    principal = reviewer_principal(viewer, org)
+
+    service.decide(principal, suggestion.id, RelationshipStatus.REJECTED, reason="other river")
+    assert dbSession.get(EvidenceRelationship, suggestion.id).status == "rejected"
+
+    reopened = service.reopen(principal, suggestion.id, reason="wrong stretch identified")
+    assert reopened.status == RelationshipStatus.SUGGESTED.value
+    assert reopened.decidedByUserId is None
+    assert reopened.decidedAt is None
+    assert reopened.decisionReason is None
+
+    # The previous decision is not lost: it is in the append-only audit trail.
+    actions = [event.action for event in dbSession.query(AuditEvent).all()]
+    assert "correlation.rejected" in actions
+    assert "correlation.reopened" in actions
+
+    # And the pair is decidable again, which is the whole point.
+    service.decide(principal, suggestion.id, RelationshipStatus.ACCEPTED, reason="same outfall")
+    assert dbSession.get(EvidenceRelationship, suggestion.id).status == "accepted"
+
+
+def test_reopening_an_open_suggestion_is_refused(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    viewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    make_observation(dbSession, org, description="dead fish at the river bend")
+    CorrelationService(dbSession).scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+
+    from ecowatch.core.errors import DomainError, ErrorCode
+
+    with pytest.raises(DomainError) as raised:
+        CorrelationService(dbSession).reopen(
+            reviewer_principal(viewer, org), suggestion.id, reason="no decision yet"
+        )
+    assert raised.value.code is ErrorCode.INVALID_STATUS_TRANSITION
+    assert raised.value.statusCode == 409
+
+
+def test_reopen_requires_a_reason_and_permission(
+    dbSession: Session, client: TestClient, authProvider
+) -> None:
+    org = create_temp_org(dbSession)
+    reviewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    otherOrg = create_temp_org(dbSession, name="Other Org")
+    outsider = create_temp_user(dbSession, memberships=[(otherOrg.id, Role.REVIEWER)])
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    service.decide(
+        reviewer_principal(reviewer, org), suggestion.id, RelationshipStatus.REJECTED,
+        reason="other river",
+    )
+
+    url = f"/api/v1/correlation/suggestions/{suggestion.id}/reopen"
+    assert client.post(
+        url, json={}, headers=auth_headers(authProvider, reviewer)
+    ).status_code == 422
+    assert client.post(
+        url, json={"reason": "wrong stretch"}, headers=auth_headers(authProvider, outsider)
+    ).status_code == 404
+    assert client.post(
+        url, json={"reason": "wrong stretch"}, headers=auth_headers(authProvider, reviewer)
+    ).status_code == 200
+
+
 def test_reviewer_cannot_decide_on_their_own_submission(dbSession: Session) -> None:
     org = create_temp_org(dbSession)
     author = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
