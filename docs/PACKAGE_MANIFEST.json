@@ -1,15 +1,18 @@
 {
   "package": "EcoWatch merged project documentation",
-  "version": "1.1",
-  "date": "2026-11-17",
+  "version": "1.2",
+  "date": "2026-11-18",
   "source_packages": [
     "SignalWeave_Documentation (PRD.md, TECHNICAL.md v1.0)",
     "EcoWatch_Full_Project_Documentation_v0.1 (documents 00-19)"
   ],
   "entry_points": {
     "agents": "AGENTS.md",
+    "backend": "backend/pyproject.toml",
+    "backend_guide": "backend/README.md",
     "canonical_index": "docs/START_HERE.md",
-    "decisions": "docs/20_Technical_Decision_Records.md"
+    "decisions": "docs/20_Technical_Decision_Records.md",
+    "tracking": "docs/PROJECT_TRACKING.md"
   },
   "canonical": [
     "00_README_and_Documentation_Guide.md",
@@ -79,5 +82,5 @@
     "archive/SignalWeave_Documentation/PRD.md",
     "archive/SignalWeave_Documentation/TECHNICAL.md"
   ],
-  "status": "Merged design baseline moving into prototype. No application code exists. Canonical = docs/00-24. docs/files/ is a secondary source; docs/archive/ is history and is never cited as authority (see docs/archive/SUPERSEDED.md and docs/files/DECISION_ID_CROSSWALK.md)."
+  "status": "Phase 1 backend implemented inside backend/ per ADR-029; frontend and Phases 2-3 remain unbuilt. Canonical = docs/00-24. docs/files/ is a secondary source; docs/archive/ is history and is never cited as authority (see docs/archive/SUPERSEDED.md and docs/files/DECISION_ID_CROSSWALK.md)."
 }

@@ -59,8 +59,8 @@
 
 ## 3. What We Are Doing Now
 
-- Finalized Phase 1 (`Core Platform, Intake, Provenance & Case Foundation`) inside `backend/` with `camelCase` Python/JSON naming mapped to `lower snake_case` PostgreSQL/PostGIS columns, Ponytail audit cleanup, and unit/integration/security tests (`16 passed, 1 skipped`).
-- Next for owner review & environment setup: install `backend[dev]` (`ruff`, `python-multipart`) and run `make up`, `alembic upgrade head`, `ECOWATCH_RUN_POSTGIS_TESTS=1 pytest -m postgis`, and `make lint`.
+- Finalized Phase 1 (`Core Platform, Intake, Provenance & Case Foundation`) inside `backend/` with `camelCase` Python/JSON naming mapped to `lower snake_case` PostgreSQL/PostGIS columns, Ponytail audit cleanup, Ruff lint clean, and full `pytest` verification (`17 passed` including live PostgreSQL 16 + PostGIS 3.4 Alembic `upgrade`/`downgrade` and `FOR UPDATE SKIP LOCKED` tests).
+- Updated repository and architecture documentation (`README.md`, `backend/README.md`, `docs/08_Data_and_Database_Architecture.md`, `docs/22_Change_History_and_References.md`, `docs/23_Implementation_Backlog_and_Acceptance.md`, `docs/PACKAGE_MANIFEST.json`) and synced `prime` with `origin/master` on PR #5 (3/3 CI checks passing).
 
 ---
 
@@ -79,8 +79,7 @@
 - [x] Evidence upload pipeline, background job worker (`processing_jobs` with `FOR UPDATE SKIP LOCKED` on PostgreSQL), content/magic-byte validation, size limits, server-generated storage keys, SHA-256 checksums, restricted original storage, and EXIF-stripped derivatives.
 - [x] Case management, many-to-many case-observation links, two-key `field_verified` approval (`ES` + `OA`), unified timeline, and governed public case summaries.
 - [x] Immutable/append-only `audit_events` logging for consequential actions and reads.
-- [x] Unit, integration, and security test suite implemented and passing in-memory (`16 passed`, `1` PostGIS test skipped pending DB container).
-- [ ] Owner/CI environment verification: install `python-multipart` + `ruff`, start PostgreSQL/PostGIS (`make up`), run `alembic upgrade head`, run `ECOWATCH_RUN_POSTGIS_TESTS=1 pytest -m postgis`, and verify `make lint`.
+- [x] Unit, integration, security, and live PostgreSQL/PostGIS tests passing (`17 passed` with `ECOWATCH_RUN_POSTGIS_TESTS=1` against `ecowatch-db`, plus `CI/backend / lint + test` green on PR #5).
 
 ### Step C — Backend Phase 2: Evidence Correlation, Async Worker & Offline Sync Hardening (ECII)
 - [ ] Bounded database-backed worker (`processing_jobs` with `FOR UPDATE SKIP LOCKED` row claiming, retries, bounded concurrency).
@@ -119,4 +118,5 @@
 | 1.6 | 2026-11-17 | `Tazor` (`e537b8b`) | Opened PR #4 (`prime` -> `master`). Squash-merging PR #2 left `prime` conflicting, so `master` was merged back in: five doc conflicts resolved in favour of `prime` (master's copies were byte-identical to `aa973a9`, so `prime` was a strict superset), then the three duplicate paths the merge resurrected (`EcoWatch Agent Guide.md`, `SignalWeave_Documentation/`, `EcoWatch_Full_Project_Documentation_v0.1/`) were removed. PR is `MERGEABLE`, `mergeStateStatus: BLOCKED` pending owner review, all three CI checks pass. Nothing merged, zero application code. |
 | 1.7 | 2026-11-18 | `prime` (`cd1c74b`) | Added `docs/GLOBAL_AGENT_RULES_MERGED.md` and pushed only that file to `origin/prime`. |
 | 1.8 | 2026-11-18 | `prime` (`068070f`) | Removed `RULES_COMPARISON_AND_MERGE_REPORT.md` from repo and local `docs/`, updated `PACKAGE_MANIFEST.json`, `REVIEW_SUMMARY.md`, and `PROJECT_TRACKING.md`. |
-| 1.9 | 2026-11-18 | `prime` | Implemented full Phase 1 backend (`backend/`) in `camelCase` mapped to `lower snake_case` DB columns, ran Ponytail audit (dropped `pydantic-settings`/`geoalchemy2`/`shapely` in favor of native stdlib/SQLAlchemy, extracted shared `paginate_descending`), recorded `ADR-029`, and verified `pytest` (`16 passed, 1 skipped`) + `compileall`. |
+| 1.9 | 2026-11-18 | `prime` (`3713211`–`bbdc5be`) | Implemented full Phase 1 backend (`backend/`) in `camelCase` mapped to `lower snake_case` DB columns, ran Ponytail audit, recorded `ADR-029`, synced `origin/master` into `prime` on PR #5, fixed CI Ruff lint checks (`3/3` CI checks green). |
+| 1.10 | 2026-11-18 | `prime` | Verified live PostgreSQL 16 + PostGIS 3.4 container (`ecowatch-db`), Alembic `upgrade`/`downgrade`/`SKIP LOCKED` (`17 passed` total), and updated `README.md`, `backend/README.md`, `docs/08`, `docs/22`, `docs/23`, and `docs/PACKAGE_MANIFEST.json`. |

@@ -12,6 +12,7 @@ Package version 1.0. Stable document identifiers are used. Each material revisio
 |---|---|---|
 | 0.1 | 9 Nov 2026 | Initial EcoWatch documentation baseline. |
 | 1.0 | 16 Nov 2026 | Merged SignalWeave PRD and technical design into EcoWatch; incorporated six owner decisions; added subsystem boundaries, revised evidence model, phased roadmap and merged requirements. |
+| 1.1 | 18 Nov 2026 | Implemented Phase 1 backend (`backend/` core platform, intake, provenance, jobs, and case foundation) per `ADR-026`–`ADR-029`, added `PERMISSIONS_MATRIX.md`, `BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`, and updated `docs/08` for Phase 1. |
 
 ## 3. Source packages reviewed
 
@@ -39,4 +40,4 @@ Prefer primary datasets, official technical documentation, peer-reviewed researc
 
 ## 7. Verification note
 
-This package does not claim implementation, deployment, model validation, data acquisition, partnership, legal compliance or environmental recovery.
+Canonical docs `00`–`24` describe the overall design baseline; Phase 1 backend code in `backend/` implements the Phase 1 foundation per `ADR-029`, while Phases 2–3, `frontend/`, legal/privacy governance sign-off, and live pilot deployment remain unimplemented.

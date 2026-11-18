@@ -40,20 +40,17 @@ This is the single review document for checking progress, recent changes, and ve
 | 2026-11-17 | PR #4 sync (`Tazor`) | `prime` conflicted after PR #2 was squash-merged. Merged `master` into `prime`, resolved 5 doc conflicts toward `prime` (master held no unique content other than the duplicates, verified by diffing against `aa973a9`), and deleted the three duplicate paths the merge resurrected. Verified the resulting tree is byte-identical to the pre-merge `prime` tree, so nothing was lost or silently reverted. | `docs/20_Technical_Decision_Records.md`, `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md`, `docs/OWNER_RULES.md`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md`, 3 duplicate trees |
 | 2026-11-18 | `cd1c74b` (`prime`) | Added `docs/GLOBAL_AGENT_RULES_MERGED.md` and pushed to `origin/prime`. | `docs/GLOBAL_AGENT_RULES_MERGED.md` |
 | 2026-11-18 | `068070f` (`prime`) | Removed `RULES_COMPARISON_AND_MERGE_REPORT.md` from repo and local `docs/`, and updated `PACKAGE_MANIFEST.json`, `REVIEW_SUMMARY.md`, and `PROJECT_TRACKING.md`. | `docs/RULES_COMPARISON_AND_MERGE_REPORT.md` (removed), `docs/PACKAGE_MANIFEST.json`, `docs/REVIEW_SUMMARY.md`, `docs/PROJECT_TRACKING.md` |
-| 2026-11-18 | Phase 1 Build (`prime`) | Implemented full Phase 1 backend (`core/`, `api/`, `audit`, `identity`, `notifications`, `observations`, `collection`, `evidence`, `jobs`, `cases`, Alembic `0001_phase1_initial_schema.py`, and test suite) in `camelCase` Python/JSON mapped to `lower snake_case` DB columns; ran Ponytail Audit; added `ADR-029`; verified `pytest` (`16 passed, 1 skipped`) and `compileall`. | `backend/`, `docs/20_Technical_Decision_Records.md`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md` |
+| 2026-11-18 | Phase 1 Build & PR #5 (`prime`) | Implemented full Phase 1 backend (`core/`, `api/`, `audit`, `identity`, `notifications`, `observations`, `collection`, `evidence`, `jobs`, `cases`, Alembic `0001_phase1_initial_schema.py`, and test suite) in `camelCase` Python/JSON mapped to `lower snake_case` DB columns; ran Ponytail Audit; added `ADR-029`; synced `origin/master` into `prime` and fixed CI Ruff lint checks (`3/3` CI checks passing on PR #5). | `backend/`, `docs/20_Technical_Decision_Records.md`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md` |
+| 2026-11-18 | Live DB Tests & Docs (`prime`) | Verified live PostgreSQL 16 + PostGIS 3.4 (`ecowatch-db`), `alembic` migrations, and full `pytest` suite (`17 passed` including `postgis` marker); updated `README.md`, `backend/README.md`, `docs/08`, `docs/22`, `docs/23`, and `PACKAGE_MANIFEST.json`. | `README.md`, `backend/README.md`, `backend/alembic.ini`, `docs/08_Data_and_Database_Architecture.md`, `docs/22_Change_History_and_References.md`, `docs/23_Implementation_Backlog_and_Acceptance.md`, `docs/PACKAGE_MANIFEST.json`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md` |
 
 ---
 
-## 3. Items For Owner Review & Local Environment Completion
+## 3. Items For Owner Review & Merge
 
-1. **Install missing dev/runtime packages in local `.venv` (already declared in `backend/pyproject.toml`):**
-   - Host system Python lacks `ruff` and `python-multipart` (needed for HTTP multipart evidence uploads and `make lint`). Run `make venv && .venv/bin/pip install -e "backend[dev]"` (or inspect `backend/pyproject.toml`).
-2. **Verify live PostgreSQL 16 + PostGIS 3.4 migrations & `SKIP LOCKED` worker test:**
-   - Start DB container (`make up`), apply migrations (`cd backend && alembic upgrade head`), and run `ECOWATCH_RUN_POSTGIS_TESTS=1 .venv/bin/pytest -m postgis`.
-3. **Run Ruff lint & CI verification:**
-   - Run `make lint` (`ruff check backend`) and `make test`.
-4. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
-   - `ADR-029` records the Phase 1 build and `camelCase` naming boundary (`Approved 2026-11-18`); formally promote `ADR-014`–`ADR-016` and `ADR-026`–`ADR-028` statuses in `docs/20_Technical_Decision_Records.md` + `docs/08` when ready to merge `prime -> master`.
+1. **Approve and squash-merge PR #5 (`prime` → `master`):**
+   - Conflict with `origin/master` is resolved and CI (`infra`, `backend`, `frontend`) is green; one maintainer review approval is needed on GitHub before squash-merging into `master` (keeping `prime` intact per `CONTRIBUTING.md`).
+2. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
+   - `ADR-029` is `Approved 2026-11-18`; optionally promote `ADR-014`–`ADR-016` and `ADR-026`–`ADR-028` statuses from `Proposed` to `Approved` during review.
 
 ---
 

@@ -1,6 +1,6 @@
 # 23 — Implementation Backlog and Acceptance
 
-**Status:** Proposed sequencing; no implementation is implied.
+**Status:** Phase 1 backend code implemented (`backend/`); Phases 2–5 and release readiness remain planned/unimplemented.
 
 ## 1. Before coding: pilot definition
 
@@ -16,19 +16,17 @@ Deliverables:
 
 Acceptance: environmental specialist and project owner review the problem, indicators, source suitability and limits. The pilot is bounded and operationally credible.
 
-## 2. Phase 1 — Unified evidence foundation
+## 2. Phase 1 — Unified evidence foundation (`backend/` implemented; live DB/lint checks in progress)
 
 Backlog:
-- Repository and development environment.
-- PostgreSQL schema and migrations.
-- Identity/roles and anonymous submission boundary.
-- Observation API and idempotency.
-- Evidence upload, original storage and derivatives.
-- Provenance and temporal precision.
-- Case creation and case-observation links.
-- Basic map/list/timeline.
-- Audit events.
-- Seed/test dataset.
+- [x] Repository and development environment (`backend/pyproject.toml`, `compose.yaml`, `Makefile`).
+- [x] PostgreSQL + PostGIS schema and Alembic migrations (`0001_phase1_initial_schema.py`, 17 Phase 1 tables).
+- [x] Identity/roles (`PERMISSIONS_MATRIX.md`) and anonymous submission boundary.
+- [x] Observation intake API, idempotency keys, `observation_sources` isolation, `methods`/`units`, and immutable `observation_versions`.
+- [x] Evidence upload pipeline, untouched original storage, scan/quarantine, and EXIF-stripped derivatives (`processing_jobs` worker).
+- [x] Provenance and four separated timestamps (`event_start_at`, `observed_at`, `submitted_at`, `received_at`) + location/time precision.
+- [x] Case creation, many-to-many case-observation links, lifecycle transitions, two-key `field_verified` approval, timelines, and approved public summaries.
+- [x] Append-only `audit_events` and temporary-record test isolation (zero seeded demo data).
 
 Acceptance:
 - Valid observations can be submitted and retrieved.
