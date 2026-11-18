@@ -90,6 +90,53 @@ def test_scan_creates_one_suggestion_and_repeated_scans_do_not_duplicate(
     assert suggestion.reasons
 
 
+def test_a_pair_that_changes_task_stays_one_suggestion(dbSession: Session) -> None:
+    """A source reference arriving later reclassifies the row, not adds a second."""
+    org = create_temp_org(dbSession)
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    second = make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    assert service.scan_observation(first.id) == 1
+    assert dbSession.query(EvidenceRelationship).one().task == CorrelationTask.DUPLICATE.value
+
+    first.sourceRef = "post-42"
+    second.sourceRef = "post-42"
+    dbSession.commit()
+
+    assert service.scan_observation(first.id) == 1
+    rows = dbSession.query(EvidenceRelationship).all()
+    assert len(rows) == 1
+    assert rows[0].task == CorrelationTask.SOURCE_DEPENDENCY.value
+    assert rows[0].sourceIndependent is False
+
+
+def test_a_decided_pair_is_never_reclassified_by_a_rescan(dbSession: Session) -> None:
+    """Reclassification is for open suggestions; a decision stays as recorded."""
+    org = create_temp_org(dbSession)
+    reviewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    second = make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    service.decide(
+        reviewer_principal(reviewer, org), suggestion.id,
+        RelationshipStatus.REJECTED, reason="different river",
+    )
+
+    first.sourceRef = "post-42"
+    second.sourceRef = "post-42"
+    dbSession.commit()
+    service.scan_observation(first.id)
+
+    rows = dbSession.query(EvidenceRelationship).all()
+    assert len(rows) == 1
+    assert rows[0].task == CorrelationTask.DUPLICATE.value
+    assert rows[0].status == RelationshipStatus.REJECTED.value
+
+
 def test_time_window_comes_from_the_category(dbSession: Session) -> None:
     """A noise complaint 15h old must not match one a week old; a dump can."""
     org = create_temp_org(dbSession)

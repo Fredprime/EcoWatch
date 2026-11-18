@@ -183,15 +183,23 @@ class CorrelationRepository:
         return self._session.get(EvidenceRelationship, relationshipId)
 
     def find_pair(
-        self, firstId: uuid.UUID, secondId: uuid.UUID, task: str
+        self, firstId: uuid.UUID, secondId: uuid.UUID
     ) -> EvidenceRelationship | None:
+        """Find the row for a pair, whatever task it was stored under.
+
+        Looking up by `(pair, task)` let one pair acquire a second row when the
+        detector's verdict changed -- a source reference arriving after the first
+        scan turns a `duplicate` into a `source_dependency`, and the reviewer saw
+        both. The pair is the identity; the task is a field of it.
+        """
         aId, bId = canonical_pair(firstId, secondId)
         return self._session.scalar(
-            select(EvidenceRelationship).where(
+            select(EvidenceRelationship)
+            .where(
                 EvidenceRelationship.observationAId == aId,
                 EvidenceRelationship.observationBId == bId,
-                EvidenceRelationship.task == task,
             )
+            .order_by(EvidenceRelationship.task, EvidenceRelationship.createdAt)
         )
 
     def upsert_suggestion(
@@ -209,12 +217,19 @@ class CorrelationRepository:
         ambiguous: bool = False,
         methodVersion: str = METHOD_VERSION,
     ) -> EvidenceRelationship:
-        """Insert a suggestion, or refresh an undecided one. Decisions are never overwritten."""
+        """Insert a suggestion, or refresh and reclassify an undecided one.
+
+        A decided row is never touched, whatever task it was decided under.
+        """
         aId, bId = canonical_pair(firstId, secondId)
-        existing = self.find_pair(aId, bId, task)
+        existing = self.find_pair(aId, bId)
         if existing is not None:
             if existing.status != RelationshipStatus.SUGGESTED.value:
                 return existing
+            # The detector may now know more than it did (a source reference, a
+            # corrected description). Reclassify in place rather than queueing
+            # the same pair twice under two task names.
+            existing.task = task
             existing.score = score
             existing.components = components
             existing.missingSignals = missingSignals
