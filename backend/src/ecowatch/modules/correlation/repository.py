@@ -1,13 +1,15 @@
 """Database access and candidate retrieval for evidence correlation.
 
-Retrieval is deliberately dialect-agnostic: a cheap SQL prefilter (organisation,
-not hidden, time window) that runs on both SQLite and PostgreSQL, then an exact
-distance test in Python over that bounded set. The bounds themselves come from
-`policy.py`, so retrieval and scoring cannot disagree about how wide a scan is.
+Retrieval is a prefilter (organisation, not hidden, time window) plus an exact
+distance test. The bounds themselves come from `policy.py`, so retrieval and
+scoring cannot disagree about how wide a scan is.
 
-`shortcut: distance is filtered in Python, not with ST_DWithin, so it is bounded
-by the prefilter limit rather than by a GiST index. Replace with an ST_DWithin
-query on PostgreSQL when candidate volumes make the bounded scan matter.`
+On PostgreSQL the distance test is `ST_DWithin` against `geography`, so it uses
+the GiST index Phase 1 created and the LIMIT applies to rows that already pass.
+
+`shortcut: SQLite has no spatial functions, so there the distance test is a
+haversine in Python over the prefiltered, limited set. Correct, just bounded by
+the prefilter rather than by an index. SQLite is the test dialect only.`
 """
 
 import uuid
@@ -17,7 +19,11 @@ from typing import Any
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
-from ecowatch.core.spatial import geography_to_text_expr, parse_point_wkt
+from ecowatch.core.spatial import (
+    format_point_wkt,
+    geography_to_text_expr,
+    parse_point_wkt,
+)
 from ecowatch.modules.correlation.models import (
     CorrelationTask,
     EvidenceRelationship,
@@ -125,12 +131,27 @@ class CorrelationRepository:
                 Observation.observedAt <= subjectObservedAt + window,
             )
 
+        # Push the distance test into PostgreSQL so the N nearest-by-time rows
+        # are not first fetched only to be thrown away.
+        indexedDistance = subjectPoint is not None and self.dialect_name == "postgresql"
+        if indexedDistance:
+            # parse_point_wkt returns (longitude, latitude), which is the order
+            # format_point_wkt expects -- the reverse of the haversine call below.
+            point = format_point_wkt(subjectPoint[0], subjectPoint[1])
+            statement = statement.where(
+                func.ST_DWithin(
+                    Observation.location,
+                    func.ST_GeogFromText(point),
+                    bounds.radius_km * 1000.0,
+                )
+            )
+
         statement = statement.order_by(Observation.receivedAt.desc()).limit(limit)
 
         rows: list[tuple[Observation, Any]] = []
         for row in self._session.execute(statement).all():
             candidate, candidateWkt = row[0], row[1]
-            if subjectPoint is not None and candidateWkt is not None:
+            if not indexedDistance and subjectPoint is not None and candidateWkt is not None:
                 point = parse_point_wkt(candidateWkt)
                 if point is not None:
                     distance = haversine_km(
