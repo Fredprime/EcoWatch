@@ -25,6 +25,8 @@ from ecowatch.core.spatial import (
     parse_point_wkt,
 )
 from ecowatch.modules.correlation.models import (
+    CorrelationCluster,
+    CorrelationClusterMember,
     CorrelationTask,
     EvidenceRelationship,
     RelationshipStatus,
@@ -204,6 +206,7 @@ class CorrelationRepository:
         missingSignals: list[str],
         reasons: list[str],
         sourceIndependent: bool,
+        ambiguous: bool = False,
         methodVersion: str = METHOD_VERSION,
     ) -> EvidenceRelationship:
         """Insert a suggestion, or refresh an undecided one. Decisions are never overwritten."""
@@ -217,6 +220,7 @@ class CorrelationRepository:
             existing.missingSignals = missingSignals
             existing.reasons = reasons
             existing.sourceIndependent = sourceIndependent
+            existing.ambiguous = ambiguous
             existing.methodVersion = methodVersion
             self._session.flush()
             return existing
@@ -231,6 +235,7 @@ class CorrelationRepository:
             missingSignals=missingSignals,
             reasons=reasons,
             sourceIndependent=sourceIndependent,
+            ambiguous=ambiguous,
             methodVersion=methodVersion,
             status=RelationshipStatus.SUGGESTED.value,
         )
@@ -259,6 +264,53 @@ class CorrelationRepository:
     def all_org_ids(self) -> set[uuid.UUID]:
         """Every organisation id, for a platform administrator's view only."""
         return set(self._session.scalars(select(Organisation.id)).all())
+
+    def ensure_cluster(self, organisationId: uuid.UUID, observationId: uuid.UUID) -> uuid.UUID:
+        """Return the cluster holding `observationId`, creating one if needed.
+
+        Creating a cluster claims nothing: it gives a reviewer a place to look.
+        An existing membership is left alone, which is what keeps a scan from
+        joining A to C because both matched B.
+        """
+        existing = self._session.scalar(
+            select(CorrelationClusterMember.clusterId).where(
+                CorrelationClusterMember.observationId == observationId
+            )
+        )
+        if existing is not None:
+            return existing
+
+        cluster = CorrelationCluster(organisationId=organisationId)
+        self._session.add(cluster)
+        self._session.flush()
+        self._session.add(
+            CorrelationClusterMember(clusterId=cluster.id, observationId=observationId)
+        )
+        self._session.flush()
+        return cluster.id
+
+    def clusters_with_members(
+        self, organisationIds: set[uuid.UUID]
+    ) -> list[tuple[CorrelationCluster, list[uuid.UUID]]]:
+        """Clusters for the caller's organisations, with their observation ids."""
+        if not organisationIds:
+            return []
+        clusters = list(
+            self._session.scalars(
+                select(CorrelationCluster)
+                .where(CorrelationCluster.organisationId.in_(organisationIds))
+                .order_by(CorrelationCluster.createdAt.desc())
+            ).all()
+        )
+        members: dict[uuid.UUID, list[uuid.UUID]] = {cluster.id: [] for cluster in clusters}
+        if clusters:
+            for clusterId, observationId in self._session.execute(
+                select(
+                    CorrelationClusterMember.clusterId, CorrelationClusterMember.observationId
+                ).where(CorrelationClusterMember.clusterId.in_(members))
+            ).all():
+                members[clusterId].append(observationId)
+        return [(cluster, members[cluster.id]) for cluster in clusters]
 
     def count_for_task(self, task: CorrelationTask) -> int:
         return int(

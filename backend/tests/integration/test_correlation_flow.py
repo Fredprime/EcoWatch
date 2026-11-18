@@ -404,6 +404,80 @@ def test_scan_endpoint_queues_a_job_and_scoring_is_never_inline(
     assert dbSession.query(EvidenceRelationship).count() == 1
 
 
+def test_reports_get_their_own_cluster_and_are_never_auto_merged(
+    dbSession: Session,
+) -> None:
+    """A~B and B~C must not quietly become one cluster of three."""
+    org = create_temp_org(dbSession)
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    second = make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(first.id)
+    service.scan_observation(second.id)
+
+    # They are related by a suggestion, but membership only grows by a human
+    # accepting it, so each report still has its own provisional home.
+    clusters = service.list_clusters(reviewer_principal(
+        create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)]), org
+    ))
+    assert len(clusters) == 2
+    assert all(len(observationIds) == 1 for _, observationIds in clusters)
+
+
+def test_a_report_with_no_match_still_has_a_cluster(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    only = make_observation(dbSession, org, description="loud generator at the market")
+
+    service = CorrelationService(dbSession)
+    assert service.scan_observation(only.id) == 0
+    viewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    clusters = service.list_clusters(reviewer_principal(viewer, org))
+    assert [observationIds for _, observationIds in clusters] == [[only.id]]
+
+
+def test_a_tie_is_marked_ambiguous_instead_of_silently_ordered(
+    dbSession: Session,
+) -> None:
+    org = create_temp_org(dbSession)
+    now = datetime.now(UTC)
+    subject = make_observation(dbSession, org, description="brown foam at the weir",
+                               observedAt=now - timedelta(hours=1))
+    for _ in range(2):
+        make_observation(dbSession, org, description="brown foam at the weir",
+                         observedAt=now - timedelta(hours=1))
+
+    CorrelationService(dbSession).scan_observation(subject.id)
+    rows = dbSession.query(EvidenceRelationship).all()
+    assert len(rows) == 2
+    assert all(row.ambiguous for row in rows)
+
+
+def test_clusters_require_authentication_and_stay_in_the_organisation(
+    dbSession: Session, client: TestClient, authProvider
+) -> None:
+    ours = create_temp_org(dbSession, name="Our Org")
+    theirs = create_temp_org(dbSession, name="Their Org")
+    oursUser = create_temp_user(dbSession, memberships=[(ours.id, Role.REVIEWER)])
+    theirsUser = create_temp_user(dbSession, memberships=[(theirs.id, Role.REVIEWER)])
+    oursObs = make_observation(dbSession, ours, description="dead fish at the river bend")
+    theirsObs = make_observation(dbSession, theirs, description="dead fish at the river bend")
+    service = CorrelationService(dbSession)
+    service.scan_observation(oursObs.id)
+    service.scan_observation(theirsObs.id)
+
+    assert client.get("/api/v1/correlation/clusters").status_code == 401
+
+    for user, expected in ((oursUser, 1), (theirsUser, 1)):
+        response = client.get(
+            "/api/v1/correlation/clusters", headers=auth_headers(authProvider, user)
+        )
+        assert response.status_code == 200
+        clusters = response.json()
+        assert len(clusters) == expected
+        assert all(len(item["observationIds"]) == 1 for item in clusters)
+
+
 def test_suggestion_listing_requires_authentication(client: TestClient) -> None:
     assert client.get("/api/v1/correlation/suggestions").status_code == 401
 

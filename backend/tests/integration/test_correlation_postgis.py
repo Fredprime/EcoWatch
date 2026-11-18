@@ -65,6 +65,25 @@ def test_correlation_constraints_and_indexes(tmp_path: Path) -> None:
                 ).scalars()
             )
             assert "ix_evidence_relationships_observation_b_id" in indexes
+            # Migration 0003: one cluster per report, so A~B and B~C cannot
+            # become one cluster by accumulation.
+            memberConstraints = set(
+                session.execute(
+                    text(
+                        "SELECT conname FROM pg_constraint "
+                        "WHERE conrelid = 'correlation_cluster_members'::regclass"
+                    )
+                ).scalars()
+            )
+            assert "uq_correlation_cluster_members_observation" in memberConstraints
+            # And the tie flag survived to the schema.
+            ambiguousColumn = session.execute(
+                text(
+                    "SELECT is_nullable FROM information_schema.columns "
+                    "WHERE table_name = 'evidence_relationships' AND column_name = 'ambiguous'"
+                )
+            ).scalar()
+            assert ambiguousColumn == "NO"
             assert "ix_evidence_relationships_status" in indexes
             assert "ix_observations_source_ref" in set(
                 session.execute(

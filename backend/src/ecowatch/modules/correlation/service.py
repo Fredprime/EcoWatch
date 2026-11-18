@@ -21,6 +21,7 @@ from ecowatch.modules.audit.service import record_audit_event
 from ecowatch.modules.correlation.detectors import TASK_REASONS, task_for
 from ecowatch.modules.correlation.features import Location, ObservationFeatures
 from ecowatch.modules.correlation.models import (
+    CorrelationCluster,
     EvidenceRelationship,
     RelationshipStatus,
 )
@@ -108,14 +109,19 @@ class CorrelationService:
             )
         ]
 
+        # Every scanned report gets a provisional home, even when nothing matched,
+        # so a reviewer can find it. This claims nothing about the report.
+        self._repo.ensure_cluster(subject.organisationId, subject.id)
+
         decided = self._repo.decided_partner_ids(subject.id)
-        written = 0
-        for suggestion in rank(
+        ranking = rank(
             subjectFeatures,
             candidateFeatures,
             temporal_window_hours=bounds.window_hours,
             radius_km=bounds.radius_km,
-        ).suggestions:
+        )
+        written = 0
+        for position, suggestion in enumerate(ranking.suggestions):
             partnerId = uuid.UUID(suggestion.observation_b_id)
             task = task_for(suggestion)
             if partnerId in decided or task is None:
@@ -132,6 +138,9 @@ class CorrelationService:
                 # link this is before the individual signals that support it.
                 reasons=[TASK_REASONS[task], *suggestion.reasons],
                 sourceIndependent=suggestion.source_independent,
+                # A tie is for a person to break, so both ends of it are marked
+                # rather than ordered and left to look decisive.
+                ambiguous=ranking.ambiguous_at_top and position < 2,
             )
             written += 1
 
@@ -297,6 +306,17 @@ class CorrelationService:
             else principal.accessible_org_ids(Permission.CORRELATION_READ)
         )
         return self._repo.list_suggestions(organisationIds, limit=limit)
+
+    def list_clusters(
+        self, principal: Principal, *, limit: int = 50
+    ) -> list[tuple[CorrelationCluster, list[uuid.UUID]]]:
+        """Provisional clusters visible to the caller. Staff-only by permission."""
+        organisationIds = (
+            self._repo.all_org_ids()
+            if principal.is_system_admin
+            else principal.accessible_org_ids(Permission.CORRELATION_READ)
+        )
+        return self._repo.clusters_with_members(organisationIds)[:limit]
 
 
 def enqueue_scan(session: Session, observationId: uuid.UUID) -> uuid.UUID:

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ecowatch.api.dependencies import get_request_id, require_permission
 from ecowatch.core.database import get_db
 from ecowatch.modules.correlation.schemas import (
+    CorrelationClusterResponse,
     CorrelationDecisionRequest,
     CorrelationReopenRequest,
     CorrelationScanResponse,
@@ -90,3 +91,25 @@ def reopen_suggestion(
         requestId=get_request_id(request),
     )
     return CorrelationSuggestionResponse.model_validate(relationship)
+
+
+@router.get("/clusters", response_model=list[CorrelationClusterResponse])
+def list_clusters(
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.CORRELATION_READ)),
+    db: Session = Depends(get_db),
+) -> list[CorrelationClusterResponse]:
+    """Provisional clusters for the caller's organisations.
+
+    Staff-only: a cluster is a review aid, never a public finding and never a case.
+    """
+    rows = CorrelationService(db).list_clusters(principal, limit=limit)
+    return [
+        CorrelationClusterResponse(
+            id=cluster.id,
+            organisationId=cluster.organisationId,
+            observationIds=observationIds,
+            createdAt=cluster.createdAt,
+        )
+        for cluster, observationIds in rows
+    ]

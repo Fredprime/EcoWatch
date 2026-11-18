@@ -22,6 +22,7 @@ class CorrelationSuggestionResponse(CamelModel):
     missingSignals: list[str]
     reasons: list[str]
     sourceIndependent: bool
+    ambiguous: bool = False
     status: str
     methodVersion: str
     decidedByUserId: uuid.UUID | None = None
@@ -35,6 +36,15 @@ class CorrelationDecisionRequest(CamelModel):
 
     decision: RelationshipStatus
     reason: str | None = Field(default=None, max_length=2000)
+
+
+class CorrelationClusterResponse(CamelModel):
+    """A provisional cluster. Not a case, and it has no case field to promote."""
+
+    id: uuid.UUID
+    organisationId: uuid.UUID
+    observationIds: list[uuid.UUID]
+    createdAt: datetime
 
 
 class CorrelationReopenRequest(CamelModel):
