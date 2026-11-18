@@ -5,7 +5,9 @@ import { WORKSPACES } from './types';
 import { OverviewPage } from './pages/OverviewPage';
 import { ReportPage } from './pages/ReportPage';
 import { CasesPage } from './pages/CasesPage';
+import { CaseDetailPage } from './pages/CaseDetailPage';
 import { MonitoringPage } from './pages/MonitoringPage';
+import { EvidencePage } from './pages/EvidencePage';
 import { SimpleWorkspace } from './pages/SimpleWorkspace';
 
 type RoleView = 'all' | 'contributor' | 'reviewer' | 'investigator' | 'specialist' | 'manager' | 'admin';
@@ -89,9 +91,10 @@ function Layout() {
           <Routes>
             <Route path="/" element={<OverviewPage />} />
             <Route path="/report" element={<ReportPage />} />
-            <Route path="/evidence" element={<SimpleWorkspace title="Evidence Intelligence" description="Candidate relationships, duplicate review and evidence context. Suggestions must be explainable, reversible, and reviewed by authorised humans." />} />
+            <Route path="/evidence" element={<EvidencePage />} />
             <Route path="/monitoring" element={<MonitoringPage />} />
             <Route path="/cases" element={<CasesPage />} />
+            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
             <Route path="/analysis" element={<SimpleWorkspace title="Analysis" description="Datasets, methods, outputs and interpretation. Derived artefacts are linked to source data and versions; interpretations are separate reviewed records." />} />
             <Route path="/prioritisation" element={<SimpleWorkspace title="Prioritisation" description="Transparent factors and human review decisions. The system supports prioritisation; it does not independently decide enforcement or public-safety action." />} />
             <Route path="/interventions" element={<SimpleWorkspace title="Interventions" description="Approved actions, owners, milestones and records. Activity completion is distinct from environmental outcome." />} />

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { WorkspacePage } from './WorkspacePage';
 
 const timeline = [
@@ -58,7 +59,7 @@ export function CasesPage() {
               <tbody>
                 {cases.map((c) => (
                   <tr key={c.id}>
-                    <th scope="row">{c.id}</th>
+                    <th scope="row"><Link to={`/cases/${c.id}`}>{c.id}</Link></th>
                     <td>{c.title} <em className="muted">(example row)</em></td>
                     <td>{c.status}</td>
                     <td>{c.owner}</td>
