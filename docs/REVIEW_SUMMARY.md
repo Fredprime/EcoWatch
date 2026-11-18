@@ -51,9 +51,19 @@ This is the single review document for checking progress, recent changes, and ve
 
 ## 3. Items For Owner Review & Merge
 
-1. **Approve and squash-merge PR #5 (`prime` → `master`):**
-   - Conflict with `origin/master` is resolved and CI (`infra`, `backend`, `frontend`) is green; one maintainer review approval is needed on GitHub before squash-merging into `master` (keeping `prime` intact per `CONTRIBUTING.md`).
-2. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
+1. **PR #11 (`phase2-hardening` → `prime`) — two correlation bug fixes:**
+   - A pair whose detector task changed on rescan got a second suggestion row; the pair is now the identity and an open row is reclassified in place.
+   - `reopen` could clear a decision on a report the caller submitted; both reviewer actions now share the self-review check.
+   - CI green (3/3). Tests: 73 passed / 3 skipped, 76 with PostGIS.
+2. **PR #12 (`phase2-intake-hook` → `prime`) — automatic scans:**
+   - Intake now queues `correlation.scan` in the same transaction as the observation insert, so new reports are actually compared. Idempotent replay queues nothing.
+   - This edits `collection/service.py` (Phase 1-owned), so it is a separate PR that can be dropped without affecting #11.
+   - CI green (3/3). Tests: 72 passed / 3 skipped, 75 with PostGIS.
+3. **Decisions that gate the rest of Phase 2** (details and options in `docs/PHASE2_TODO.md`, "What I need from the owner"):
+   - **pgvector** — gates `correlation_embeddings` and semantic similarity only.
+   - **Evaluation route** — gates the scored harness run and any accuracy claim.
+   - **Module / authority split** — `cross_case`, `promote_to_case`, `merge` and `split` need the case-side rules in `docs/PERMISSIONS_MATRIX.md` §4 and the cases module Phase 1 owns.
+4. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
    - `ADR-029` is `Approved 2026-11-18`; optionally promote `ADR-014`–`ADR-016` and `ADR-026`–`ADR-028` statuses from `Proposed` to `Approved` during review.
 
 ---
