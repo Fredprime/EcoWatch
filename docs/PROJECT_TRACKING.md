@@ -1,11 +1,11 @@
 # EcoWatch Project Tracking
 
-**Version:** 1.4  
+**Version:** 1.5  
 **Date:** 2026-11-18  
 **Project:** EcoWatch (Merged Project — canonical baseline in `docs/`, incorporating SignalWeave as the Evidence Correlation and Incident Intelligence subsystem)  
 **Repository:** `Fredprime/EcoWatch`  
-**Working Branch:** `prime` (branched from `master`; never push directly to `main` or `master`)  
-**Status:** Phase 1 backend (`EcoWatch/backend/`) implemented in `camelCase` (Python/JSON) mapped to `lower snake_case` PostgreSQL/PostGIS schema, Ponytail-audited, and verified with `pytest` (`16 passed, 1 skipped`) + `compileall`; pending `ruff` lint, `python-multipart` install, and live PostGIS migration verification.
+**Working Branch:** `prime` (branched from `master`; never push directly to `main` or `master`). Phase 2 pgvector work is on `Tazor` pending PR into `prime`.  
+**Status:** Phase 1 backend plus Phase 2 evidence correlation (incl. approved pgvector storage and semantic candidate prefilter) implemented in `camelCase` (Python/JSON) mapped to `lower snake_case` PostgreSQL/PostGIS schema. Ruff clean; `pytest` 106 passed against live PostgreSQL 16 + PostGIS 3.7 + pgvector, 102 passed / 4 skipped without a live DB. Database image is built locally from the root `Dockerfile`.
 
 ---
 
@@ -130,3 +130,4 @@
 | 2.7 | 2026-11-18 | `docs/phase2-decisions` | Recorded the owner's four Phase 2 decisions: pgvector approved (`ADR-030`), smoke-test-only evaluation, case-side actions owned by the cases module (`ADR-031`), and re-scan on corrections plus evidence uploads. Updated `PHASE2_TODO.md`, `PHASE2_CORRELATION.md`, `REVIEW_SUMMARY.md` and the ADR register. |
 | 2.8 | 2026-11-18 | `feat/correlation-rescan-triggers` | Implemented the approved re-scan triggers: observation corrections and evidence uploads enqueue `correlation.scan` in the same transaction as the change. Added two integration tests. Ruff clean; 96 passed with PostGIS, 93 passed / 3 skipped without. |
 | 2.9 | 2026-11-18 | `test/correlation-evaluation-smoke` | Ran the evaluation harness under the owner's smoke-test-only route with temporary synthetic fixtures. Counts assert scoring-to-evaluation wiring only; no accuracy claim. Ruff clean; 97 passed with PostGIS, 94 passed / 3 skipped without. |
+| 2.10 | 2026-11-18 | `Tazor` | Implemented ADR-030 pgvector support: migration `0005_phase2_embeddings` (`correlation_embeddings` with `vector(384)`, HNSW cosine index on PostgreSQL, JSON fallback on SQLite, unique per observation/model/input hash, skip-on-unchanged); deterministic hashed-word vectors (`hashed-words-v1`, not a semantic model — ADR-019 open, no accuracy claim); `semantic_similarity` uses vector cosine with `token_similarity` fallback; nearest-vector query narrows the org/time/space candidate set. Combined DB image from new root `Dockerfile` (pgvector base + PostGIS 3.7); compose and both CI DB jobs use it and prove both extensions. Ruff clean; 106 passed with live PostgreSQL, 102 passed / 4 skipped without. |

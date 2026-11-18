@@ -22,11 +22,16 @@ jobs:
       - name: Validate compose file
         run: docker compose config -q
       - name: Start database
-        run: docker compose up -d --wait db
-      - name: PostGIS reachable
+        run: docker compose up -d --wait --build db
+      - name: PostgreSQL extensions (PostGIS + pgvector)
         run: |
-          docker compose exec -T db psql -U "${POSTGRES_USER:-ecowatch}" -d "${POSTGRES_DB:-ecowatch}" \
-            -c "SELECT postgis_version();"
+          docker compose exec -T db psql -v ON_ERROR_STOP=1 \
+            -U "${POSTGRES_USER:-ecowatch}" -d "${POSTGRES_DB:-ecowatch}" \
+            -c "CREATE EXTENSION IF NOT EXISTS postgis;" \
+            -c "CREATE EXTENSION IF NOT EXISTS vector;" \
+            -c "SELECT postgis_version();" \
+            -c "SELECT extname, extversion FROM pg_extension WHERE extname IN ('postgis','vector') ORDER BY extname;" \
+            -c "SELECT '[1,2,3]'::vector;"
       - name: Dump logs on failure
         if: failure()
         run: docker compose logs db
@@ -38,23 +43,6 @@ jobs:
   backend:
     name: backend / lint + test
     runs-on: ubuntu-latest
-    # A real PostGIS instance, so the migrations are exercised instead of only
-    # modelled. Without this the migration tests skip and a broken revision
-    # reaches a deploy before anyone notices.
-    services:
-      db:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_USER: ecowatch
-          POSTGRES_PASSWORD: ecowatch_dev
-          POSTGRES_DB: ecowatch
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U ecowatch -d ecowatch"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - id: detect
@@ -64,6 +52,19 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
+      - name: Start database
+        if: steps.detect.outputs.present == 'true'
+        run: docker compose up -d --wait --build db
+      - name: PostgreSQL extensions (PostGIS + pgvector)
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          docker compose exec -T db psql -v ON_ERROR_STOP=1 \
+            -U "${POSTGRES_USER:-ecowatch}" -d "${POSTGRES_DB:-ecowatch}" \
+            -c "CREATE EXTENSION IF NOT EXISTS postgis;" \
+            -c "CREATE EXTENSION IF NOT EXISTS vector;" \
+            -c "SELECT postgis_version();" \
+            -c "SELECT extname, extversion FROM pg_extension WHERE extname IN ('postgis','vector') ORDER BY extname;" \
+            -c "SELECT '[1,2,3]'::vector;"
       - name: Install, lint, test
         if: steps.detect.outputs.present == 'true'
         env:
@@ -73,6 +74,9 @@ jobs:
           pip install -e "backend[dev]"
           ruff check backend
           pytest backend
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
       - name: Not present yet
         if: steps.detect.outputs.present == 'false'
         run: echo "backend/pyproject.toml not found — skipping."

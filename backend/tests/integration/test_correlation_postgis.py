@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ecowatch.modules.correlation.models import EvidenceRelationship
+from ecowatch.modules.correlation.repository import METHOD_VERSION
 from ecowatch.modules.identity.models import Organisation
 from ecowatch.modules.observations.models import Observation
 
@@ -91,6 +92,35 @@ def test_correlation_constraints_and_indexes(tmp_path: Path) -> None:
                 ).scalars()
             )
 
+            # ADR-030: the embedding table is a real pgvector column with a
+            # cosine index and a one-vector-per-input guarantee.
+            vectorUdt = session.execute(
+                text(
+                    "SELECT udt_name FROM information_schema.columns "
+                    "WHERE table_name = 'correlation_embeddings' AND column_name = 'embedding'"
+                )
+            ).scalar()
+            assert vectorUdt == "vector"
+            embeddingIndexes = set(
+                session.execute(
+                    text(
+                        "SELECT indexname FROM pg_indexes "
+                        "WHERE tablename = 'correlation_embeddings'"
+                    )
+                ).scalars()
+            )
+            assert "ix_correlation_embeddings_vector" in embeddingIndexes
+            assert "ix_correlation_embeddings_observation_id" in embeddingIndexes
+            embeddingConstraints = set(
+                session.execute(
+                    text(
+                        "SELECT conname FROM pg_constraint "
+                        "WHERE conrelid = 'correlation_embeddings'::regclass"
+                    )
+                ).scalars()
+            )
+            assert "uq_correlation_embeddings_observation_model_input" in embeddingConstraints
+
             org = Organisation(
                 name=f"Correlation Constraints {uuid.uuid4().hex[:8]}", orgType="ngo"
             )
@@ -157,7 +187,7 @@ def _relationship(org: Organisation, aId: uuid.UUID, bId: uuid.UUID) -> Evidence
         components={},
         missingSignals=[],
         reasons=[],
-        methodVersion="correlation-1",
+        methodVersion=METHOD_VERSION,
         sourceIndependent=True,
         status="suggested",
     )
@@ -246,3 +276,82 @@ def _located_observation(
     session.add(observation)
     session.flush()
     return observation
+
+
+@pytest.mark.skipif(
+    os.environ.get("ECOWATCH_RUN_POSTGIS_TESTS") != "1",
+    reason="Set ECOWATCH_RUN_POSTGIS_TESTS=1 with running Postgres/PostGIS",
+)
+def test_pgvector_semantic_prefilter_ranks_and_scopes() -> None:
+    """The stored-vector prefilter ranks by cosine distance and stays in-tenant."""
+    dbUrl = os.environ.get(
+        "DATABASE_URL",
+        "postgresql+psycopg://ecowatch:ecowatch_dev@localhost:5433/ecowatch",
+    )
+    backendDir = Path(__file__).resolve().parents[2]
+    alembicCfg = Config(str(backendDir / "alembic.ini"))
+    alembicCfg.set_main_option("script_location", str(backendDir / "alembic"))
+    os.environ["DATABASE_URL"] = dbUrl
+    command.upgrade(alembicCfg, "head")
+
+    engine = create_engine(dbUrl)
+    try:
+        from ecowatch.modules.correlation.embeddings import (
+            build_embedding,
+            embedding_input_hash,
+        )
+        from ecowatch.modules.correlation.repository import CorrelationRepository
+
+        with Session(engine) as session:
+            org = Organisation(name=f"Semantic Prefilter {uuid.uuid4().hex[:8]}", orgType="ngo")
+            session.add(org)
+            session.flush()
+
+            observedAt = datetime.now(UTC) - timedelta(hours=2)
+            subject = _located_observation(session, org, 6.6885, -1.6244, observedAt)
+            near = _located_observation(session, org, 6.6886, -1.6245, observedAt)
+            far = _located_observation(session, org, 6.6887, -1.6246, observedAt)
+            session.commit()
+
+            repo = CorrelationRepository(session)
+            texts = {
+                subject.id: "dead fish at the river bend",
+                near.id: "dead fish at the river bend",
+                far.id: "copper refinery downstream monitoring",
+            }
+            for observation in (subject, near, far):
+                text = texts[observation.id]
+                embedding = build_embedding(text, "water_pollution")
+                assert embedding is not None
+                repo.store_embedding(
+                    organisationId=org.id,
+                    observationId=observation.id,
+                    inputHash=embedding_input_hash(text, "water_pollution"),
+                    embedding=embedding,
+                )
+
+            # Nearest by cosine distance, not by recency or id.
+            assert repo.semantic_candidate_ids(subject, limit=1) == {near.id}
+
+            # A same-text vector in another organisation is never a candidate.
+            otherOrg = Organisation(name=f"Other Org {uuid.uuid4().hex[:8]}", orgType="ngo")
+            session.add(otherOrg)
+            session.flush()
+            other = _located_observation(session, otherOrg, 6.6885, -1.6244, observedAt)
+            session.commit()
+            otherText = "dead fish at the river bend"
+            otherEmbedding = build_embedding(otherText, "water_pollution")
+            assert otherEmbedding is not None
+            repo.store_embedding(
+                organisationId=otherOrg.id,
+                observationId=other.id,
+                inputHash=embedding_input_hash(otherText, "water_pollution"),
+                embedding=otherEmbedding,
+            )
+            session.commit()
+
+            assert other.id not in repo.semantic_candidate_ids(subject, limit=10)
+    finally:
+        command.downgrade(alembicCfg, "base")
+        command.upgrade(alembicCfg, "head")
+        engine.dispose()

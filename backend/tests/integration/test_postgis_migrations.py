@@ -40,6 +40,14 @@ def test_alembic_upgrade_downgrade_and_skip_locked(tmp_path: Path) -> None:
             postgisVer = session.execute(text("SELECT postgis_version()")).scalar_one()
             assert postgisVer is not None
 
+            # ADR-030: migration 0005 provisions pgvector in the same database.
+            extensions = set(
+                session.execute(
+                    text("SELECT extname FROM pg_extension WHERE extname IN ('postgis','vector')")
+                ).scalars()
+            )
+            assert {"postgis", "vector"} <= extensions
+
             job = ProcessingJob(
                 jobType="test.noop",
                 payload={"temp": str(uuid.uuid4())},

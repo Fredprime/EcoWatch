@@ -1,7 +1,7 @@
 .PHONY: help up down reset psql logs venv lint test
 
 help:
-	@echo "up      start local Postgres/PostGIS (podman)"
+	@echo "up      build and start local PostgreSQL + PostGIS + pgvector (podman)"
 	@echo "down    stop it (keeps data)"
 	@echo "reset   stop and DELETE local data"
 	@echo "psql    open a psql shell"
@@ -11,7 +11,7 @@ help:
 	@echo "test    pytest (needs backend/)"
 
 up:
-	scripts/compose.sh up -d --wait
+	scripts/compose.sh up -d --wait --build
 
 down:
 	scripts/compose.sh down
