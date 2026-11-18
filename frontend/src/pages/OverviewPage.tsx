@@ -21,7 +21,7 @@ export function OverviewPage() {
   const [query, setQuery] = useState('');
   const [showExamples, setShowExamples] = useState(false);
 
-  const sourceRows = showExamples ? mockObservations : [];
+  const sourceRows = useMemo(() => (showExamples ? mockObservations : []), [showExamples]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
