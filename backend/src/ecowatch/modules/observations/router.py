@@ -10,6 +10,7 @@ from ecowatch.api.dependencies import (
     get_request_id,
     require_permission,
 )
+from ecowatch.core.config import Settings, get_settings
 from ecowatch.core.database import get_db
 from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
@@ -87,6 +88,7 @@ def correct_observation(
     observationId: uuid.UUID = Path(),
     principal: Principal = Depends(require_permission(Permission.OBS_CORRECT)),
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
     requestId: str | None = Depends(get_request_id),
 ) -> ObservationRestrictedResponse:
     """Append an observation correction version without mutating prior history."""
@@ -94,6 +96,7 @@ def correct_observation(
         principal,
         observationId,
         payload,
+        settings=settings,
         requestId=requestId,
     )
 

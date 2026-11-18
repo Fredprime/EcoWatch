@@ -13,6 +13,7 @@ from ecowatch.core.models import utc_now
 from ecowatch.core.security import hash_tracking_code
 from ecowatch.core.storage import StorageProvider
 from ecowatch.modules.audit.service import record_audit_event
+from ecowatch.modules.correlation.service import enqueue_scan
 from ecowatch.modules.evidence.models import (
     AssetDerivative,
     DerivativeType,
@@ -204,6 +205,9 @@ class EvidenceService:
             {"assetId": str(asset.id)},
             maxAttempts=settings.workerMaxAttempts,
         )
+        # New evidence changes what may be compared, so rescan in the same
+        # transaction as the upload and its scan job.
+        enqueue_scan(self._session, obs.id, maxAttempts=settings.workerMaxAttempts)
 
         record_audit_event(
             self._session,
