@@ -101,11 +101,6 @@
   margin: 0;
   min-width: 260px;
 }
-.menu-button,
-.menu-close,
-.sidebar-backdrop {
-  display: none;
-}
 
 .icon-button {
   padding: 0.5rem;
@@ -243,6 +238,12 @@
   cursor: not-allowed;
 }
 
+.btn.menu-button,
+.btn.menu-close,
+.sidebar-backdrop {
+  display: none;
+}
+
 .toolbar {
   display: flex;
   gap: var(--space-3);
@@ -284,13 +285,13 @@ th { font-size: 0.9rem; color: var(--color-text-muted); font-weight: 600; }
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
 
-  .menu-button {
+  .btn.menu-button {
     display: inline-flex;
   }
   .icon-button.menu-button {
     padding: 0.5rem;
   }
-  .menu-close {
+  .btn.menu-close {
     display: inline-flex;
     flex-shrink: 0;
     padding: 0.45rem 0.7rem;
