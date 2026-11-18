@@ -7,10 +7,12 @@ from typing import Any
 from fastapi import status
 from sqlalchemy.orm import Session
 
+from ecowatch.core.config import Settings
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.schemas import CursorPage
 from ecowatch.core.spatial import format_point_wkt
 from ecowatch.modules.audit.service import record_audit_event
+from ecowatch.modules.correlation.service import enqueue_scan
 from ecowatch.modules.identity.permissions import Permission, Principal, Role
 from ecowatch.modules.observations.models import AccessClass, LocationPrecision, Observation
 from ecowatch.modules.observations.repository import ObservationRepository
@@ -167,6 +169,7 @@ class ObservationService:
         observationId: uuid.UUID,
         payload: CreateCorrectionRequest,
         *,
+        settings: Settings,
         requestId: str | None = None,
     ) -> ObservationRestrictedResponse:
         """Apply a controlled correction, append ObservationVersion, and audit."""
@@ -339,6 +342,9 @@ class ObservationService:
             },
             requestId=requestId,
         )
+        # A correction changes the evidence the engine compares, so rescan in
+        # the same transaction as the version and audit record.
+        enqueue_scan(self._session, obs.id, maxAttempts=settings.workerMaxAttempts)
         self._session.commit()
         self._session.refresh(obs)
         return ObservationRestrictedResponse.from_orm_record(obs)

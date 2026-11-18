@@ -43,6 +43,7 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 | T8 | API: `GET /correlation/suggestions`, `POST /correlation/observations/{id}/scan`, `POST /correlation/suggestions/{id}/decision`, `POST /correlation/suggestions/{id}/reopen`, `GET /correlation/clusters` | `router.py` |
 | T9 | `correlation_clusters` + members, one cluster per report, provisional and staff-only — never a case | migration `0003_phase2_clusters` |
 | T10 | RBAC: `correlation:read` / `correlation:review`, deny-by-default; review implies read, enforced by a test | `identity/permissions.py` |
+| T12 | Corrections and evidence uploads enqueue another `correlation.scan` in the same transaction as the change | `observations/service.py`, `evidence/service.py` |
 
 ### Deliberate deviations from the plan, and why
 
@@ -60,7 +61,6 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 | `cross_case` detector | case-side rules and authority owner decided 2026-11-18 (`ADR-031`); not built |
 | `promote_to_case`, `merge`, `split` | owned by the Phase 1 cases module under `ADR-031`; correlation keeps suggestions and provisional clusters only |
 | Scored harness run | smoke-test only approved 2026-11-18; temporary fixtures prove mechanics, no accuracy claim |
-| Re-scan on corrections / evidence uploads | approved 2026-11-18; hooks belong to the Phase 1-owned modules and are not built yet |
 | Split-phase intake, notification push | plan §2.1 lists them under Phase 2, but they live in `collection` and `notifications`, which Phase 1 owns |
 
 ## 4. Honest limits

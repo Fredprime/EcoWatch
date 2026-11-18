@@ -31,7 +31,7 @@ Sizes are S / M / L, not hours.
 | T5 | Detector wiring: duplicate, same-event, repost/source-dependency (`FR-027`), cross-case relevance — each with its own thresholds and reason codes, all feeding one `PairSuggestion` shape | T1, T4 | M | **done** — `detectors.py`: one task per pair, `source_dependency` > `duplicate` > `same_event`, nothing below the review threshold. `cross_case` is deliberately absent: ADR-031 gives it to the cases module. |
 | T6 | Provisional clusters: staff-only, never counted as cases, never transitively merged, ambiguity surfaced not broken | T1, T5 | M | **done (container only)** — `correlation_clusters` + members, one cluster per report, created on scan, staff-only. No auto-merge, so A~B and B~C stay separate; `merge`/`split` are not built. |
 | T7 | Background job types `correlation_score` and `embedding_backfill`: idempotent, bounded retries, dead-letter state, intake latency never includes scoring (`NFR-001`) | **`processing_jobs` + worker** | M | **partly done** — `correlation.scan` queued automatically on intake and on demand, with bounded retries and a dead-letter state; `embedding_backfill` remains to build now that pgvector is approved. |
-| T12 | Re-scan on observation corrections and evidence uploads | T1, Phase 1-owned modules | S | **approved 2026-11-18, not built** — both triggers enqueue `correlation.scan`; implement in the owning modules on separate branches. |
+| T12 | Re-scan on observation corrections and evidence uploads | T1, Phase 1-owned modules | S | **done** — both triggers enqueue `correlation.scan` in the same transaction as the change; verified by two integration tests. |
 
 ## 3. Review boundary
 
