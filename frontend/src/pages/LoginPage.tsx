@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client';
 import { useAuth } from '../auth/authContext';
-import { WorkspacePage } from './WorkspacePage';
 
 export function LoginPage() {
   const { login, status } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedDestination = (location.state as { from?: unknown } | null)?.from;
+  // Only accept an internal absolute path from router state, never a crafted external URL.
+  const destination =
+    typeof requestedDestination === 'string' &&
+    requestedDestination.startsWith('/') &&
+    !requestedDestination.startsWith('//')
+      ? requestedDestination
+      : '/workspace';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +27,7 @@ export function LoginPage() {
     setBusy(true);
     try {
       await login(email.trim(), password);
-      navigate('/');
+      navigate(destination);
       window.requestAnimationFrame(() => document.getElementById('main-content')?.focus());
     } catch (cause) {
       setError(errorMessage(cause));
@@ -29,12 +37,16 @@ export function LoginPage() {
   }
 
   return (
-    <WorkspacePage
-      title="Sign in"
-      description="Sign in to view records within your permitted scope. Roles and permissions are enforced by the server, not by this interface."
-    >
+    <div className="public-page public-narrow">
+      <header className="public-page-header">
+        <h1>Staff sign in</h1>
+        <p>
+          Sign in to view records within your permitted scope. Roles and permissions are enforced by the
+          server, not by this interface. Reporting and tracking do not need an account.
+        </p>
+      </header>
       {status === 'authenticated' && (
-        <p className="muted">You are already signed in. Use Sign out in the header to change account.</p>
+        <p className="muted">You are already signed in. Open the <a href="/workspace">staff workspace</a> to continue.</p>
       )}
       <form className="card form-grid" onSubmit={onSubmit}>
         {error && (
@@ -73,6 +85,6 @@ export function LoginPage() {
         </div>
         <p className="muted">Accounts are provisioned by an administrator. There is no self-service sign-up.</p>
       </form>
-    </WorkspacePage>
+    </div>
   );
 }

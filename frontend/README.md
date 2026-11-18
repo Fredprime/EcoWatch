@@ -9,8 +9,23 @@ Prototype frontend aligned to the EcoWatch documentation baseline in `../docs/`.
 - **Auth:** sign-in against `login` and `auth/me`. The bearer token is held in memory only, so a page reload requires signing in again; a 401 clears auth locally. Logout and 401 clearing are client-only: the stateless HMAC token is not server-side revocable and stays valid until expiry (default 12h), although deactivated users are rejected on every request. Immediate server-side revocation is deferred, not implemented.
 - **Overview / Report:** health and observation list reads, and observation intake with real server receipts. Submission states are draft / submitting / received / error only; nothing is shown as "queued locally" or as received before a server receipt.
 - **Cases / Evidence intelligence:** case list, detail and timeline reads, plus correlation suggestion listing and human accept/reject/ambiguous decisions. A suggestion is ranked decision support with a stated method and reasons, never a source, causation, illegality or harm finding.
-- **Shells:** Analysis, Monitoring, Prioritisation, Interventions, Verification and Administration remain honest shells with no API integration. Offline-first PWA collection is not implemented.
-- Baseline tokens and styles in `src/index.css` and `src/App.css` (see `../design-system/ecowatch/MASTER.md`).
+- **Shells:** Analysis, Monitoring, Prioritisation, Interventions, Verification and Administration remain honest staff shells with no API integration. Offline-first PWA collection is not implemented.
+- **Public site vs staff workspace:** `PublicLayout` + `public.css` render the no-login pages with no staff sidebar or record-management actions. Everything else sits behind `RequireAuth` in `StaffLayout` (staff overview moved from `/` to `/workspace`). UI gating is convenience only — the backend enforces permissions.
+- **Public endpoints:** anonymous intake (`POST /observations`), throttled `POST /observations/receipt-lookup` (returns only a PII-free server receipt), and approved redacted `GET /public/cases` list/detail. The report form keeps all existing fields; only wrapper, copy and spacing changed.
+- Baseline tokens and styles in `src/index.css` and `src/App.css`, with the lighter public theme in `src/public.css` (see `../design-system/ecowatch/MASTER.md`).
+
+## Route map
+
+| Route | Shell | Access | Data shown |
+|---|---|---|---|
+| `/` | public | no login | service health and process overview |
+| `/report` | public | no login | anonymous observation intake |
+| `/track` | public | no login | tracking-code receipt lookup |
+| `/updates`, `/updates/:caseId` | public | no login | approved redacted case summaries |
+| `/login` | public | no login | staff sign-in |
+| `/workspace`, `/cases`, `/evidence`, `/monitoring`, `/analysis`, `/prioritisation`, `/interventions`, `/verification`, `/admin` | staff | sign-in required | records within the permitted scope |
+
+Public pages never show contributor identity, exact locations or automated findings. A receipt confirms durable storage only; a published status is a human-reviewed record, not an automated finding.
 
 ## Proposed stack (not yet approved)
 

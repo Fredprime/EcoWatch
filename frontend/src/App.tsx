@@ -1,12 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import {
+  BrowserRouter,
+  NavLink,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import './App.css';
 import { WORKSPACES } from './types';
 import { useAuth } from './auth/authContext';
 import { AuthProvider } from './auth/AuthProvider';
-import { OverviewPage } from './pages/OverviewPage';
+import { PublicLayout } from './components/PublicLayout';
+import { PublicHomePage } from './pages/PublicHomePage';
+import { PublicUpdatesPage } from './pages/PublicUpdatesPage';
+import { PublicCaseDetailPage } from './pages/PublicCaseDetailPage';
+import { TrackPage } from './pages/TrackPage';
 import { LoginPage } from './pages/LoginPage';
 import { ReportPage } from './pages/ReportPage';
+import { OverviewPage } from './pages/OverviewPage';
 import { CasesPage } from './pages/CasesPage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
 import { MonitoringPage } from './pages/MonitoringPage';
@@ -19,17 +34,25 @@ import { AdminPage } from './pages/AdminPage';
 
 function NotFoundPage() {
   return (
-    <section>
-      <header className="page-header">
-        <h1>Page not found</h1>
-        <p>The page you requested does not exist. Use the workspace navigation to continue.</p>
-      </header>
-      <p className="muted">Access to workspaces and records is role-scoped and enforced server-side.</p>
-    </section>
+    <div className="public-page public-narrow">
+      <h1>Page not found</h1>
+      <p>The page you requested does not exist. Use the navigation above to continue.</p>
+      <p><a href="/">Return to the public home page</a></p>
+    </div>
   );
 }
 
-function Layout() {
+/** Staff-only guard. The backend still enforces every permission independently. */
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { status } = useAuth();
+  const location = useLocation();
+  if (status !== 'authenticated') {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+  return <>{children}</>;
+}
+
+function StaffLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [authAnnouncement, setAuthAnnouncement] = useState('');
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -116,7 +139,7 @@ function Layout() {
               <li key={ws.id}>
                 <NavLink
                   to={ws.path}
-                  end={ws.path === '/'}
+                  end={ws.path === '/workspace'}
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
                   onClick={navigateFromMenu}
                 >
@@ -129,6 +152,9 @@ function Layout() {
         <p className="sidebar-note">
           Navigation lists the documented workspaces. Record access and reviewer actions are enforced server-side.
         </p>
+        <button type="button" className="btn btn-secondary public-return" onClick={() => navigate('/')}>
+          Public site
+        </button>
       </aside>
 
       <div className="main">
@@ -149,12 +175,12 @@ function Layout() {
               </span>
             </button>
             <div>
-              <strong>EcoWatch</strong>
+              <strong>EcoWatch staff workspace</strong>
               <div className="topbar-meta">Evidence-led environmental intelligence</div>
             </div>
           </div>
           <div className="topbar-account">
-            {status === 'authenticated' && me ? (
+            {me ? (
               <>
                 <div>
                   <span className="topbar-name">{me.displayName}</span>
@@ -168,21 +194,7 @@ function Layout() {
           </div>
         </header>
         <main id="main-content" className="content" tabIndex={-1}>
-          <Routes>
-            <Route path="/" element={<OverviewPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/report" element={<ReportPage />} />
-            <Route path="/evidence" element={<EvidencePage />} />
-            <Route path="/monitoring" element={<MonitoringPage />} />
-            <Route path="/cases" element={<CasesPage />} />
-            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-            <Route path="/analysis" element={<AnalysisPage />} />
-            <Route path="/prioritisation" element={<PrioritisationPage />} />
-            <Route path="/interventions" element={<InterventionsPage />} />
-            <Route path="/verification" element={<VerificationPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+          <Outlet />
         </main>
       </div>
     </div>
@@ -193,7 +205,30 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Layout />
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<PublicHomePage />} />
+            <Route path="/report" element={<ReportPage />} />
+            <Route path="/track" element={<TrackPage />} />
+            <Route path="/updates" element={<PublicUpdatesPage />} />
+            <Route path="/updates/:caseId" element={<PublicCaseDetailPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+
+          <Route element={<RequireAuth><StaffLayout /></RequireAuth>}>
+            <Route path="/workspace" element={<OverviewPage />} />
+            <Route path="/cases" element={<CasesPage />} />
+            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
+            <Route path="/monitoring" element={<MonitoringPage />} />
+            <Route path="/evidence" element={<EvidencePage />} />
+            <Route path="/analysis" element={<AnalysisPage />} />
+            <Route path="/prioritisation" element={<PrioritisationPage />} />
+            <Route path="/interventions" element={<InterventionsPage />} />
+            <Route path="/verification" element={<VerificationPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+          </Route>
+        </Routes>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { WorkspacePage } from './WorkspacePage';
 import { ApiError, errorMessage } from '../api/client';
 import { createObservation } from '../api/observations';
 import type { IntakeReceiptResponse, LocationPrecision, TimePrecision } from '../api/types';
@@ -119,10 +118,15 @@ export function ReportPage() {
   const errorEntries = Object.entries(errors).filter(([, message]) => Boolean(message)) as [FieldName, string][];
 
   return (
-    <WorkspacePage
-      title="Report / Collect"
-      description="Mobile-first reporting for communities and field contributors. Uncertainty about time and location is explicit."
-    >
+    <div className="public-page public-narrow">
+      <header className="public-page-header">
+        <h1>Report an observation</h1>
+        <p>
+          No account is needed. Describe what you observed and how certain you are about the time and place;
+          uncertainty is explicit rather than filled in for you.
+        </p>
+      </header>
+
       <div className="card notice notice-warn" role="note">
         <strong>Privacy and safety:</strong> Share only what is safe to share. Avoid identifying people unnecessarily. Sensitive locations may be restricted or generalised in later views. Submission goes directly to the server; there is no local queue.
       </div>
@@ -303,6 +307,11 @@ export function ReportPage() {
           </button>
         </div>
       </form>
-    </WorkspacePage>
+
+      <p className="muted public-after-form">
+        After a successful submission you will see a tracking reference. Keep it private so you can look up
+        the server receipt later.
+      </p>
+    </div>
   );
 }

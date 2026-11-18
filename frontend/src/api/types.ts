@@ -204,3 +204,31 @@ export interface CorrelationSuggestion {
 }
 
 export type CorrelationDecision = 'accepted' | 'rejected' | 'ambiguous';
+
+/** Unauthenticated receipt lookup: high-entropy code in, PII-free receipt out. */
+export interface ReceiptLookupRequest {
+  trackingCode: string;
+}
+
+export interface ReceiptLookupResponse {
+  observationId: string;
+  receivedAt: string;
+  observationType: string;
+  timePrecision: TimePrecision;
+  locationPrecision: LocationPrecision;
+  evidenceCount: number;
+}
+
+/** Approved public case summary. Internal notes, identities and exact geometry are absent. */
+export interface PublicCaseSummary {
+  id: string;
+  caseCode: string;
+  title: string;
+  status: string;
+  publicSummary: string;
+  publicGeometry?: string | null;
+  areaReference?: string | null;
+  lastReviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
