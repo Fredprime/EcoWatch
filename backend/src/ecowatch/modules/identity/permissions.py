@@ -29,7 +29,7 @@ class SystemRole(StrEnum):
 
 
 class Permission(StrEnum):
-    """Fine-grained Phase 1 resource permissions."""
+    """Fine-grained resource permissions across all phases."""
 
     OBS_CREATE = "obs:create"
     OBS_READ_OWN = "obs:read_own"
@@ -57,6 +57,14 @@ class Permission(StrEnum):
     ORG_MANAGE_USERS = "org:manage_users"
     ADMIN_MANAGE_SYSTEM = "admin:manage_system"
     JOBS_READ = "jobs:read"
+    CATALOGUE_WRITE = "catalogue:write"
+    INTELLIGENCE_WRITE = "intelligence:write"
+    INTELLIGENCE_REVIEW = "intelligence:review"
+    PRIORITISATION_WRITE = "prioritisation:write"
+    INTERVENTION_WRITE = "intervention:write"
+    VERIFICATION_WRITE = "verification:write"
+    VERIFICATION_APPROVE = "verification:approve"
+    PUBLICATION_WRITE = "publication:write"
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -90,6 +98,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_UPDATE,
             Permission.CASE_LINK_OBS,
             Permission.CASE_TRANSITION_BASIC,
+            Permission.INTELLIGENCE_REVIEW,
         }
     ),
     Role.INVESTIGATOR: frozenset(
@@ -109,6 +118,10 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_BASIC,
             Permission.CASE_TRANSITION_REFER,
             Permission.CASE_TRANSITION_CLOSE,
+            Permission.INTELLIGENCE_WRITE,
+            Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_WRITE,
+            Permission.VERIFICATION_WRITE,
         }
     ),
     Role.ENVIRONMENTAL_SPECIALIST: frozenset(
@@ -123,6 +136,14 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_READ,
             Permission.CASE_UPDATE,
             Permission.CASE_TRANSITION_FIELD_VERIFIED,
+            Permission.CATALOGUE_WRITE,
+            Permission.INTELLIGENCE_WRITE,
+            Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_WRITE,
+            Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_WRITE,
+            Permission.VERIFICATION_APPROVE,
+            Permission.PUBLICATION_WRITE,
         }
     ),
     Role.INTERVENTION_MANAGER: frozenset(
@@ -132,6 +153,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.EVIDENCE_UPLOAD,
             Permission.EVIDENCE_READ_DERIVATIVE,
             Permission.CASE_READ,
+            Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_WRITE,
         }
     ),
     Role.ORGANISATION_ADMIN: frozenset(
@@ -153,6 +176,14 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_CLOSE,
             Permission.AUDIT_READ,
             Permission.ORG_MANAGE_USERS,
+            Permission.CATALOGUE_WRITE,
+            Permission.INTELLIGENCE_WRITE,
+            Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_WRITE,
+            Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_WRITE,
+            Permission.VERIFICATION_APPROVE,
+            Permission.PUBLICATION_WRITE,
         }
     ),
     Role.SYSTEM_ADMIN: frozenset(
@@ -179,6 +210,14 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ORG_MANAGE_USERS,
             Permission.ADMIN_MANAGE_SYSTEM,
             Permission.JOBS_READ,
+            Permission.CATALOGUE_WRITE,
+            Permission.INTELLIGENCE_WRITE,
+            Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_WRITE,
+            Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_WRITE,
+            Permission.VERIFICATION_APPROVE,
+            Permission.PUBLICATION_WRITE,
         }
     ),
 }

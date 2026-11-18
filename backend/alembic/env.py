@@ -1,4 +1,4 @@
-"""Alembic migration environment importing all Phase 1 ORM models."""
+"""Alembic migration environment importing all ORM models."""
 
 from logging.config import fileConfig
 
@@ -9,9 +9,20 @@ from ecowatch.core.config import get_settings
 from ecowatch.core.models import Base
 from ecowatch.core.rate_limit import RateLimitBucket  # noqa: F401
 from ecowatch.modules.audit.models import AuditEvent  # noqa: F401
+from ecowatch.modules.catalogue.models import Dataset, DatasetVersion  # noqa: F401
 from ecowatch.modules.cases.models import Case, CaseObservation  # noqa: F401
 from ecowatch.modules.evidence.models import AssetDerivative, EvidenceAsset  # noqa: F401
 from ecowatch.modules.identity.models import Membership, Organisation, User  # noqa: F401
+from ecowatch.modules.intelligence.models import (  # noqa: F401
+    AnalysisOutput,
+    AnalysisRun,
+    EnvironmentalEntity,
+    EnvironmentalRelationship,
+)
+from ecowatch.modules.interventions.models import (  # noqa: F401
+    Intervention,
+    InterventionMilestone,
+)
 from ecowatch.modules.jobs.models import ProcessingJob  # noqa: F401
 from ecowatch.modules.notifications.models import ClarificationRequest, Notification  # noqa: F401
 from ecowatch.modules.observations.models import (  # noqa: F401
@@ -20,6 +31,13 @@ from ecowatch.modules.observations.models import (  # noqa: F401
     ObservationSource,
     ObservationVersion,
     Unit,
+)
+from ecowatch.modules.prioritisation.models import PrioritisationAssessment  # noqa: F401
+from ecowatch.modules.verification.models import (  # noqa: F401
+    IndicatorDefinition,
+    IndicatorMeasurement,
+    Publication,
+    VerificationAssessment,
 )
 
 alembicConfig = context.config
