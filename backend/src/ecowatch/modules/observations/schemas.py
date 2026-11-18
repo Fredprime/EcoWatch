@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Self
 
 from pydantic import Field, model_validator
 
@@ -86,7 +86,7 @@ class ObservationPublicSummaryResponse(CamelModel):
     updatedAt: datetime
 
     @classmethod
-    def from_orm_record(cls, obs: Observation) -> "ObservationPublicSummaryResponse":
+    def from_orm_record(cls, obs: Observation) -> Self:
         """Map an Observation ORM row into a redacted DTO."""
         return cls(
             id=obs.id,
@@ -125,7 +125,7 @@ class ObservationRestrictedResponse(ObservationPublicSummaryResponse):
     submittedByUserId: uuid.UUID | None = None
 
     @classmethod
-    def from_orm_record(cls, obs: Observation) -> "ObservationRestrictedResponse":
+    def from_orm_record(cls, obs: Observation) -> Self:
         """Map an Observation ORM row into a restricted DTO."""
         base = ObservationPublicSummaryResponse.from_orm_record(obs)
         return cls(
@@ -169,7 +169,7 @@ class CreateCorrectionRequest(CamelModel):
     originalLocationWording: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
-    def validate_correction(self) -> "CreateCorrectionRequest":
+    def validate_correction(self) -> Self:
         if (self.lat is None) != (self.lon is None):
             raise ValueError("Both lat and lon must be provided together")
         if self.description is not None and not self.description.strip():

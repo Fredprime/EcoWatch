@@ -1,11 +1,7 @@
 """Shared Pydantic boundary schemas enforcing camelCase payloads."""
 
-from typing import Generic, TypeVar
-
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
-
-T = TypeVar("T")
 
 
 class CamelModel(BaseModel):
@@ -19,7 +15,7 @@ class CamelModel(BaseModel):
     )
 
 
-class CursorPage(CamelModel, Generic[T]):
+class CursorPage[T](CamelModel):
     """Standard cursor-paginated list response."""
 
     items: list[T]

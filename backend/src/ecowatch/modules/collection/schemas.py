@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Self
 
 from pydantic import Field, model_validator
 
@@ -55,7 +55,7 @@ class CreateObservationRequest(CamelModel):
     source: ObservationSourceInput | None = None
 
     @model_validator(mode="after")
-    def validate_intake_constraints(self) -> "CreateObservationRequest":
+    def validate_intake_constraints(self) -> Self:
         if not self.observationType.strip():
             raise ValueError("observationType must not be empty")
         if not self.description.strip():
