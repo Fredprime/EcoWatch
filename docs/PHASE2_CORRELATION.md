@@ -46,6 +46,8 @@ Two schema facts Phase 2 needs that are decided on Phase 1's side:
 
 ## 3. Not built, and why
 
+> Task-by-task plan and the exact Phase 1 questions are in `docs/PHASE2_TODO.md`.
+
 | Missing | Blocked on |
 |---|---|
 | `evidence_relationships` table | foreign keys to `observations`, which does not exist yet |
