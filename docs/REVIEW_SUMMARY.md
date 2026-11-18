@@ -57,10 +57,11 @@ This is the single review document for checking progress, recent changes, and ve
    - #12 closed the gap that left correlation manual-only: intake now queues `correlation.scan` in the same transaction as the observation insert, so new reports are actually compared. An idempotent replay queues nothing. It edits `collection/service.py`, which Phase 1 owns, so it was merged as a separate PR after #11.
    - Final combined tree: `ruff check backend` clean, 75 passed / 3 skipped, 78 passed with `ECOWATCH_RUN_POSTGIS_TESTS=1`; CI 3/3 green on both PRs.
    - PR #14's backend job failed on the combined `prime` + `master` tree because Phase 2 and Phase 3 each added a `0003` Alembic revision from the same `0002` parent. `0004_merge_phase2_phase3` joins them as a no-op booking revision; `alembic heads` now reports one head, and the full backend suite passes with and without PostGIS.
-2. **Decisions that gate the rest of Phase 2** (details and options in `docs/PHASE2_TODO.md`, "What I need from the owner"):
-   - **pgvector** — gates `correlation_embeddings` and semantic similarity only.
-   - **Evaluation route** — gates the scored harness run and any accuracy claim.
-   - **Module / authority split** — `cross_case`, `promote_to_case`, `merge` and `split` need the case-side rules in `docs/PERMISSIONS_MATRIX.md` §4 and the cases module Phase 1 owns.
+2. **Phase 2 decisions made 2026-11-18** (recorded in `docs/PHASE2_TODO.md`, `docs/PHASE2_CORRELATION.md` and ADRs):
+   - **pgvector approved (ADR-030)** — `correlation_embeddings` and semantic similarity proceed in the existing PostgreSQL service; `token_similarity` stays the keyword fallback.
+   - **Evaluation route: smoke-test only** — the harness will be run on temporary fixtures to prove mechanics; no accuracy claim will be made.
+   - **Case-side actions owned by the cases module (ADR-031)** — `cross_case`, `promote_to_case`, `merge` and `split` use the two-key rules in `docs/PERMISSIONS_MATRIX.md` §4; correlation stays decision support only.
+   - **Re-scan triggers: corrections and evidence uploads** — both enqueue another `correlation.scan`; hooks live in the Phase 1-owned modules and go on separate branches.
 4. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
    - `ADR-029` is `Approved 2026-11-18`; optionally promote `ADR-014`–`ADR-016` and `ADR-026`–`ADR-028` statuses from `Proposed` to `Approved` during review.
 

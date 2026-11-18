@@ -53,13 +53,14 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 
 ## 3. Not built, and why
 
-| Missing | Blocked on |
+| Missing | Status |
 |---|---|
-| `correlation_embeddings` + vector index | the vector-store decision (plan §6 item 3) — `pgvector` assumed, not approved |
-| Semantic similarity | same: `token_similarity` is the keyword fallback, not the model |
-| `cross_case` detector | needs the case-side rules (`docs/PERMISSIONS_MATRIX.md` §4) and the cases module Phase 1 owns |
-| `promote_to_case`, `merge`, `split` | case-side actions with two-key authority rules; the cluster container they need now exists |
-| Scored harness run | needs a labelled set and the evaluation-route decision (plan §6 item 5) |
+| `correlation_embeddings` + vector index | pgvector approved 2026-11-18 (`ADR-030`); table and index not built yet |
+| Semantic similarity | same approval; `token_similarity` remains the labelled keyword fallback, not the model |
+| `cross_case` detector | case-side rules and authority owner decided 2026-11-18 (`ADR-031`); not built |
+| `promote_to_case`, `merge`, `split` | owned by the Phase 1 cases module under `ADR-031`; correlation keeps suggestions and provisional clusters only |
+| Scored harness run | smoke-test only approved 2026-11-18; temporary fixtures prove mechanics, no accuracy claim |
+| Re-scan on corrections / evidence uploads | approved 2026-11-18; hooks belong to the Phase 1-owned modules and are not built yet |
 | Split-phase intake, notification push | plan §2.1 lists them under Phase 2, but they live in `collection` and `notifications`, which Phase 1 owns |
 
 ## 4. Honest limits

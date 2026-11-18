@@ -20,7 +20,7 @@ Sizes are S / M / L, not hours.
 |---|---|---|---|---|
 | T1 | `evidence_relationships` migration: a/b in canonical order, task type, score, component scores, method version, reason codes, status (`suggested`/`accepted`/`rejected`/`ambiguous`/`merged`), created/decided by and at | `observations` | M | **done** — migration `0002`, constraints proven on real PostgreSQL. |
 | T2 | Rejected-pair guarantee: unique constraint on the canonical pair so rejection is an index probe and re-rejection is idempotent | T1 | S | **done** — `CHECK` + `UNIQUE` in migration `0002`. |
-| T3 | `correlation_embeddings` + vector column + index (one row per observation, model version, input hash; skip re-embed when unchanged) | **owner: pgvector decision** | M | **not started** — blocked on the pgvector decision (plan §6 item 3). Migration `0003` created the cluster tables, not the embedding table. |
+| T3 | `correlation_embeddings` + vector column + index (one row per observation, model version, input hash; skip re-embed when unchanged) | **owner decision made 2026-11-18: pgvector approved** | M | **unblocked, not built** — ADR-030; add the table and embedding job behind the approved pgvector choice. |
 | T4b | `ST_DWithin` retrieval path + GiST usage on PostgreSQL | T1, PostGIS | M | **done** — `ST_DWithin` on geography in `repository.py`, on the GiST index Phase 1 created; proven on live PostgreSQL. |
 
 ## 2. Correlation
@@ -28,15 +28,16 @@ Sizes are S / M / L, not hours.
 | # | Task | Depends on | Size | Status |
 |---|---|---|---|---|
 | T4 | Candidate retrieval SQL: `ST_DWithin` + temporal window + category pre-filter, excludes rejected pairs, applies lower-context bounds when location is absent, always `LIMIT` | T0, T1, PostGIS | M | **done** — bounded, org-scoped retrieval; distance filtered by `ST_DWithin` on PostgreSQL, in Python on SQLite (test dialect only). |
-| T5 | Detector wiring: duplicate, same-event, repost/source-dependency (`FR-027`), cross-case relevance — each with its own thresholds and reason codes, all feeding one `PairSuggestion` shape | T1, T4 | M | **done** — `detectors.py`: one task per pair, `source_dependency` > `duplicate` > `same_event`, nothing below the review threshold. `cross_case` is deliberately absent: it needs the case-side rules and the cases module Phase 1 owns. |
+| T5 | Detector wiring: duplicate, same-event, repost/source-dependency (`FR-027`), cross-case relevance — each with its own thresholds and reason codes, all feeding one `PairSuggestion` shape | T1, T4 | M | **done** — `detectors.py`: one task per pair, `source_dependency` > `duplicate` > `same_event`, nothing below the review threshold. `cross_case` is deliberately absent: ADR-031 gives it to the cases module. |
 | T6 | Provisional clusters: staff-only, never counted as cases, never transitively merged, ambiguity surfaced not broken | T1, T5 | M | **done (container only)** — `correlation_clusters` + members, one cluster per report, created on scan, staff-only. No auto-merge, so A~B and B~C stay separate; `merge`/`split` are not built. |
-| T7 | Background job types `correlation_score` and `embedding_backfill`: idempotent, bounded retries, dead-letter state, intake latency never includes scoring (`NFR-001`) | **`processing_jobs` + worker** | M | **partly done** — `correlation.scan` queued automatically on intake and on demand, with bounded retries and a dead-letter state; `embedding_backfill` waits on the pgvector decision. |
+| T7 | Background job types `correlation_score` and `embedding_backfill`: idempotent, bounded retries, dead-letter state, intake latency never includes scoring (`NFR-001`) | **`processing_jobs` + worker** | M | **partly done** — `correlation.scan` queued automatically on intake and on demand, with bounded retries and a dead-letter state; `embedding_backfill` remains to build now that pgvector is approved. |
+| T12 | Re-scan on observation corrections and evidence uploads | T1, Phase 1-owned modules | S | **approved 2026-11-18, not built** — both triggers enqueue `correlation.scan`; implement in the owning modules on separate branches. |
 
 ## 3. Review boundary
 
 | # | Task | Depends on | Size | Status |
 |---|---|---|---|---|
-| T8 | Review API: `accept`, `reject`, `mark_ambiguous`, `promote_to_case`, `merge`, `split` — reversible by new action, never by edit | T1, RBAC | M | **partly done** — accept / reject / ambiguous / reopen implemented and audited; `promote_to_case`, `merge`, `split` not built. |
+| T8 | Review API: `accept`, `reject`, `mark_ambiguous`, `promote_to_case`, `merge`, `split` — reversible by new action, never by edit | T1, RBAC | M | **partly done** — accept / reject / ambiguous / reopen implemented and audited; case-side actions are owned by the cases module under ADR-031. |
 | T9 | Separation of duties: a reviewer cannot decide on their own submission; cross-organisation reads return 404, not 403 | RBAC, org scoping | S | **done** — reuses `ensure_not_self_submitted`; cross-org returns 404. |
 | T10 | Audit integration: every review decision writes an `audit_events` row in the same transaction | audit helper | S | **done** — same transaction as the decision, verified by test. |
 
@@ -44,7 +45,7 @@ Sizes are S / M / L, not hours.
 
 | # | Task | Depends on | Size | Status |
 |---|---|---|---|---|
-| T11 | Scored run of the harness on a labelled set and a written result. No accuracy claim beyond what the run shows | **owner: evaluation route (plan §6 item 5)** | M | not started — blocked on the owner's evaluation-route decision. |
+| T11 | Scored run of the harness on a labelled set and a written result. No accuracy claim beyond what the run shows | **owner decision made 2026-11-18: smoke-test only** | S | run on temporary fixtures to prove mechanics; no accuracy claim and no real-report result. |
 
 ## Not mine — hand back
 
@@ -72,15 +73,9 @@ Three gaps that blocked Phase 2 outright, now closed from this side:
 | No `source_ref` anywhere | `FR-027` repost / shared-source detection had no way to tell two reports from one original source, so every repost scored as independent | nullable indexed column on `observations` (migration `0002`) |
 | `observation_sources` is PII-only | reusing it for provenance would put correlation reads next to contributor identity | not reused; `source_ref` lives on `observations` |
 
-## What I need from the owner
+## Owner decisions, 2026-11-18
 
-Each decision below is a single choice; the rest of Phase 2 proceeds without it.
-
-1. **pgvector** (plan §6 item 3). Gates T3 (`correlation_embeddings`) and semantic similarity only.
-   - **Recommendation:** approve `pgvector` as the vector store, keep `token_similarity` as the labelled keyword fallback, and add the embedding column in a new migration. It avoids a second datastore and reuses the PostGIS service already in CI.
-   - Alternative: external vector store — needs a new service, its own credentials and a privacy review before any text leaves the current database.
-2. **Phase 2 evaluation route** (plan §6 item 5). Gates T11 and any accuracy claim.
-   - **Recommendation:** harness on a consented, human-labelled set already held by the organisation. No accuracy number is reported until that run exists; `evaluate` currently reports unlabelled count as absent rather than approximated.
-   - Alternative: a separate synthetic corpus, which can test mechanics but cannot support a claim about real reports.
-3. **Module / authority split.** `cross_case`, `promote_to_case`, `merge` and `split` need the case-side rules in `docs/PERMISSIONS_MATRIX.md` §4 and the cases module Phase 1 owns; guessing the two-key authority rules would produce code that has to be deleted. The cluster container they need now exists.
-4. **Confirm the "Not mine" split above**, so nobody builds split-phase intake or notification push twice.
+1. **pgvector: approved.** T3 and semantic similarity proceed with `pgvector` in the existing PostgreSQL service; `token_similarity` stays as the labelled keyword fallback. Recorded in ADR-030.
+2. **Evaluation route: smoke-test only.** T11 proves the harness mechanics on temporary fixtures. No accuracy number is reported and no claim is made about real reports.
+3. **Case-side actions: cases module owns them.** `cross_case`, `promote_to_case`, `merge` and `split` use the two-key authority rules in `docs/PERMISSIONS_MATRIX.md` §4. Correlation records suggestions and clusters; it does not decide case state. Recorded in ADR-031.
+4. **Re-scan triggers: corrections and evidence uploads.** Both enqueue another `correlation.scan` for the affected observation. They live in the Phase 1-owned `observations` and `evidence` modules, so each hook is a separate branch and PR.
