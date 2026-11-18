@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecowatch-backend"
+version = "0.1.0"
+description = "EcoWatch environmental intelligence and response platform backend (Phase 1)"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "sqlalchemy>=2.0.38",
+    "alembic>=1.14.1",
+    "psycopg[binary]>=3.2.4",
+    "python-multipart>=0.0.20",
+    "pillow>=11.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4",
+    "httpx>=0.28.1",
+    "ruff>=0.9.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+# FastAPI dependency injection passes callables as defaults by design, so these
+# are declared immutable rather than rewriting every route signature.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "ecowatch.api.dependencies.require_permission",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "postgis: integration tests requiring a live PostgreSQL + PostGIS database",
+]

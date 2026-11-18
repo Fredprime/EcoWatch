@@ -10,6 +10,7 @@ Instructions for any AI coding agent working in this repository. Read this file 
 4. `CONTRIBUTING.md` — branch, PR and commit rules.
 5. `docs/OWNER_RULES.md` — the owner's standing instructions for this repository.
 6. `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` — the backend build plan (read before writing backend code).
+7. `docs/PHASE2_CORRELATION.md` — Phase 2 correlation: what is built, and the exact Phase 1 contract it needs.
 
 ## Precedence when instructions conflict
 
