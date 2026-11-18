@@ -45,7 +45,7 @@ Sizes are S / M / L, not hours.
 
 | # | Task | Depends on | Size | Status |
 |---|---|---|---|---|
-| T11 | Scored run of the harness on a labelled set and a written result. No accuracy claim beyond what the run shows | **owner decision made 2026-11-18: smoke-test only** | S | run on temporary fixtures to prove mechanics; no accuracy claim and no real-report result. |
+| T11 | Scored run of the harness on a labelled set and a written result. No accuracy claim beyond what the run shows | **owner decision made 2026-11-18: smoke-test only** | S | **done (smoke test)** — `backend/tests/evaluation/test_correlation_smoke.py` proves scoring-to-evaluation wiring on temporary synthetic fixtures; no accuracy claim and no real-report result. |
 
 ## Not mine — hand back
 
