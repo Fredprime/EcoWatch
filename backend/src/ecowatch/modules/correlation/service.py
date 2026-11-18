@@ -18,12 +18,14 @@ from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
 from ecowatch.core.spatial import parse_point_wkt
 from ecowatch.modules.audit.service import record_audit_event
+from ecowatch.modules.correlation.detectors import TASK_REASONS, task_for
 from ecowatch.modules.correlation.features import Location, ObservationFeatures
 from ecowatch.modules.correlation.models import (
-    CorrelationTask,
+    CorrelationCluster,
     EvidenceRelationship,
     RelationshipStatus,
 )
+from ecowatch.modules.correlation.policy import policy_for
 from ecowatch.modules.correlation.repository import (
     MAX_CANDIDATES,
     CorrelationRepository,
@@ -89,6 +91,12 @@ class CorrelationService:
             dialectName=dialectName,
         )
 
+        # One policy for retrieval and scoring, so a candidate cannot be
+        # retrieved on a wide window and then scored to zero on a narrow one.
+        bounds = policy_for(
+            subject.observationType, has_location=subjectFeatures.location is not None
+        )
+
         candidateFeatures = [
             features_for(
                 candidate,
@@ -97,26 +105,42 @@ class CorrelationService:
                 dialectName=dialectName,
             )
             for candidate, candidateWkt in self._repo.candidate_rows(
-                subject, limit=MAX_CANDIDATES
+                subject, limit=MAX_CANDIDATES, policy=bounds
             )
         ]
 
+        # Every scanned report gets a provisional home, even when nothing matched,
+        # so a reviewer can find it. This claims nothing about the report.
+        self._repo.ensure_cluster(subject.organisationId, subject.id)
+
         decided = self._repo.decided_partner_ids(subject.id)
+        ranking = rank(
+            subjectFeatures,
+            candidateFeatures,
+            temporal_window_hours=bounds.window_hours,
+            radius_km=bounds.radius_km,
+        )
         written = 0
-        for suggestion in rank(subjectFeatures, candidateFeatures).suggestions:
+        for position, suggestion in enumerate(ranking.suggestions):
             partnerId = uuid.UUID(suggestion.observation_b_id)
-            if partnerId in decided:
+            task = task_for(suggestion)
+            if partnerId in decided or task is None:
                 continue
             self._repo.upsert_suggestion(
                 organisationId=subject.organisationId,
                 firstId=subject.id,
                 secondId=partnerId,
-                task=CorrelationTask.SAME_EVENT.value,
+                task=task.value,
                 score=suggestion.score,
                 components=dict(suggestion.components),
                 missingSignals=list(suggestion.missing_signals),
-                reasons=list(suggestion.reasons),
+                # The task's own wording leads, so a reviewer sees what kind of
+                # link this is before the individual signals that support it.
+                reasons=[TASK_REASONS[task], *suggestion.reasons],
                 sourceIndependent=suggestion.source_independent,
+                # A tie is for a person to break, so both ends of it are marked
+                # rather than ordered and left to look decisive.
+                ambiguous=ranking.ambiguous_at_top and position < 2,
             )
             written += 1
 
@@ -140,17 +164,7 @@ class CorrelationService:
                 statusCode=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        relationship = self._repo.get_relationship(relationshipId)
-        # A caller without permission gets the same answer as one asking about a
-        # record that does not exist, so existence does not leak across tenants.
-        if relationship is None or not principal.has_permission(
-            Permission.CORRELATION_REVIEW, relationship.organisationId
-        ):
-            raise DomainError(
-                ErrorCode.NOT_FOUND,
-                "Suggestion not found",
-                statusCode=status.HTTP_404_NOT_FOUND,
-            )
+        relationship = self._require_reviewable(principal, relationshipId)
 
         for observationId in (relationship.observationAId, relationship.observationBId):
             observation = self._repo.get_observation(observationId)
@@ -212,6 +226,76 @@ class CorrelationService:
         self._session.commit()
         return jobId
 
+    def _require_reviewable(
+        self, principal: Principal, relationshipId: uuid.UUID
+    ) -> EvidenceRelationship:
+        """Load a suggestion the caller may act on, or raise the same 404.
+
+        A caller without permission gets the same answer as one asking about a
+        record that does not exist, so existence does not leak across tenants.
+        """
+        relationship = self._repo.get_relationship(relationshipId)
+        if relationship is None or not principal.has_permission(
+            Permission.CORRELATION_REVIEW, relationship.organisationId
+        ):
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Suggestion not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+            )
+        return relationship
+
+    def reopen(
+        self,
+        principal: Principal,
+        relationshipId: uuid.UUID,
+        *,
+        reason: str,
+        requestId: str | None = None,
+    ) -> EvidenceRelationship:
+        """Return a decided suggestion to the queue, so it can be decided again.
+
+        The row holds current state only: the decision fields are cleared, and the
+        previous decision stays in `audit_events`, which is append-only. That is
+        what makes reversal an action rather than an edit.
+
+        A reason is required. Reopening silently is how a decision gets undone
+        without anyone being able to say why.
+        """
+        relationship = self._require_reviewable(principal, relationshipId)
+        previous = relationship.status
+        if previous == RelationshipStatus.SUGGESTED.value:
+            raise DomainError(
+                ErrorCode.INVALID_STATUS_TRANSITION,
+                "Suggestion is already open; there is no decision to reopen",
+                statusCode=status.HTTP_409_CONFLICT,
+            )
+
+        relationship.status = RelationshipStatus.SUGGESTED.value
+        relationship.decidedByUserId = None
+        relationship.decidedAt = None
+        relationship.decisionReason = None
+
+        record_audit_event(
+            self._session,
+            actorUserId=principal.userId,
+            actorRole=principal.primary_role_label,
+            action="correlation.reopened",
+            targetType="evidence_relationship",
+            targetId=relationship.id,
+            organisationId=relationship.organisationId,
+            reason=reason,
+            details={
+                "previousStatus": previous,
+                "observationAId": str(relationship.observationAId),
+                "observationBId": str(relationship.observationBId),
+                "task": relationship.task,
+            },
+            requestId=requestId,
+        )
+        self._session.commit()
+        return relationship
+
     def list_suggestions(
         self, principal: Principal, *, limit: int = 50
     ) -> list[EvidenceRelationship]:
@@ -222,6 +306,17 @@ class CorrelationService:
             else principal.accessible_org_ids(Permission.CORRELATION_READ)
         )
         return self._repo.list_suggestions(organisationIds, limit=limit)
+
+    def list_clusters(
+        self, principal: Principal, *, limit: int = 50
+    ) -> list[tuple[CorrelationCluster, list[uuid.UUID]]]:
+        """Provisional clusters visible to the caller. Staff-only by permission."""
+        organisationIds = (
+            self._repo.all_org_ids()
+            if principal.is_system_admin
+            else principal.accessible_org_ids(Permission.CORRELATION_READ)
+        )
+        return self._repo.clusters_with_members(organisationIds)[:limit]
 
 
 def enqueue_scan(session: Session, observationId: uuid.UUID) -> uuid.UUID:

@@ -84,8 +84,62 @@ def test_scan_creates_one_suggestion_and_repeated_scans_do_not_duplicate(
     # canonical ordering: the stored pair is independent of which end was scanned
     assert suggestion.observationAId < suggestion.observationBId
     assert suggestion.status == RelationshipStatus.SUGGESTED.value
-    assert suggestion.task == CorrelationTask.SAME_EVENT.value
+    # Identical wording is now classified as a duplicate rather than a vague
+    # "same event"; the point of this test is the canonical pair and idempotency.
+    assert suggestion.task == CorrelationTask.DUPLICATE.value
     assert suggestion.reasons
+
+
+def test_time_window_comes_from_the_category(dbSession: Session) -> None:
+    """A noise complaint 15h old must not match one a week old; a dump can."""
+    org = create_temp_org(dbSession)
+    now = datetime.now(UTC)
+
+    noiseRecent = make_observation(
+        dbSession, org, observationType="noise", description="generator running all night",
+        observedAt=now - timedelta(hours=1),
+    )
+    make_observation(
+        dbSession, org, observationType="noise", description="generator running all night",
+        observedAt=now - timedelta(hours=15),
+    )
+    # noise window is 12h, so the 15h-old neighbour is outside it
+    assert CorrelationService(dbSession).scan_observation(noiseRecent.id) == 0
+
+    # A separate organisation, so the noise reports above cannot be candidates
+    # here: this half is about the waste window, not about scope.
+    wasteOrg = create_temp_org(dbSession, name="Waste Org")
+    wasteOld = make_observation(
+        dbSession, wasteOrg, observationType="waste",
+        description="dumped drums behind the clinic",
+        observedAt=now - timedelta(hours=100),
+    )
+    make_observation(
+        dbSession, wasteOrg, observationType="waste",
+        description="dumped drums behind the clinic",
+        observedAt=now - timedelta(hours=60),
+    )
+    # waste window is a week, so a 40h gap is still a candidate
+    assert CorrelationService(dbSession).scan_observation(wasteOld.id) == 1
+
+
+def test_a_report_without_a_location_is_still_scanned(dbSession: Session) -> None:
+    """No point means no distance test, not a skipped comparison."""
+    org = create_temp_org(dbSession)
+    now = datetime.now(UTC)
+    first = make_observation(
+        dbSession, org, description="smoke from the tyre dump", observedAt=now - timedelta(hours=1),
+        lat=None, lon=None,
+    )
+    make_observation(
+        dbSession, org, description="smoke from the tyre dump", observedAt=now - timedelta(hours=2),
+        lat=None, lon=None,
+    )
+
+    assert CorrelationService(dbSession).scan_observation(first.id) == 1
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    assert any("no location" in signal for signal in suggestion.missingSignals)
+    assert "spatial_proximity" not in suggestion.components
 
 
 def test_candidates_never_cross_organisation_boundaries(dbSession: Session) -> None:
@@ -150,6 +204,84 @@ def test_decision_is_audited_and_cannot_be_overwritten(dbSession: Session) -> No
     assert dbSession.get(EvidenceRelationship, suggestion.id).status == "accepted"
 
 
+def test_reopening_returns_a_decided_pair_to_the_queue(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    viewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    principal = reviewer_principal(viewer, org)
+
+    service.decide(principal, suggestion.id, RelationshipStatus.REJECTED, reason="other river")
+    assert dbSession.get(EvidenceRelationship, suggestion.id).status == "rejected"
+
+    reopened = service.reopen(principal, suggestion.id, reason="wrong stretch identified")
+    assert reopened.status == RelationshipStatus.SUGGESTED.value
+    assert reopened.decidedByUserId is None
+    assert reopened.decidedAt is None
+    assert reopened.decisionReason is None
+
+    # The previous decision is not lost: it is in the append-only audit trail.
+    actions = [event.action for event in dbSession.query(AuditEvent).all()]
+    assert "correlation.rejected" in actions
+    assert "correlation.reopened" in actions
+
+    # And the pair is decidable again, which is the whole point.
+    service.decide(principal, suggestion.id, RelationshipStatus.ACCEPTED, reason="same outfall")
+    assert dbSession.get(EvidenceRelationship, suggestion.id).status == "accepted"
+
+
+def test_reopening_an_open_suggestion_is_refused(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    viewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    make_observation(dbSession, org, description="dead fish at the river bend")
+    CorrelationService(dbSession).scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+
+    from ecowatch.core.errors import DomainError, ErrorCode
+
+    with pytest.raises(DomainError) as raised:
+        CorrelationService(dbSession).reopen(
+            reviewer_principal(viewer, org), suggestion.id, reason="no decision yet"
+        )
+    assert raised.value.code is ErrorCode.INVALID_STATUS_TRANSITION
+    assert raised.value.statusCode == 409
+
+
+def test_reopen_requires_a_reason_and_permission(
+    dbSession: Session, client: TestClient, authProvider
+) -> None:
+    org = create_temp_org(dbSession)
+    reviewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    otherOrg = create_temp_org(dbSession, name="Other Org")
+    outsider = create_temp_user(dbSession, memberships=[(otherOrg.id, Role.REVIEWER)])
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    service.decide(
+        reviewer_principal(reviewer, org), suggestion.id, RelationshipStatus.REJECTED,
+        reason="other river",
+    )
+
+    url = f"/api/v1/correlation/suggestions/{suggestion.id}/reopen"
+    assert client.post(
+        url, json={}, headers=auth_headers(authProvider, reviewer)
+    ).status_code == 422
+    assert client.post(
+        url, json={"reason": "wrong stretch"}, headers=auth_headers(authProvider, outsider)
+    ).status_code == 404
+    assert client.post(
+        url, json={"reason": "wrong stretch"}, headers=auth_headers(authProvider, reviewer)
+    ).status_code == 200
+
+
 def test_reviewer_cannot_decide_on_their_own_submission(dbSession: Session) -> None:
     org = create_temp_org(dbSession)
     author = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
@@ -190,6 +322,53 @@ def test_repost_from_the_same_source_is_flagged_as_not_independent(
     assert any("not independent" in reason for reason in suggestion.reasons)
 
 
+def test_repost_is_stored_as_source_dependency_not_a_second_witness(
+    dbSession: Session,
+) -> None:
+    org = create_temp_org(dbSession)
+    first = make_observation(
+        dbSession, org, description="dead fish at the river bend", sourceRef="post-42"
+    )
+    make_observation(
+        dbSession, org, description="dead fish at the river bend", sourceRef="post-42"
+    )
+
+    CorrelationService(dbSession).scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    assert suggestion.task == CorrelationTask.SOURCE_DEPENDENCY.value
+    assert suggestion.sourceIndependent is False
+    assert "one account, not two" in suggestion.reasons[0]
+
+
+def test_near_identical_wording_is_stored_as_a_duplicate(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    first = make_observation(
+        dbSession, org, description="truck dumping waste into the drain at Avenor"
+    )
+    make_observation(
+        dbSession, org, description="truck dumping waste into the drain at Avenor again"
+    )
+
+    CorrelationService(dbSession).scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    assert suggestion.task == CorrelationTask.DUPLICATE.value
+    assert suggestion.sourceIndependent is True
+    assert "submitted twice" in suggestion.reasons[0]
+
+
+def test_unrelated_report_is_not_suggested(dbSession: Session) -> None:
+    """Below the review threshold nothing is written, so the queue stays useful."""
+    org = create_temp_org(dbSession)
+    first = make_observation(dbSession, org, description="loud generator at the market")
+    make_observation(
+        dbSession, org, description="blocked storm drain on the coast road",
+        observationType="flooding", lat=6.9, lon=-1.9,
+    )
+
+    assert CorrelationService(dbSession).scan_observation(first.id) == 0
+    assert dbSession.query(EvidenceRelationship).count() == 0
+
+
 def test_scan_endpoint_queues_a_job_and_scoring_is_never_inline(
     dbSession: Session,
     client: TestClient,
@@ -223,6 +402,80 @@ def test_scan_endpoint_queues_a_job_and_scoring_is_never_inline(
     monkeypatch.undo()
     assert run_once(dbSession, storageProvider) == 1
     assert dbSession.query(EvidenceRelationship).count() == 1
+
+
+def test_reports_get_their_own_cluster_and_are_never_auto_merged(
+    dbSession: Session,
+) -> None:
+    """A~B and B~C must not quietly become one cluster of three."""
+    org = create_temp_org(dbSession)
+    first = make_observation(dbSession, org, description="dead fish at the river bend")
+    second = make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(first.id)
+    service.scan_observation(second.id)
+
+    # They are related by a suggestion, but membership only grows by a human
+    # accepting it, so each report still has its own provisional home.
+    clusters = service.list_clusters(reviewer_principal(
+        create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)]), org
+    ))
+    assert len(clusters) == 2
+    assert all(len(observationIds) == 1 for _, observationIds in clusters)
+
+
+def test_a_report_with_no_match_still_has_a_cluster(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    only = make_observation(dbSession, org, description="loud generator at the market")
+
+    service = CorrelationService(dbSession)
+    assert service.scan_observation(only.id) == 0
+    viewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    clusters = service.list_clusters(reviewer_principal(viewer, org))
+    assert [observationIds for _, observationIds in clusters] == [[only.id]]
+
+
+def test_a_tie_is_marked_ambiguous_instead_of_silently_ordered(
+    dbSession: Session,
+) -> None:
+    org = create_temp_org(dbSession)
+    now = datetime.now(UTC)
+    subject = make_observation(dbSession, org, description="brown foam at the weir",
+                               observedAt=now - timedelta(hours=1))
+    for _ in range(2):
+        make_observation(dbSession, org, description="brown foam at the weir",
+                         observedAt=now - timedelta(hours=1))
+
+    CorrelationService(dbSession).scan_observation(subject.id)
+    rows = dbSession.query(EvidenceRelationship).all()
+    assert len(rows) == 2
+    assert all(row.ambiguous for row in rows)
+
+
+def test_clusters_require_authentication_and_stay_in_the_organisation(
+    dbSession: Session, client: TestClient, authProvider
+) -> None:
+    ours = create_temp_org(dbSession, name="Our Org")
+    theirs = create_temp_org(dbSession, name="Their Org")
+    oursUser = create_temp_user(dbSession, memberships=[(ours.id, Role.REVIEWER)])
+    theirsUser = create_temp_user(dbSession, memberships=[(theirs.id, Role.REVIEWER)])
+    oursObs = make_observation(dbSession, ours, description="dead fish at the river bend")
+    theirsObs = make_observation(dbSession, theirs, description="dead fish at the river bend")
+    service = CorrelationService(dbSession)
+    service.scan_observation(oursObs.id)
+    service.scan_observation(theirsObs.id)
+
+    assert client.get("/api/v1/correlation/clusters").status_code == 401
+
+    for user, expected in ((oursUser, 1), (theirsUser, 1)):
+        response = client.get(
+            "/api/v1/correlation/clusters", headers=auth_headers(authProvider, user)
+        )
+        assert response.status_code == 200
+        clusters = response.json()
+        assert len(clusters) == expected
+        assert all(len(item["observationIds"]) == 1 for item in clusters)
 
 
 def test_suggestion_listing_requires_authentication(client: TestClient) -> None:

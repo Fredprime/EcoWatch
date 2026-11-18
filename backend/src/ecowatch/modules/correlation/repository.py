@@ -1,12 +1,15 @@
 """Database access and candidate retrieval for evidence correlation.
 
-Retrieval is deliberately dialect-agnostic: a cheap SQL prefilter (organisation,
-not hidden, time window) that runs on both SQLite and PostgreSQL, then an exact
-distance test in Python over that bounded set.
+Retrieval is a prefilter (organisation, not hidden, time window) plus an exact
+distance test. The bounds themselves come from `policy.py`, so retrieval and
+scoring cannot disagree about how wide a scan is.
 
-`shortcut: distance is filtered in Python, not with ST_DWithin, so it is bounded
-by the prefilter limit rather than by a GiST index. Replace with an ST_DWithin
-query on PostgreSQL when candidate volumes make the bounded scan matter.`
+On PostgreSQL the distance test is `ST_DWithin` against `geography`, so it uses
+the GiST index Phase 1 created and the LIMIT applies to rows that already pass.
+
+`shortcut: SQLite has no spatial functions, so there the distance test is a
+haversine in Python over the prefiltered, limited set. Correct, just bounded by
+the prefilter rather than by an index. SQLite is the test dialect only.`
 """
 
 import uuid
@@ -16,17 +19,20 @@ from typing import Any
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
-from ecowatch.core.spatial import geography_to_text_expr, parse_point_wkt
+from ecowatch.core.spatial import (
+    format_point_wkt,
+    geography_to_text_expr,
+    parse_point_wkt,
+)
 from ecowatch.modules.correlation.models import (
+    CorrelationCluster,
+    CorrelationClusterMember,
     CorrelationTask,
     EvidenceRelationship,
     RelationshipStatus,
 )
-from ecowatch.modules.correlation.scoring import (
-    DEFAULT_RADIUS_KM,
-    DEFAULT_TEMPORAL_WINDOW_HOURS,
-    haversine_km,
-)
+from ecowatch.modules.correlation.policy import RetrievalPolicy, policy_for
+from ecowatch.modules.correlation.scoring import haversine_km
 from ecowatch.modules.identity.models import Organisation
 from ecowatch.modules.observations.models import Observation
 
@@ -96,14 +102,19 @@ class CorrelationRepository:
         subject: Observation,
         *,
         limit: int = MAX_CANDIDATES,
-        temporal_window_hours: float = DEFAULT_TEMPORAL_WINDOW_HOURS,
-        radius_km: float = DEFAULT_RADIUS_KM,
+        policy: RetrievalPolicy | None = None,
     ) -> list[tuple[Observation, Any]]:
         """Return bounded candidates for `subject` as (observation, location WKT).
 
         Organisation scoping and the hidden flag are applied here, so a caller
-        cannot accidentally retrieve across tenants.
+        cannot accidentally retrieve across tenants. The bounds come from the
+        subject's category, and tighten when it has no point to measure from.
         """
+        subjectPoint = parse_point_wkt(self.location_wkt(subject.id))
+        bounds = policy or policy_for(
+            subject.observationType, has_location=subjectPoint is not None
+        )
+
         statement: Select[Any] = select(
             Observation,
             geography_to_text_expr(Observation.location, self.dialect_name),
@@ -115,26 +126,40 @@ class CorrelationRepository:
 
         subjectObservedAt = require_aware(subject.observedAt, dialectName=self.dialect_name)
         if subjectObservedAt is not None:
-            window = timedelta(hours=temporal_window_hours)
+            window = timedelta(hours=bounds.window_hours)
             statement = statement.where(
                 Observation.observedAt.is_not(None),
                 Observation.observedAt >= subjectObservedAt - window,
                 Observation.observedAt <= subjectObservedAt + window,
             )
 
+        # Push the distance test into PostgreSQL so the N nearest-by-time rows
+        # are not first fetched only to be thrown away.
+        indexedDistance = subjectPoint is not None and self.dialect_name == "postgresql"
+        if indexedDistance:
+            # parse_point_wkt returns (longitude, latitude), which is the order
+            # format_point_wkt expects -- the reverse of the haversine call below.
+            point = format_point_wkt(subjectPoint[0], subjectPoint[1])
+            statement = statement.where(
+                func.ST_DWithin(
+                    Observation.location,
+                    func.ST_GeogFromText(point),
+                    bounds.radius_km * 1000.0,
+                )
+            )
+
         statement = statement.order_by(Observation.receivedAt.desc()).limit(limit)
 
-        subjectPoint = parse_point_wkt(self.location_wkt(subject.id))
         rows: list[tuple[Observation, Any]] = []
         for row in self._session.execute(statement).all():
             candidate, candidateWkt = row[0], row[1]
-            if subjectPoint is not None and candidateWkt is not None:
+            if not indexedDistance and subjectPoint is not None and candidateWkt is not None:
                 point = parse_point_wkt(candidateWkt)
                 if point is not None:
                     distance = haversine_km(
                         subjectPoint[1], subjectPoint[0], point[1], point[0]
                     )
-                    if distance > radius_km:
+                    if distance > bounds.radius_km:
                         continue
             rows.append((candidate, candidateWkt))
         return rows
@@ -181,6 +206,7 @@ class CorrelationRepository:
         missingSignals: list[str],
         reasons: list[str],
         sourceIndependent: bool,
+        ambiguous: bool = False,
         methodVersion: str = METHOD_VERSION,
     ) -> EvidenceRelationship:
         """Insert a suggestion, or refresh an undecided one. Decisions are never overwritten."""
@@ -194,6 +220,7 @@ class CorrelationRepository:
             existing.missingSignals = missingSignals
             existing.reasons = reasons
             existing.sourceIndependent = sourceIndependent
+            existing.ambiguous = ambiguous
             existing.methodVersion = methodVersion
             self._session.flush()
             return existing
@@ -208,6 +235,7 @@ class CorrelationRepository:
             missingSignals=missingSignals,
             reasons=reasons,
             sourceIndependent=sourceIndependent,
+            ambiguous=ambiguous,
             methodVersion=methodVersion,
             status=RelationshipStatus.SUGGESTED.value,
         )
@@ -236,6 +264,53 @@ class CorrelationRepository:
     def all_org_ids(self) -> set[uuid.UUID]:
         """Every organisation id, for a platform administrator's view only."""
         return set(self._session.scalars(select(Organisation.id)).all())
+
+    def ensure_cluster(self, organisationId: uuid.UUID, observationId: uuid.UUID) -> uuid.UUID:
+        """Return the cluster holding `observationId`, creating one if needed.
+
+        Creating a cluster claims nothing: it gives a reviewer a place to look.
+        An existing membership is left alone, which is what keeps a scan from
+        joining A to C because both matched B.
+        """
+        existing = self._session.scalar(
+            select(CorrelationClusterMember.clusterId).where(
+                CorrelationClusterMember.observationId == observationId
+            )
+        )
+        if existing is not None:
+            return existing
+
+        cluster = CorrelationCluster(organisationId=organisationId)
+        self._session.add(cluster)
+        self._session.flush()
+        self._session.add(
+            CorrelationClusterMember(clusterId=cluster.id, observationId=observationId)
+        )
+        self._session.flush()
+        return cluster.id
+
+    def clusters_with_members(
+        self, organisationIds: set[uuid.UUID]
+    ) -> list[tuple[CorrelationCluster, list[uuid.UUID]]]:
+        """Clusters for the caller's organisations, with their observation ids."""
+        if not organisationIds:
+            return []
+        clusters = list(
+            self._session.scalars(
+                select(CorrelationCluster)
+                .where(CorrelationCluster.organisationId.in_(organisationIds))
+                .order_by(CorrelationCluster.createdAt.desc())
+            ).all()
+        )
+        members: dict[uuid.UUID, list[uuid.UUID]] = {cluster.id: [] for cluster in clusters}
+        if clusters:
+            for clusterId, observationId in self._session.execute(
+                select(
+                    CorrelationClusterMember.clusterId, CorrelationClusterMember.observationId
+                ).where(CorrelationClusterMember.clusterId.in_(members))
+            ).all():
+                members[clusterId].append(observationId)
+        return [(cluster, members[cluster.id]) for cluster in clusters]
 
     def count_for_task(self, task: CorrelationTask) -> int:
         return int(
