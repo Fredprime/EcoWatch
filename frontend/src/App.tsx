@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import './App.css';
 import { WORKSPACES } from './types';
 import { OverviewPage } from './pages/OverviewPage';
@@ -42,6 +42,13 @@ function NotFoundPage() {
 
 function Layout() {
   const [roleView, setRoleView] = useState<RoleView>('all');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => setMenuOpen(false));
+    return () => window.cancelAnimationFrame(id);
+  }, [location.pathname]);
 
   const visibleWorkspaces = useMemo(() => {
     if (roleView === 'all') return WORKSPACES;
@@ -51,12 +58,18 @@ function Layout() {
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <aside className="sidebar" aria-label="Workspace navigation">
-        <div className="brand">
-          <p className="brand-title">EcoWatch</p>
-          <p className="brand-subtitle">Evidence-led environmental intelligence</p>
+      {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
+      <aside className={`sidebar${menuOpen ? ' open' : ''}`} aria-label="Workspace navigation">
+        <div className="sidebar-header">
+          <div className="brand">
+            <p className="brand-title">EcoWatch</p>
+            <p className="brand-subtitle">Evidence-led environmental intelligence</p>
+          </div>
+          <button type="button" className="btn btn-secondary menu-close" onClick={() => setMenuOpen(false)}>
+            Close
+          </button>
         </div>
-        <nav aria-label="Primary">
+        <nav id="primary-nav" aria-label="Primary">
           <ul className="nav-list">
             {visibleWorkspaces.map((ws) => (
               <li key={ws.id}>
@@ -64,6 +77,7 @@ function Layout() {
                   to={ws.path}
                   end={ws.path === '/'}
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                  onClick={() => setMenuOpen(false)}
                 >
                   {ws.label}
                 </NavLink>
@@ -78,11 +92,22 @@ function Layout() {
 
       <div className="main">
         <header className="topbar">
-          <div>
-            <strong>Prototype frontend scaffold</strong>
-            <div className="topbar-meta">Design baseline — no backend integration, no live data.</div>
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="btn btn-secondary menu-button"
+              aria-expanded={menuOpen}
+              aria-controls="primary-nav"
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              Menu
+            </button>
+            <div>
+              <strong>Prototype frontend scaffold</strong>
+              <div className="topbar-meta">Design baseline — no backend integration, no live data.</div>
+            </div>
           </div>
-          <div className="field" style={{ margin: 0, minWidth: '260px' }}>
+          <div className="field topbar-role">
             <label htmlFor="role-view">Role view (UI demo)</label>
             <select id="role-view" value={roleView} onChange={(e) => setRoleView(e.target.value as RoleView)}>
               {ROLE_OPTIONS.map((opt) => (
