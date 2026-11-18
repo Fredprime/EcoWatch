@@ -40,4 +40,4 @@ Prefer primary datasets, official technical documentation, peer-reviewed researc
 
 ## 7. Verification note
 
-Canonical docs `00`–`24` describe the overall design baseline; Phase 1 backend code in `backend/` implements the Phase 1 foundation per `ADR-029`, while Phases 2–3, `frontend/`, legal/privacy governance sign-off, and live pilot deployment remain unimplemented.
+Canonical docs `00`–`24` describe the overall design baseline; Phase 1 backend code in `backend/` implements the Phase 1 foundation per `ADR-029`, and a first Phase 2 correlation slice exists on `phase2-correlation` (see `docs/PHASE2_CORRELATION.md`). Phase 3, `frontend/`, legal/privacy governance sign-off, and live pilot deployment remain unimplemented.

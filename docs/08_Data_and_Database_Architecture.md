@@ -50,7 +50,7 @@ An immutable or append-only record of sensitive actions and status changes.
 | `memberships` | User-to-organisation roles (Phase 1) |
 | `methods` | Controlled field/lab measurement protocols (`ADR-028`, Phase 1) |
 | `units` | Controlled measurement units (`ADR-028`, Phase 1) |
-| `observations` | Core org-scoped observation records (Phase 1) |
+| `observations` | Core org-scoped observation records (Phase 1; Phase 2 adds nullable `source_ref` for repost/shared-origin detection, `FR-027`) |
 | `observation_versions` | Controlled corrections/version history (Phase 1) |
 | `observation_sources` | Source and contributor metadata with restricted access (Phase 1) |
 | `evidence_assets` | Original and derivative file metadata (Phase 1) |
@@ -60,7 +60,7 @@ An immutable or append-only record of sensitive actions and status changes.
 | `dataset_versions` | Source version, licence, coverage and acquisition details (Phase 3) |
 | `cases` | Org-scoped environmental investigation/response cases (Phase 1) |
 | `case_observations` | Many-to-many observation/case links (Phase 1) |
-| `evidence_relationships` | Suggested/reviewed evidence links and explanations (Phase 2) |
+| `evidence_relationships` | Suggested/reviewed evidence links and explanations (Phase 2; migration `0002`, canonical `observation_a_id < observation_b_id` ordering enforced by `CHECK`, unique per pair and task) |
 | `correlation_embeddings` | Semantic vector representations for correlation retrieval (`ADR-028`, Phase 2) |
 | `environmental_entities` | Optional sites, waterbodies, catchments, habitats or monitored assets (Phase 3) |
 | `environmental_relationships` | Domain relationships between entities/observations (Phase 3) |

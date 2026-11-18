@@ -23,6 +23,9 @@ from ecowatch.core.storage import LocalFilesystemStorage
 from ecowatch.main import create_app
 from ecowatch.modules.audit.models import AuditEvent  # noqa: F401
 from ecowatch.modules.cases.models import Case, CaseObservation  # noqa: F401
+from ecowatch.modules.correlation.models import (  # noqa: F401
+    EvidenceRelationship,
+)
 from ecowatch.modules.evidence.models import AssetDerivative, EvidenceAsset  # noqa: F401
 from ecowatch.modules.identity.models import Membership, Organisation, User
 from ecowatch.modules.identity.permissions import Role, SystemRole

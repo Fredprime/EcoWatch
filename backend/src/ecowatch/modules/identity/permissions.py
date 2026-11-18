@@ -53,6 +53,8 @@ class Permission(StrEnum):
     CASE_TRANSITION_FIELD_VERIFIED = "case:transition_field_verified"
     CASE_TRANSITION_REFER = "case:transition_refer"
     CASE_TRANSITION_CLOSE = "case:transition_close"
+    CORRELATION_READ = "correlation:read"
+    CORRELATION_REVIEW = "correlation:review"
     AUDIT_READ = "audit:read"
     ORG_MANAGE_USERS = "org:manage_users"
     ADMIN_MANAGE_SYSTEM = "admin:manage_system"
@@ -90,6 +92,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_UPDATE,
             Permission.CASE_LINK_OBS,
             Permission.CASE_TRANSITION_BASIC,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
         }
     ),
     Role.INVESTIGATOR: frozenset(
@@ -109,6 +113,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_BASIC,
             Permission.CASE_TRANSITION_REFER,
             Permission.CASE_TRANSITION_CLOSE,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
         }
     ),
     Role.ENVIRONMENTAL_SPECIALIST: frozenset(
@@ -123,6 +129,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_READ,
             Permission.CASE_UPDATE,
             Permission.CASE_TRANSITION_FIELD_VERIFIED,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
         }
     ),
     Role.INTERVENTION_MANAGER: frozenset(
@@ -153,6 +161,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_CLOSE,
             Permission.AUDIT_READ,
             Permission.ORG_MANAGE_USERS,
+            Permission.CORRELATION_READ,
         }
     ),
     Role.SYSTEM_ADMIN: frozenset(
@@ -179,6 +188,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ORG_MANAGE_USERS,
             Permission.ADMIN_MANAGE_SYSTEM,
             Permission.JOBS_READ,
+            Permission.CORRELATION_READ,
+            Permission.CORRELATION_REVIEW,
         }
     ),
 }

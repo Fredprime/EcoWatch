@@ -129,6 +129,21 @@ def test_rbac_deny_by_default_and_separation_of_duties() -> None:
     assert excInfo.value.code == ErrorCode.SELF_REVIEW_FORBIDDEN
 
 
+def test_correlation_review_implies_correlation_read() -> None:
+    """A role that may decide a suggestion must be able to list it.
+
+    Otherwise the reviewer who is supposed to act on suggestions gets a 403 on
+    the only endpoint that shows them, and the query silently returns nothing.
+    """
+    from ecowatch.modules.identity.permissions import ROLE_PERMISSIONS
+
+    for role, granted in ROLE_PERMISSIONS.items():
+        if Permission.CORRELATION_REVIEW in granted:
+            assert Permission.CORRELATION_READ in granted, role
+    # And the read-only end stays closed to contributors, who never review.
+    assert Permission.CORRELATION_READ not in ROLE_PERMISSIONS[Role.REGISTERED_CONTRIBUTOR]
+
+
 def test_scanner_magic_bytes_and_exif_stripping() -> None:
     from tests.conftest import make_jpeg_with_exif_bytes
 

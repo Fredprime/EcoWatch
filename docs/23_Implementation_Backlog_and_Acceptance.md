@@ -38,23 +38,25 @@ Acceptance:
 
 ## 3. Phase 2 — Evidence correlation
 
+**Status (2026-11-18):** a first slice is implemented on `phase2-correlation` — bounded org-scoped retrieval, scoring with missing-signal handling, `evidence_relationships` storage with canonical-pair constraints, reviewer accept/reject/ambiguous with audit, and background scanning. Semantic similarity, the remaining detectors, merge/split and the scored evaluation run are not built. Per-item status: `docs/PHASE2_TODO.md`; what exists and its limits: `docs/PHASE2_CORRELATION.md`.
+
 Backlog:
-- Candidate retrieval.
-- Semantic baseline model or deterministic fallback.
-- Spatial and temporal compatibility signals.
-- Source-dependency checks.
-- Relationship types and explanations.
-- Reviewer accept/reject/ambiguous workflow.
-- Merge/split audit behaviour.
-- Offline queue and sync states.
+- Candidate retrieval. — *built, distance filtered in Python rather than `ST_DWithin` (upgrade tracked as T4b)*
+- Semantic baseline model or deterministic fallback. — *deterministic keyword/token fallback built; model not built, gated on the pgvector decision*
+- Spatial and temporal compatibility signals. — *built*
+- Source-dependency checks. — *built for explicitly recorded `source_ref`; no inference of shared origin*
+- Relationship types and explanations. — *`same_event` only; duplicate / repost / cross-case not differentiated yet*
+- Reviewer accept/reject/ambiguous workflow. — *built, audited, one-way*
+- Merge/split audit behaviour. — *not built*
+- Offline queue and sync states. — *not built (intake side, Phase 1 module)*
 
 Acceptance:
-- Labelled evaluation set exists.
-- False links and missed links are measured.
-- Missing data is not fabricated.
-- Suggestions are explainable and reversible.
-- Reviewer actions are audited.
-- Offline retries are idempotent.
+- Labelled evaluation set exists. — *not yet; harness and metrics exist, the run is gated on the evaluation-route decision*
+- False links and missed links are measured. — *metrics implemented, no result claimed*
+- Missing data is not fabricated. — *enforced: a missing signal leaves the score, it is not imputed*
+- Suggestions are explainable and reversible. — *explainable (components, missing signals, reasons); reversal needs a designed action, not built*
+- Reviewer actions are audited. — *enforced in the same transaction as the decision*
+- Offline retries are idempotent. — *not applicable yet, intake is Phase 1*
 
 ## 4. Phase 3 — Environmental intelligence
 
