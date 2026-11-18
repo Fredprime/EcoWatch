@@ -84,7 +84,9 @@ def test_scan_creates_one_suggestion_and_repeated_scans_do_not_duplicate(
     # canonical ordering: the stored pair is independent of which end was scanned
     assert suggestion.observationAId < suggestion.observationBId
     assert suggestion.status == RelationshipStatus.SUGGESTED.value
-    assert suggestion.task == CorrelationTask.SAME_EVENT.value
+    # Identical wording is now classified as a duplicate rather than a vague
+    # "same event"; the point of this test is the canonical pair and idempotency.
+    assert suggestion.task == CorrelationTask.DUPLICATE.value
     assert suggestion.reasons
 
 
@@ -240,6 +242,53 @@ def test_repost_from_the_same_source_is_flagged_as_not_independent(
 
     assert suggestion.sourceIndependent is False
     assert any("not independent" in reason for reason in suggestion.reasons)
+
+
+def test_repost_is_stored_as_source_dependency_not_a_second_witness(
+    dbSession: Session,
+) -> None:
+    org = create_temp_org(dbSession)
+    first = make_observation(
+        dbSession, org, description="dead fish at the river bend", sourceRef="post-42"
+    )
+    make_observation(
+        dbSession, org, description="dead fish at the river bend", sourceRef="post-42"
+    )
+
+    CorrelationService(dbSession).scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    assert suggestion.task == CorrelationTask.SOURCE_DEPENDENCY.value
+    assert suggestion.sourceIndependent is False
+    assert "one account, not two" in suggestion.reasons[0]
+
+
+def test_near_identical_wording_is_stored_as_a_duplicate(dbSession: Session) -> None:
+    org = create_temp_org(dbSession)
+    first = make_observation(
+        dbSession, org, description="truck dumping waste into the drain at Avenor"
+    )
+    make_observation(
+        dbSession, org, description="truck dumping waste into the drain at Avenor again"
+    )
+
+    CorrelationService(dbSession).scan_observation(first.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    assert suggestion.task == CorrelationTask.DUPLICATE.value
+    assert suggestion.sourceIndependent is True
+    assert "submitted twice" in suggestion.reasons[0]
+
+
+def test_unrelated_report_is_not_suggested(dbSession: Session) -> None:
+    """Below the review threshold nothing is written, so the queue stays useful."""
+    org = create_temp_org(dbSession)
+    first = make_observation(dbSession, org, description="loud generator at the market")
+    make_observation(
+        dbSession, org, description="blocked storm drain on the coast road",
+        observationType="flooding", lat=6.9, lon=-1.9,
+    )
+
+    assert CorrelationService(dbSession).scan_observation(first.id) == 0
+    assert dbSession.query(EvidenceRelationship).count() == 0
 
 
 def test_scan_endpoint_queues_a_job_and_scoring_is_never_inline(

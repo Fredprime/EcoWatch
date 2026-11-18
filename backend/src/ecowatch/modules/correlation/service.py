@@ -18,9 +18,9 @@ from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
 from ecowatch.core.spatial import parse_point_wkt
 from ecowatch.modules.audit.service import record_audit_event
+from ecowatch.modules.correlation.detectors import TASK_REASONS, task_for
 from ecowatch.modules.correlation.features import Location, ObservationFeatures
 from ecowatch.modules.correlation.models import (
-    CorrelationTask,
     EvidenceRelationship,
     RelationshipStatus,
 )
@@ -117,17 +117,20 @@ class CorrelationService:
             radius_km=bounds.radius_km,
         ).suggestions:
             partnerId = uuid.UUID(suggestion.observation_b_id)
-            if partnerId in decided:
+            task = task_for(suggestion)
+            if partnerId in decided or task is None:
                 continue
             self._repo.upsert_suggestion(
                 organisationId=subject.organisationId,
                 firstId=subject.id,
                 secondId=partnerId,
-                task=CorrelationTask.SAME_EVENT.value,
+                task=task.value,
                 score=suggestion.score,
                 components=dict(suggestion.components),
                 missingSignals=list(suggestion.missing_signals),
-                reasons=list(suggestion.reasons),
+                # The task's own wording leads, so a reviewer sees what kind of
+                # link this is before the individual signals that support it.
+                reasons=[TASK_REASONS[task], *suggestion.reasons],
                 sourceIndependent=suggestion.source_independent,
             )
             written += 1
