@@ -45,14 +45,25 @@ This is the single review document for checking progress, recent changes, and ve
 | 2026-11-18 | Phase 2 (`phase2-correlation`) | Built phase 2 on the real Phase 1 schema rather than a guessed contract. Migration `0002`: `evidence_relationships` with canonical-pair `CHECK` + `UNIQUE (pair, task)`, and `observations.source_ref` because `FR-027` (repost detection) was unimplementable without it. Bounded org-scoped retrieval, `CorrelationService` scan/decide, worker job type `correlation.scan` so intake never includes scoring, three endpoints, `correlation:read`/`correlation:review`. Constraints proven on live PostgreSQL: an unordered pair is refused, not stored twice. Fixed `prime`'s 159 lint errors so CI could gate anything. 49 passed / 2 skipped, plus 2 PostGIS-gated tests. | `backend/src/ecowatch/modules/correlation/`, `backend/alembic/versions/0002_phase2_correlation.py`, `backend/tests/integration/test_correlation_*.py`, `backend/pyproject.toml`, `docs/PHASE2_CORRELATION.md` |
 | 2026-11-18 | Phase 2 CI and merge (`phase2-correlation`) | Merged `origin/prime` (`3f1e6df`), keeping prime's change-log rows and re-appending mine. Backend CI job now provisions PostGIS and runs the migration tests, so `0001` and `0002` are verified on every PR; a broken `pyproject.toml` merge was caught by CI in 9 seconds before any test ran. | `.github/workflows/ci.yml`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md`, `docs/08_Data_and_Database_Architecture.md`, `docs/22_Change_History_and_References.md`, `docs/23_Implementation_Backlog_and_Acceptance.md` |
 | 2026-11-18 | Phase 2 capability pass (`phase2-correlation`) | Closed five gaps that made the first slice narrower than its own docs claimed: category-aware retrieval bounds instead of two constants; `ST_DWithin` instead of a Python distance test; three detectors instead of everything-as-`same_event`; a reopen action so "reversible by a new action" is true; and a cluster container plus a persisted tie flag. Each was committed and verified separately; `cross_case`, `promote_to_case`, `merge`, `split` and the scored evaluation run remain unbuilt and are named as such. | `backend/src/ecowatch/modules/correlation/` (`policy.py`, `detectors.py`, `repository.py`, `service.py`, `router.py`, `schemas.py`, `models.py`), `backend/alembic/versions/0003_phase2_clusters.py`, `backend/tests/`, `docs/PHASE2_CORRELATION.md`, `docs/PHASE2_TODO.md` |
+| 2026-11-18 | Phase 2 intake hook (`phase2-intake-hook`) | Closed the gap that left correlation manual-only: `CollectionService.submit_observation` enqueues `correlation.scan` before its commit, using the configured worker retry limit. Enqueue and submission share a transaction, so a rolled-back intake leaves no orphan job, and idempotent replay returns before enqueueing. This touches `collection/service.py`, which Phase 1 owns, so it is on its own branch for separate review. | `backend/src/ecowatch/modules/collection/service.py`, `backend/src/ecowatch/modules/correlation/service.py`, `backend/tests/integration/test_correlation_intake_hook.py`, `backend/tests/integration/test_phase1_workflows.py`, `docs/PHASE2_CORRELATION.md`, `docs/PHASE2_TODO.md` |
 
 ---
 
 ## 3. Items For Owner Review & Merge
 
-1. **Approve and squash-merge PR #5 (`prime` → `master`):**
-   - Conflict with `origin/master` is resolved and CI (`infra`, `backend`, `frontend`) is green; one maintainer review approval is needed on GitHub before squash-merging into `master` (keeping `prime` intact per `CONTRIBUTING.md`).
-2. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
+1. **PR #11 (`phase2-hardening` → `prime`) — two correlation bug fixes:**
+   - A pair whose detector task changed on rescan got a second suggestion row; the pair is now the identity and an open row is reclassified in place.
+   - `reopen` could clear a decision on a report the caller submitted; both reviewer actions now share the self-review check.
+   - CI green (3/3). Tests: 73 passed / 3 skipped, 76 with PostGIS.
+2. **PR #12 (`phase2-intake-hook` → `prime`) — automatic scans:**
+   - Intake now queues `correlation.scan` in the same transaction as the observation insert, so new reports are actually compared. Idempotent replay queues nothing.
+   - This edits `collection/service.py` (Phase 1-owned), so it is a separate PR that can be dropped without affecting #11.
+   - CI green (3/3). Tests: 72 passed / 3 skipped, 75 with PostGIS.
+3. **Decisions that gate the rest of Phase 2** (details and options in `docs/PHASE2_TODO.md`, "What I need from the owner"):
+   - **pgvector** — gates `correlation_embeddings` and semantic similarity only.
+   - **Evaluation route** — gates the scored harness run and any accuracy claim.
+   - **Module / authority split** — `cross_case`, `promote_to_case`, `merge` and `split` need the case-side rules in `docs/PERMISSIONS_MATRIX.md` §4 and the cases module Phase 1 owns.
+4. **Formal ADR status alignment (`docs/20_Technical_Decision_Records.md`):**
    - `ADR-029` is `Approved 2026-11-18`; optionally promote `ADR-014`–`ADR-016` and `ADR-026`–`ADR-028` statuses from `Proposed` to `Approved` during review.
 
 ---

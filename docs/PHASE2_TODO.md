@@ -30,7 +30,7 @@ Sizes are S / M / L, not hours.
 | T4 | Candidate retrieval SQL: `ST_DWithin` + temporal window + category pre-filter, excludes rejected pairs, applies lower-context bounds when location is absent, always `LIMIT` | T0, T1, PostGIS | M | **done** — bounded, org-scoped retrieval; distance filtered by `ST_DWithin` on PostgreSQL, in Python on SQLite (test dialect only). |
 | T5 | Detector wiring: duplicate, same-event, repost/source-dependency (`FR-027`), cross-case relevance — each with its own thresholds and reason codes, all feeding one `PairSuggestion` shape | T1, T4 | M | **done** — `detectors.py`: one task per pair, `source_dependency` > `duplicate` > `same_event`, nothing below the review threshold. `cross_case` is deliberately absent: it needs the case-side rules and the cases module Phase 1 owns. |
 | T6 | Provisional clusters: staff-only, never counted as cases, never transitively merged, ambiguity surfaced not broken | T1, T5 | M | **done (container only)** — `correlation_clusters` + members, one cluster per report, created on scan, staff-only. No auto-merge, so A~B and B~C stay separate; `merge`/`split` are not built. |
-| T7 | Background job types `correlation_score` and `embedding_backfill`: idempotent, bounded retries, dead-letter state, intake latency never includes scoring (`NFR-001`) | **`processing_jobs` + worker** | M | **partly done** — `correlation.scan` registered and queued; `embedding_backfill` waits on the pgvector decision. |
+| T7 | Background job types `correlation_score` and `embedding_backfill`: idempotent, bounded retries, dead-letter state, intake latency never includes scoring (`NFR-001`) | **`processing_jobs` + worker** | M | **partly done** — `correlation.scan` queued automatically on intake and on demand, with bounded retries and a dead-letter state; `embedding_backfill` waits on the pgvector decision. |
 
 ## 3. Review boundary
 
@@ -74,6 +74,13 @@ Three gaps that blocked Phase 2 outright, now closed from this side:
 
 ## What I need from the owner
 
-1. **pgvector** (plan §6 item 3). Gates T3 only. Everything else proceeds without it.
-2. **Phase 2 evaluation route** (plan §6 item 5): harness on a consented set, or a separate synthetic corpus. Gates T11 only.
-3. **Confirm the module split** in "Not mine" above, so nobody builds split-phase intake twice.
+Each decision below is a single choice; the rest of Phase 2 proceeds without it.
+
+1. **pgvector** (plan §6 item 3). Gates T3 (`correlation_embeddings`) and semantic similarity only.
+   - **Recommendation:** approve `pgvector` as the vector store, keep `token_similarity` as the labelled keyword fallback, and add the embedding column in a new migration. It avoids a second datastore and reuses the PostGIS service already in CI.
+   - Alternative: external vector store — needs a new service, its own credentials and a privacy review before any text leaves the current database.
+2. **Phase 2 evaluation route** (plan §6 item 5). Gates T11 and any accuracy claim.
+   - **Recommendation:** harness on a consented, human-labelled set already held by the organisation. No accuracy number is reported until that run exists; `evaluate` currently reports unlabelled count as absent rather than approximated.
+   - Alternative: a separate synthetic corpus, which can test mechanics but cannot support a claim about real reports.
+3. **Module / authority split.** `cross_case`, `promote_to_case`, `merge` and `split` need the case-side rules in `docs/PERMISSIONS_MATRIX.md` §4 and the cases module Phase 1 owns; guessing the two-key authority rules would produce code that has to be deleted. The cluster container they need now exists.
+4. **Confirm the "Not mine" split above**, so nobody builds split-phase intake or notification push twice.

@@ -327,9 +327,13 @@ class CorrelationService:
         return self._repo.clusters_with_members(organisationIds)[:limit]
 
 
-def enqueue_scan(session: Session, observationId: uuid.UUID) -> uuid.UUID:
+def enqueue_scan(
+    session: Session, observationId: uuid.UUID, *, maxAttempts: int = 5
+) -> uuid.UUID:
     """Queue a scan so intake latency never includes scoring (`NFR-001`)."""
     job = JobsRepository(session).enqueue(
-        SCAN_JOB_TYPE, {"observationId": str(observationId)}
+        SCAN_JOB_TYPE,
+        {"observationId": str(observationId)},
+        maxAttempts=maxAttempts,
     )
     return job.id
