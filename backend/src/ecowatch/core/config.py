@@ -3,6 +3,7 @@
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -54,7 +55,7 @@ class Settings(BaseModel):
     workerMaxAttempts: int = Field(default=5, ge=1, le=20)
 
     @model_validator(mode="after")
-    def validate_production_secret(self) -> Settings:
+    def validate_production_secret(self) -> Self:
         if (
             self.environment.lower() == "production"
             and self.authSecret == "dev-only-insecure-secret-change-in-production"
@@ -63,7 +64,7 @@ class Settings(BaseModel):
         return self
 
     @classmethod
-    def from_env(cls, envPath: Path | None = None) -> Settings:
+    def from_env(cls, envPath: Path | None = None) -> Self:
         """Build Settings from process environment overlaid onto .env defaults."""
         dotenvMap = _load_dotenv_values(envPath or Path(".env"))
         envMap = {**dotenvMap, **os.environ}
