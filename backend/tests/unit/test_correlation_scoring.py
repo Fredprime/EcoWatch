@@ -9,8 +9,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from ecowatch.correlation.features import Location, ObservationFeatures
-from ecowatch.correlation.scoring import (
+from ecowatch.modules.correlation.features import Location, ObservationFeatures
+from ecowatch.modules.correlation.scoring import (
     haversine_km,
     rank,
     score_pair,

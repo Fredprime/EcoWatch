@@ -15,7 +15,7 @@ Phase 2 answers one question: *do these two reports look like they are about the
 | `scoring.py` | `token_similarity`, `temporal_proximity`, `spatial_proximity`, `category_agreement`, `score_pair`, `rank` |
 | `evaluate.py` | Precision / recall / false links / missed links / unlabelled count against human labels |
 
-23 tests in `backend/tests/`. `ruff check backend` and `pytest backend` both pass, and CI's `backend` job now activates itself because `backend/pyproject.toml` exists.
+49 tests pass and 2 are skipped by default (the PostGIS-gated ones run with `ECOWATCH_RUN_POSTGIS_TESTS=1`). `ruff check backend` is clean, and CI's `backend` job now activates itself because `backend/pyproject.toml` exists.
 
 ### The four decisions the code makes, which are the whole point
 
@@ -44,20 +44,37 @@ Two schema facts Phase 2 needs that are decided on Phase 1's side:
 - `observed_at` must be **timezone-aware** in the database. `ObservationFeatures` raises on a naive datetime rather than guessing an offset.
 - Category must come from a controlled vocabulary, or `category_agreement` compares free text and means nothing.
 
-## 3. Not built, and why
+## 3. Built against the real Phase 1 schema
 
-> Task-by-task plan and the exact Phase 1 questions are in `docs/PHASE2_TODO.md`.
+Phase 1 (`3713211`) answered the contract questions from code, so the columns are now pinned by a test rather than read from a chat message.
+
+| # | Now exists | Where |
+|---|---|---|
+| T0 | `evidence_relationships` with canonical-pair ordering, uniqueness per `(pair, task)`, status, components, missing signals, reasons, method version, decision record | `models.py`, migration `0002_phase2_correlation` |
+| T1 | Rejected-pair guarantee: `CHECK (observation_a_id < observation_b_id)` plus `UNIQUE (pair, task)`, so rejection is an index probe and re-rejection is a no-op | migration `0002` |
+| T2 | `observations.source_ref` (nullable, indexed) — **`FR-027` was unimplementable without it** | migration `0002` |
+| T3 | Bounded candidate retrieval, organisation-scoped and hidden-aware | `repository.py` |
+| T4 | `CorrelationService.scan_observation` — scores, persists, never overwrites a decision | `service.py` |
+| T5 | Worker job type `correlation.scan`, so intake latency never includes scoring | `jobs/worker.py` |
+| T6 | API: `GET /correlation/suggestions`, `POST /correlation/observations/{id}/scan`, `POST /correlation/suggestions/{id}/decision` | `router.py` |
+| T7 | RBAC: `correlation:read` / `correlation:review`, deny-by-default, granted to reviewer, investigator, environmental specialist, org admin, system admin | `identity/permissions.py` |
+
+### Deliberate deviations from the plan, and why
+
+- **Retrieval filters distance in Python, not `ST_DWithin`.** The SQL prefilter (organisation, hidden, time window) runs on both dialects; the exact distance test runs over that bounded set. Honest limitation: it is bounded by the prefilter limit rather than a GiST index. Marked in code as a shortcut with its upgrade point. This is what let retrieval be tested on SQLite today instead of waiting for a database fixture.
+- **Review decisions are one-way with `409` on re-decision.** "Reversible by a new action, not by an edit" is enforced as a refusal rather than silently allowing overwrite. Reopening a decision needs its own explicit action, which is not built.
+- **`source_ref` lives on `observations`, not `observation_sources`.** The latter is the isolated contributor-identity table; a source reference is provenance, not a person, and mixing them would put correlation reads next to PII.
+
+## 4. Not built, and why
 
 | Missing | Blocked on |
 |---|---|
-| `evidence_relationships` table | foreign keys to `observations`, which does not exist yet |
-| `correlation_embeddings` table + vector index | the vector-store decision (plan §6 item 3) — `pgvector` is the assumed default and has not been approved |
-| Rejected-pair unique index | same as above; it normalises `(observation_a_id, observation_b_id)` so rejection is an index probe instead of a rescan |
-| Candidate retrieval SQL (spatial + temporal bounding) | needs PostGIS and the Phase 1 tables to test against |
-| Worker job types | `processing_jobs` + worker are Phase 1 |
-| Review API (`accept` / `reject` / `mark_ambiguous` / `promote_to_case` / `merge` / `split`) | needs reviewer identity, audit, and the tables above |
-
-I did not create these as placeholder migrations. A migration that cannot be run is not a design, and it would collide with the team's Phase 1 revisions.
+| `correlation_embeddings` + vector index | the vector-store decision (plan §6 item 3) — `pgvector` assumed, not approved |
+| Semantic similarity | same: `token_similarity` is the keyword fallback, not the model |
+| Duplicate / repost / cross-case detectors as separate tasks | only `same_event` is wired; the enum and storage support all four, the scoring does not yet differentiate |
+| `promote_to_case`, `merge`, `split` | needs the case-side rules and the two-key rules in `PERMISSIONS_MATRIX.md` §4 |
+| Reopening a decided suggestion | needs a designed action, not an overwrite |
+| Scored harness run | needs a labelled set and the evaluation-route decision (plan §6 item 5) |
 
 ## 4. Honest limits of the current engine
 

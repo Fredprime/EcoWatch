@@ -7,8 +7,8 @@ a harness that counts generously is worse than no harness.
 
 import pytest
 
-from ecowatch.correlation.evaluate import Label, evaluate
-from ecowatch.correlation.features import PairSuggestion
+from ecowatch.modules.correlation.evaluate import Label, evaluate
+from ecowatch.modules.correlation.features import PairSuggestion
 
 
 def suggestion(a: str, b: str, score: float) -> PairSuggestion:

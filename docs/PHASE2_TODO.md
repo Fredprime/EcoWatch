@@ -3,47 +3,48 @@
 **Branch:** `phase2-correlation` · **Owner of Phase 2:** this agent · **Phase 1 and 3:** team
 **Companion:** `docs/PHASE2_CORRELATION.md` (what is built today and the Phase 1 contract)
 
-Rule for this list: nothing waits unless it physically cannot proceed. Where the only blocker is a Phase 1 table, the work is developed and tested against `backend/tests/sql/phase1_contract.sql` — an executable mirror of the contract — so the real table is a swap, not a restart.
+Rule for this list: nothing waits unless it physically cannot proceed. T0 planned an executable mirror of the Phase 1 contract so work could start before Phase 1 landed; Phase 1 (`3713211`) landed first, so the contract is now read from the real migration instead of a fixture.
 
 Sizes are S / M / L, not hours.
 
 ## 0. Unblocking work (do first)
 
-| # | Task | Depends on | Size |
-|---|---|---|---|
-| T0 | `phase1_contract.sql` test fixture: minimal `observations`, `observation_sources`, `processing_jobs`, `audit_events` matching the agreed contract, plus a test that fails loudly if a real migration contradicts it | nothing | S |
-| T0b | Retrieval policy module: per-category temporal windows, radius per category, "no location → tighter time window" rule, rejected-pair exclusion | nothing | S |
+| # | Task | Depends on | Size | Status |
+|---|---|---|---|---|
+| T0 | `phase1_contract.sql` test fixture: minimal `observations`, `observation_sources`, `processing_jobs`, `audit_events` matching the agreed contract, plus a test that fails loudly if a real migration contradicts it | nothing | S | **superseded** — Phase 1 landed before the fixture was needed; the contract is now pinned by `test_correlation_postgis.py` and the SQLite flow tests. |
+| T0b | Retrieval policy module: per-category temporal windows, radius per category, "no location → tighter time window" rule, rejected-pair exclusion | nothing | S | not started |
 
 ## 1. Storage (needs Phase 1 `observations` to run, developed against T0)
 
-| # | Task | Depends on | Size |
-|---|---|---|---|
-| T1 | `evidence_relationships` migration: a/b in canonical order, task type, score, component scores, method version, reason codes, status (`suggested`/`accepted`/`rejected`/`ambiguous`/`merged`), created/decided by and at | `observations` | M |
-| T2 | Rejected-pair guarantee: unique constraint on the canonical pair so rejection is an index probe and re-rejection is idempotent | T1 | S |
-| T3 | `correlation_embeddings` + vector column + index (one row per observation, model version, input hash; skip re-embed when unchanged) | **owner: pgvector decision** | M |
+| # | Task | Depends on | Size | Status |
+|---|---|---|---|---|
+| T1 | `evidence_relationships` migration: a/b in canonical order, task type, score, component scores, method version, reason codes, status (`suggested`/`accepted`/`rejected`/`ambiguous`/`merged`), created/decided by and at | `observations` | M | **done** — migration `0002`, constraints proven on real PostgreSQL. |
+| T2 | Rejected-pair guarantee: unique constraint on the canonical pair so rejection is an index probe and re-rejection is idempotent | T1 | S | **done** — `CHECK` + `UNIQUE` in migration `0002`. |
+| T3 | `correlation_embeddings` + vector column + index (one row per observation, model version, input hash; skip re-embed when unchanged) | **owner: pgvector decision** | M | not started |
+| T4b | `ST_DWithin` retrieval path + GiST usage on PostgreSQL | T1, PostGIS | M | not started |
 
 ## 2. Correlation
 
-| # | Task | Depends on | Size |
-|---|---|---|---|
-| T4 | Candidate retrieval SQL: `ST_DWithin` + temporal window + category pre-filter, excludes rejected pairs, applies lower-context bounds when location is absent, always `LIMIT` | T0, T1, PostGIS | M |
-| T5 | Detector wiring: duplicate, same-event, repost/source-dependency (`FR-027`), cross-case relevance — each with its own thresholds and reason codes, all feeding one `PairSuggestion` shape | T1, T4 | M |
-| T6 | Provisional clusters: staff-only, never counted as cases, never transitively merged, ambiguity surfaced not broken | T1, T5 | M |
-| T7 | Background job types `correlation_score` and `embedding_backfill`: idempotent, bounded retries, dead-letter state, intake latency never includes scoring (`NFR-001`) | **`processing_jobs` + worker** | M |
+| # | Task | Depends on | Size | Status |
+|---|---|---|---|---|
+| T4 | Candidate retrieval SQL: `ST_DWithin` + temporal window + category pre-filter, excludes rejected pairs, applies lower-context bounds when location is absent, always `LIMIT` | T0, T1, PostGIS | M | **partly done** — bounded, org-scoped retrieval works; distance is filtered in Python, not `ST_DWithin` (see T4b below). |
+| T5 | Detector wiring: duplicate, same-event, repost/source-dependency (`FR-027`), cross-case relevance — each with its own thresholds and reason codes, all feeding one `PairSuggestion` shape | T1, T4 | M | not started |
+| T6 | Provisional clusters: staff-only, never counted as cases, never transitively merged, ambiguity surfaced not broken | T1, T5 | M | not started |
+| T7 | Background job types `correlation_score` and `embedding_backfill`: idempotent, bounded retries, dead-letter state, intake latency never includes scoring (`NFR-001`) | **`processing_jobs` + worker** | M | **partly done** — `correlation.scan` registered and queued; correlation runs in the worker, never inline. |
 
 ## 3. Review boundary
 
-| # | Task | Depends on | Size |
-|---|---|---|---|
-| T8 | Review API: `accept`, `reject`, `mark_ambiguous`, `promote_to_case`, `merge`, `split` — reversible by new action, never by edit | T1, RBAC | M |
-| T9 | Separation of duties: a reviewer cannot decide on their own submission; cross-organisation reads return 404, not 403 | RBAC, org scoping | S |
-| T10 | Audit integration: every review decision writes an `audit_events` row in the same transaction | audit helper | S |
+| # | Task | Depends on | Size | Status |
+|---|---|---|---|---|
+| T8 | Review API: `accept`, `reject`, `mark_ambiguous`, `promote_to_case`, `merge`, `split` — reversible by new action, never by edit | T1, RBAC | M | **partly done** — accept / reject / ambiguous implemented and audited; promote / merge / split not built. |
+| T9 | Separation of duties: a reviewer cannot decide on their own submission; cross-organisation reads return 404, not 403 | RBAC, org scoping | S | **done** — reuses `ensure_not_self_submitted`; cross-org returns 404. |
+| T10 | Audit integration: every review decision writes an `audit_events` row in the same transaction | audit helper | S | **done** — same transaction as the decision, verified by test. |
 
 ## 4. Acceptance
 
-| # | Task | Depends on | Size |
-|---|---|---|---|
-| T11 | Scored run of the harness on a labelled set and a written result. No accuracy claim beyond what the run shows | **owner: evaluation route (plan §6 item 5)** | M |
+| # | Task | Depends on | Size | Status |
+|---|---|---|---|---|
+| T11 | Scored run of the harness on a labelled set and a written result. No accuracy claim beyond what the run shows | **owner: evaluation route (plan §6 item 5)** | M | not started |
 
 ## Not mine — hand back
 
@@ -53,27 +54,26 @@ Sizes are S / M / L, not hours.
 
 ---
 
-## What I need from the Phase 1 teammate
+## What Phase 1 answered, and the three gaps it left
 
-Fastest possible answer: **paste the four `CREATE TABLE` statements.** Everything below is answerable in two minutes and each answer removes a guess from my side.
+Answered by reading `0001_phase1_initial_schema.py` rather than by asking:
 
-Priority 1 — without these I am guessing:
+- `observations.observed_at` is `timestamptz` — aware datetimes throughout, no guessing an offset.
+- `observations.location` is PostGIS `geography(Point,4326)`; `geography_to_text_expr` already existed for the SQLite/PostgreSQL split.
+- `processing_jobs` declares job type as a string, so `correlation.scan` registers without touching Phase 1's schema.
+- RBAC is `Permission` + `ROLE_PERMISSIONS` deny-by-default; audit is `record_audit_event`, same-transaction.
+- No category lookup table: `observation_type` is a string. Correlation treats it as an opaque label.
 
-1. `observations` — the `CREATE TABLE`. I need the exact name and type of: primary key, original text, category, `observed_at`, and the location column.
-2. `observed_at` — is it `timestamptz`? If a naive `timestamp`, the engine rejects it and correlation silently stops being trustworthy.
-3. `observation_sources` — how do I get "the original source this report came from"? Column name, and whether reposts point at a shared root id.
-4. Alembic — who owns the migrations directory, and may I add my own revision on top of theirs? Two revision heads in one chain is the most common way parallel backend work breaks.
+Three gaps that blocked Phase 2 outright, now closed from this side:
 
-Priority 2 — needed before T5/T7/T8:
-
-5. `processing_jobs` — column names for claim/complete/fail, and how a job type is declared (enum, string, table). I need to register `correlation_score` and `embedding_backfill`.
-6. Category — is it a lookup table, a Postgres enum, or free text? Exact values for water / air / land / waste / noise if they exist.
-7. PostGIS — extension enabled, and what SRID observations are stored in.
-8. RBAC and audit — signature of the "current user + organisation" dependency, and the audit-writing helper. If neither exists yet, say so and I will call a one-line stub I control.
-9. Timing — which branch and roughly when does `observations` land on `prime`? Not to rush you: I am building against a fixture either way, and I would rather know when to swap it.
+| Gap | Why it blocked | Closed by |
+|---|---|---|
+| No `correlation:*` permissions | correlation could not authorise anything without widening an existing permission, which would have leaked access | `CORRELATION_READ` / `CORRELATION_REVIEW` added to `permissions.py` |
+| No `source_ref` anywhere | `FR-027` repost / shared-source detection had no way to tell two reports from one original source, so every repost scored as independent | nullable indexed column on `observations` (migration `0002`) |
+| `observation_sources` is PII-only | reusing it for provenance would put correlation reads next to contributor identity | not reused; `source_ref` lives on `observations` |
 
 ## What I need from the owner
 
 1. **pgvector** (plan §6 item 3). Gates T3 only. Everything else proceeds without it.
-2. **Phase 2 evaluation route** (plan §6 item 5): harness on a consented set, or a separate synthetic corpus. Gates T11 only, which is the last task.
+2. **Phase 2 evaluation route** (plan §6 item 5): harness on a consented set, or a separate synthetic corpus. Gates T11 only.
 3. **Confirm the module split** in "Not mine" above, so nobody builds split-phase intake twice.
