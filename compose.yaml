@@ -1,6 +1,6 @@
 services:
   db:
-    image: docker.io/postgis/postgis:16-3.4
+    build: .
     container_name: ecowatch-db
     restart: unless-stopped
     environment:
