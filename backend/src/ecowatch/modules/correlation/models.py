@@ -127,3 +127,58 @@ class EvidenceRelationship(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     decisionReason: Mapped[str | None] = mapped_column(
         "decision_reason", Text, nullable=True
     )
+    # Set when this suggestion was tied with another for the same subject. The
+    # engine never breaks a tie silently, so the flag travels with the row.
+    ambiguous: Mapped[bool] = mapped_column(
+        "ambiguous", Boolean, nullable=False, default=False
+    )
+
+
+class CorrelationCluster(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A provisional grouping of reports. Staff-only, and not a case.
+
+    Nothing here promotes a cluster or links it to a case: that is a separate
+    action with its own permission and audit trail. A cluster exists so a
+    reviewer has something to look at while deciding, and so `merge`/`split`/
+    `promote_to_case` have a subject once they are built.
+    """
+
+    __tablename__ = "correlation_clusters"
+
+    organisationId: Mapped[uuid.UUID] = mapped_column(
+        "organisation_id",
+        Uuid(as_uuid=True),
+        ForeignKey("organisations.id"),
+        nullable=False,
+        index=True,
+    )
+
+
+class CorrelationClusterMember(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """One observation in one provisional cluster.
+
+    `observation_id` is unique: a report belongs to at most one cluster, which is
+    what stops A~B and B~C quietly becoming a three-member cluster. Membership
+    only grows when a person accepts a relationship, never because two scores
+    happened to be close (`docs/files/22` section 9).
+    """
+
+    __tablename__ = "correlation_cluster_members"
+    __table_args__ = (
+        UniqueConstraint("observation_id", name="uq_correlation_cluster_members_observation"),
+    )
+
+    clusterId: Mapped[uuid.UUID] = mapped_column(
+        "cluster_id",
+        Uuid(as_uuid=True),
+        ForeignKey("correlation_clusters.id"),
+        nullable=False,
+        index=True,
+    )
+    observationId: Mapped[uuid.UUID] = mapped_column(
+        "observation_id",
+        Uuid(as_uuid=True),
+        ForeignKey("observations.id"),
+        nullable=False,
+        index=True,
+    )

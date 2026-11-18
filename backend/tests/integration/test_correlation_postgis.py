@@ -65,6 +65,25 @@ def test_correlation_constraints_and_indexes(tmp_path: Path) -> None:
                 ).scalars()
             )
             assert "ix_evidence_relationships_observation_b_id" in indexes
+            # Migration 0003: one cluster per report, so A~B and B~C cannot
+            # become one cluster by accumulation.
+            memberConstraints = set(
+                session.execute(
+                    text(
+                        "SELECT conname FROM pg_constraint "
+                        "WHERE conrelid = 'correlation_cluster_members'::regclass"
+                    )
+                ).scalars()
+            )
+            assert "uq_correlation_cluster_members_observation" in memberConstraints
+            # And the tie flag survived to the schema.
+            ambiguousColumn = session.execute(
+                text(
+                    "SELECT is_nullable FROM information_schema.columns "
+                    "WHERE table_name = 'evidence_relationships' AND column_name = 'ambiguous'"
+                )
+            ).scalar()
+            assert ambiguousColumn == "NO"
             assert "ix_evidence_relationships_status" in indexes
             assert "ix_observations_source_ref" in set(
                 session.execute(
@@ -142,3 +161,88 @@ def _relationship(org: Organisation, aId: uuid.UUID, bId: uuid.UUID) -> Evidence
         sourceIndependent=True,
         status="suggested",
     )
+
+
+@pytest.mark.skipif(
+    os.environ.get("ECOWATCH_RUN_POSTGIS_TESTS") != "1",
+    reason="Set ECOWATCH_RUN_POSTGIS_TESTS=1 with running Postgres/PostGIS",
+)
+def test_distance_is_filtered_by_postgis_not_by_python() -> None:
+    """ST_DWithin on geography, so the GiST index is what bounds the scan."""
+    dbUrl = os.environ.get(
+        "DATABASE_URL",
+        "postgresql+psycopg://ecowatch:ecowatch_dev@localhost:5433/ecowatch",
+    )
+    backendDir = Path(__file__).resolve().parents[2]
+    alembicCfg = Config(str(backendDir / "alembic.ini"))
+    alembicCfg.set_main_option("script_location", str(backendDir / "alembic"))
+    os.environ["DATABASE_URL"] = dbUrl
+    command.upgrade(alembicCfg, "head")
+
+    engine = create_engine(dbUrl)
+    try:
+        with Session(engine) as session:
+            indexes = set(
+                session.execute(
+                    text("SELECT indexname FROM pg_indexes WHERE tablename = 'observations'")
+                ).scalars()
+            )
+            assert "ix_observations_location_gist" in indexes, (
+                "the GiST index ST_DWithin relies on is missing"
+            )
+
+            org = Organisation(
+                name=f"Correlation Distance {uuid.uuid4().hex[:8]}", orgType="ngo"
+            )
+            session.add(org)
+            session.flush()
+
+            # Same wording and time for all three, so distance is the only
+            # signal that can separate them.
+            observedAt = datetime.now(UTC) - timedelta(hours=2)
+            subject = _located_observation(session, org, 6.6885, -1.6244, observedAt)
+            _located_observation(session, org, 6.6950, -1.6250, observedAt)  # ~0.7 km
+            _located_observation(session, org, 7.9500, -1.0300, observedAt)  # ~200 km
+            session.commit()
+
+            from ecowatch.modules.correlation.service import CorrelationService
+
+            assert CorrelationService(session).scan_observation(subject.id) == 1
+            suggestion = session.query(EvidenceRelationship).one()
+            partners = {suggestion.observationAId, suggestion.observationBId} - {subject.id}
+            assert len(partners) == 1
+            assert "spatial_proximity" in suggestion.components
+    finally:
+        command.downgrade(alembicCfg, "base")
+        command.upgrade(alembicCfg, "head")
+        engine.dispose()
+
+
+def _located_observation(
+    session: Session,
+    org: Organisation,
+    latitude: float,
+    longitude: float,
+    observedAt: datetime,
+) -> Observation:
+    from ecowatch.core.spatial import format_point_wkt
+
+    observation = Observation(
+        organisationId=org.id,
+        idempotencyKey=uuid.uuid4(),
+        payloadHash="0" * 64,
+        observationType="water_pollution",
+        sourceType="community_registered",
+        description="oily sheen at the river bend",
+        observedAt=observedAt,
+        receivedAt=datetime.now(UTC),
+        timePrecision="exact",
+        location=format_point_wkt(longitude, latitude),
+        locationPrecision="exact",
+        qualityFlags=[],
+        accessClass="internal",
+        currentVersion=1,
+    )
+    session.add(observation)
+    session.flush()
+    return observation
