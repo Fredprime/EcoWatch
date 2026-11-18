@@ -11,8 +11,9 @@ Phase 2 answers one question: *do these two reports look like they are about the
 
 | File | What it does |
 |---|---|
-| `features.py` | `ObservationFeatures` (what may be compared), `PairSuggestion` (the result), `Ranking` (ordered results plus a tie flag) |
-| `scoring.py` | `token_similarity`, `temporal_proximity`, `spatial_proximity`, `category_agreement`, `score_pair`, `rank` |
+| `features.py` | `ObservationFeatures` (what may be compared, including an optional stored vector), `PairSuggestion` (the result), `Ranking` (ordered results plus a tie flag) |
+| `scoring.py` | `semantic_similarity` (vector cosine, or `token_similarity` fallback), `vector_similarity`, `tokens`, `temporal_proximity`, `spatial_proximity`, `category_agreement`, `score_pair`, `rank` |
+| `embeddings.py` | `build_embedding` / `embedding_input_hash`: deterministic hashed-word vector input (`hashed-words-v1`, 384 dims). Not a validated semantic model |
 | `policy.py` | per-category radius and time window, and the tighter window used when a report has no point |
 | `detectors.py` | which task a pair belongs to (`duplicate`, `source_dependency`, `same_event`) and the thresholds that decide it |
 | `evaluate.py` | precision / recall / false links / missed links / unlabelled count against human labels |
@@ -26,6 +27,8 @@ Phase 2 answers one question: *do these two reports look like they are about the
 
 The score is named `score` and only ever `score`. It is not a probability, not a confidence, not a severity, and not a danger level (`docs/13` §3, `docs/AGENT_GUIDE.md` §5). Every `PairSuggestion` has `status="unverified"` and there is no code path that changes it.
 
+`semantic_similarity` uses cosine overlap of stored vectors when both observations have one; if either vector is absent it falls back to the labelled `token_similarity` keyword signal. The nearest-vector query is a **candidate prefilter** — it narrows the time/space-bounded candidate set, never widens it and never establishes a relationship on its own.
+
 ## 2. Built against the real Phase 1 schema
 
 Phase 1 (`3713211`) answered the contract questions from code, so the columns are pinned by tests rather than read from a chat message.
@@ -35,11 +38,12 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 | T0 | `evidence_relationships`: canonical-pair ordering, uniqueness per `(pair, task)`, task, score, components, missing signals, reasons, method version, `ambiguous`, decision record | `models.py`, migration `0002_phase2_correlation` |
 | T1 | Rejected-pair guarantee: `CHECK (observation_a_id < observation_b_id)` plus `UNIQUE (pair, task)`, so rejection is an index probe and re-rejection is a no-op | migration `0002` |
 | T2 | `observations.source_ref` (nullable, indexed) — **`FR-027` was unimplementable without it** | migration `0002` |
-| T3 | Bounded candidate retrieval, organisation-scoped and hidden-aware, distance filtered by `ST_DWithin` on PostgreSQL | `repository.py` |
+| T3 | Bounded candidate retrieval, organisation-scoped and hidden-aware, distance filtered by `ST_DWithin` on PostgreSQL; optional nearest-vector prefilter narrows (never widens) that set | `repository.py` |
+| T3b | `correlation_embeddings`: `vector(384)` + HNSW cosine index on PostgreSQL (JSON fallback on SQLite), unique per `(observation, model version, input hash)`, unchanged inputs skip the write; deterministic hashed-word vectors, no accuracy claim | `models.py`, `embeddings.py`, `core/vector.py`, migration `0005_phase2_embeddings` |
 | T4 | Per-category retrieval policy; a report without a location gets a tighter time window instead of a wider scan | `policy.py` |
 | T5 | Detector differentiation: `source_dependency` > `duplicate` > `same_event`, one task per pair, and nothing below the review threshold | `detectors.py` |
 | T6 | `CorrelationService.scan_observation` — scores, persists, never overwrites a decision; `decide` and `reopen` record reviewer actions | `service.py` |
-| T7 | Worker job type `correlation.scan`, queued automatically on observation intake and also available on demand; scoring never runs in the intake request | `jobs/worker.py`, `collection/service.py` |
+| T7 | Worker job type `correlation.scan`, queued on intake, on demand and on re-scan triggers; each scan materialises its observation's vector, so no separate backfill job is needed; scoring never runs in the intake request | `jobs/worker.py`, `collection/service.py`, `service.py` |
 | T8 | API: `GET /correlation/suggestions`, `POST /correlation/observations/{id}/scan`, `POST /correlation/suggestions/{id}/decision`, `POST /correlation/suggestions/{id}/reopen`, `GET /correlation/clusters` | `router.py` |
 | T9 | `correlation_clusters` + members, one cluster per report, provisional and staff-only — never a case | migration `0003_phase2_clusters` |
 | T10 | RBAC: `correlation:read` / `correlation:review`, deny-by-default; review implies read, enforced by a test | `identity/permissions.py` |
@@ -57,8 +61,7 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 
 | Missing | Status |
 |---|---|
-| `correlation_embeddings` + vector index | pgvector approved 2026-11-18 (`ADR-030`); table and index not built yet |
-| Semantic similarity | same approval; `token_similarity` remains the labelled keyword fallback, not the model |
+| An approved semantic embedding model | ADR-019 is still open. The current vectors are deterministic hashed-word inputs (`hashed-words-v1`) that let the pgvector storage/prefilter path be tested; they are **not** a validated semantic model and carry no accuracy claim. `token_similarity` remains the labelled keyword fallback. |
 | `cross_case` detector | case-side rules and authority owner decided 2026-11-18 (`ADR-031`); not built |
 | `promote_to_case`, `merge`, `split` | owned by the Phase 1 cases module under `ADR-031`; correlation keeps suggestions and provisional clusters only |
 | Scored harness run on real labelled reports | needs a consented, human-reviewed set; smoke test approved and run on temporary fixtures only, no accuracy claim |
@@ -66,7 +69,8 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 
 ## 4. Honest limits
 
-- `token_similarity` is exact word overlap, not embeddings. It is the documented keyword fallback, not the semantic model. Marked in the code as a shortcut with the upgrade point.
+- The stored vectors come from deterministic word hashing (`hashed-words-v1`, 384 dims), not a learned semantic model. They give pgvector a stable input so the storage, skip-on-unchanged and candidate-prefilter paths can be tested; they do **not** make the engine semantically accurate and no accuracy claim is made (ADR-019 is still open). `token_similarity` is exact word overlap and is the labelled keyword fallback whenever either vector is absent.
+- The nearest-vector query runs only on PostgreSQL (pgvector). SQLite — the test dialect — keeps the time/space candidate set and the keyword fallback, so the two dialects are equivalent in behaviour, not in retrieval index.
 - Thresholds (`0.45` same-event, `0.9` duplicate, 72 hours, 25 km, weights `0.45/0.25/0.20/0.10`) are reasoned defaults, not tuned values. Tuning needs labelled reviewed data, which does not exist yet.
 - Category matching in `policy.py` is an exact normalised string match against a small table. An unknown category gets the default window; this costs recall, never correctness.
 - `evaluate` cannot report reviewer override rate; that needs real reviewer decisions. Reported as absent rather than approximated.

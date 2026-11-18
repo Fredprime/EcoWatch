@@ -10,13 +10,15 @@ Read `docs/START_HERE.md`, then at minimum `docs/01`, `docs/06` (requirements), 
 
 ## Local development
 
-Python 3.14 · Postgres 16 + PostGIS 3.4 · **podman** for containers (Docker in CI only)
+Python 3.14 · PostgreSQL 16 + PostGIS 3.7 + pgvector · **podman** for containers (Docker in CI only)
+
+The database image is built locally from the root `Dockerfile` (pgvector base + PostGIS). Both extensions are created by the migrations/CI check.
 
 ```bash
 cp .env.example .env
 make venv
 .venv/bin/pip install -e "backend[dev]"
-make up          # Postgres/PostGIS
+make up          # builds the DB image on first run, then starts it
 make lint        # ruff check backend
 make test        # pytest backend
 make psql        # psql shell
@@ -37,7 +39,7 @@ Branch off `master`, one branch per change, PR into `master`. **Branches are nev
 
 ## CI
 
-`.github/workflows/ci.yml` — `infra` validates the compose file and proves PostGIS responds; `backend` runs `ruff check backend` and `pytest backend`; `frontend` activates once `frontend/package.json` exists.
+`.github/workflows/ci.yml` — `infra` builds the compose DB image and proves both `postgis` and `vector` extensions load; `backend` runs `ruff check backend` and `pytest backend` against a live database built from the same image; `frontend` activates once `frontend/package.json` exists.
 
 ## Contributing
 

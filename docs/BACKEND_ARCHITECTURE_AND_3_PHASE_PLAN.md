@@ -3,7 +3,7 @@
 **Version:** 1.1  
 **Date:** 2026-11-17  
 **Status:** Proposed architecture blueprint (zero application code written yet). Version 1.1 applies a technical review: corrected coverage claims, closed sequencing defects, and listed the decisions that must be approved before Phase 1 code is written.  
-**Target Directory:** `backend/` (Python 3.14, FastAPI, Pydantic, SQLAlchemy, Alembic, PostgreSQL 16 + PostGIS 3.4)
+**Target Directory:** `backend/` (Python 3.14, FastAPI, Pydantic, SQLAlchemy, Alembic, PostgreSQL 16 + PostGIS 3.7 + pgvector)
 
 ---
 
@@ -12,7 +12,7 @@
 This document translates EcoWatch's merged baseline (`docs/00`–`24`, `docs/files/22_Correlation_Engine_and_Offline_Collection.md`, `docs/AGENT_GUIDE.md`) and repository infrastructure (`compose.yaml`, `Makefile`, `.github/workflows/ci.yml`, `CONTRIBUTING.md`) into a concrete, **three-phase backend architecture**.
 
 ### Core Architectural Decisions
-1. **Modular Monolith First (`ADR-013`, `docs/07`):** One deployable FastAPI service (`backend/`) backed by one PostgreSQL 16 + PostGIS 3.4 database (`compose.yaml`). Domain modules communicate via explicit service/interface calls inside one process and share ACID transactions without premature microservices, Redis, Kafka, or Kubernetes.
+1. **Modular Monolith First (`ADR-013`, `docs/07`):** One deployable FastAPI service (`backend/`) backed by one PostgreSQL 16 + PostGIS 3.7 + pgvector database (`compose.yaml`). Domain modules communicate via explicit service/interface calls inside one process and share ACID transactions without premature microservices, Redis, Kafka, or Kubernetes.
 2. **Database-Backed Asynchronous Processing (`docs/07` §4, `docs/files/22` §13):** Slow or heavy tasks (media scanning/derivatives, ECII semantic embeddings and correlation, dataset imports, spatial/raster analysis) execute asynchronously via a `processing_jobs` table (`FOR UPDATE SKIP LOCKED` row claiming) in a bounded in-app worker loop. API intake returns durable receipt immediately (`NFR-001`).
 3. **Provider Interfaces for Open Choices (`docs/18`, `docs/AGENT_GUIDE.md` §7):** Authentication/identity verification and object storage (evidence originals and derivatives) sit behind narrow Python protocols/interfaces so local development (local disk + local token/session auth) swaps cleanly to chosen cloud/object-storage/IdP providers later.
 4. **Organisation-scoped data (`docs/05` §2, `docs/16` §3, `ADR-027`):** Every aggregate row carries `organisation_id`, and access is deny-by-default. Without it, the `organisation_admin` role and every "own organisation" restriction in `docs/PERMISSIONS_MATRIX.md` are unimplementable. A missing `organisation_id` is a defect, not a default of "everyone can see it".
@@ -71,7 +71,7 @@ Clients (Public / Field PWA / Staff & Specialist Web UI)
 |                       publications)                               |
 +-------------------------------------------------------------------+
           |                                      |
-PostgreSQL 16 + PostGIS 3.4              Object Storage Interface
+PostgreSQL 16 + PostGIS 3.7 + pgvector              Object Storage Interface
 (26 tables from `docs/08` + 5 proposed   (Restricted originals vs.
  additions, see §5, Alembic)             derivatives / previews)
 ```
@@ -228,7 +228,7 @@ Every requirement in `docs/06` is mapped to a phase below, so acceptance tests c
   - Table: `audit_events` (append-only; transactional logging for role changes, case status changes, sensitive evidence access, and corrections).
 
 #### 1.2 Phase 1 Acceptance Criteria
-- `make up` starts Postgres 16 + PostGIS 3.4 and Alembic migrations apply cleanly from empty DB.
+- `make up` builds/starts PostgreSQL 16 + PostGIS 3.7 + pgvector and Alembic migrations apply cleanly from an empty DB.
 - Duplicate retries with the same `idempotencyKey` produce one observation and return the original receipt. **Re-using a key with a different payload must be rejected with a stable error code, not silently return the old receipt** — the behaviour is defined once, in the API contract.
 - Original uploaded files retain exact checksums; previews exist separately; unauthorised roles cannot access restricted originals or `observation_sources`.
 - Case edits and status changes never overwrite linked observations.
@@ -336,7 +336,7 @@ Without one of these, Phase 2 has no pass condition. Correlation stays a clearly
 
 | Concern | Implementation Approach Across Phases |
 |---|---|
-| **Local & CI Tooling** | Python 3.14, `ruff` (`make lint`), `pytest` (`make test`), PostgreSQL 16 + PostGIS 3.4 (`compose.yaml`, `make up`), integrated into `.github/workflows/ci.yml` (`backend` job activates automatically once `backend/pyproject.toml` exists). |
+| **Local & CI Tooling** | Python 3.14, `ruff` (`make lint`), `pytest` (`make test`), PostgreSQL 16 + PostGIS 3.7 + pgvector (`compose.yaml`, `make up`), integrated into `.github/workflows/ci.yml` (`backend` job activates automatically once `backend/pyproject.toml` exists). |
 | **Database Integrity** | UUID PKs, unique `idempotency_key` constraints, FK integrity, enumerated status checks, coordinate/non-negative checks, PostGIS GiST spatial indexes, B-tree status/timestamp indexes, and query pagination/bounds on every list endpoint. |
 | **API contract (P1)** | Every Phase 1 endpoint is specified before code: method, path, request/response schema, required role, idempotency behaviour, error codes, and pagination style. A **stable error-code catalogue** (`code`, `message`, `field`, no internals) is part of the contract, not an afterthought; union of 4xx cases is finite and testable. Pagination is cursor-based for observations, cases and timeline; offset is not used for anything that changes while paged. |
 | **Security & Privacy** | Server-side RBAC per `docs/PERMISSIONS_MATRIX.md` (`ADR-027`), deny-by-default, organisation scoping on every aggregate. **Rate limiting is specified, not merely named:** per-IP and per-tracking-code limits on public intake and receipt lookup, attempt-limit lockout, bounded request body size, and the counters stored where a restart does not reset them. Strict Pydantic validation, untrusted-data handling (prompt injection safe), content-verified uploads outside public web roots, zero personal data in application logs. |

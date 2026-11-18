@@ -2,7 +2,8 @@
 
 Four signals, each either a number in [0, 1] or absent:
 
-    semantic_similarity  shared distinctive words in the two texts
+    semantic_similarity  pgvector-backed text vectors when both exist, else
+                         shared distinctive words in the two texts
     temporal_proximity    how close the two `observed_at` values are
     spatial_proximity     how close the two reported points are
     category_agreement    whether the two reports use the same category
@@ -57,23 +58,46 @@ _STOPWORDS = frozenset(_STOPWORDS_TEXT.split())
 def token_similarity(text_a: str | None, text_b: str | None) -> float | None:
     """Jaccard overlap of distinctive words, or None when there is nothing to compare.
 
-    `shortcut: exact word overlap, not embeddings. Replaced by the semantic
-    model when the Phase 2 embedding pipeline lands (docs/files/22 section 7).`
+    `shortcut: exact word overlap. Used only when one or both observations have
+    no stored vector; the model itself remains an open decision (ADR-019).`
 
     Empty text is *absent*, not dissimilar: a report with no description must
     not be labelled as unlike every other report.
     """
-    tokens_a = _tokens(text_a)
-    tokens_b = _tokens(text_b)
+    tokens_a = tokens(text_a)
+    tokens_b = tokens(text_b)
     if not tokens_a or not tokens_b:
         return None
     return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 
 
-def _tokens(text: str | None) -> frozenset[str]:
+def tokens(text: str | None) -> frozenset[str]:
     if not text:
         return frozenset()
     return frozenset(w for w in _WORD.findall(text.lower()) if len(w) > 2 and w not in _STOPWORDS)
+
+
+def vector_similarity(
+    first: tuple[float, ...] | list[float] | None,
+    second: tuple[float, ...] | list[float] | None,
+) -> float | None:
+    """Cosine overlap, clamped to [0, 1], or None when no vectors exist."""
+    if first is None or second is None or not first or not second:
+        return None
+    if len(first) != len(second):
+        return None
+    dot = math.fsum(left * right for left, right in zip(first, second, strict=True))
+    firstNorm = math.sqrt(math.fsum(value * value for value in first))
+    secondNorm = math.sqrt(math.fsum(value * value for value in second))
+    if firstNorm == 0.0 or secondNorm == 0.0:
+        return None
+    return max(0.0, min(1.0, dot / (firstNorm * secondNorm)))
+
+
+def semantic_similarity(first: ObservationFeatures, second: ObservationFeatures) -> float | None:
+    """Use stored vectors when both exist, otherwise the labelled keyword fallback."""
+    vectorScore = vector_similarity(first.embedding, second.embedding)
+    return token_similarity(first.text, second.text) if vectorScore is None else vectorScore
 
 
 def haversine_km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> float:
@@ -132,7 +156,7 @@ def score_pair(
         raise ValueError("a pair needs two different observations")
 
     raw: dict[str, float | None] = {
-        "semantic_similarity": token_similarity(first.text, second.text),
+        "semantic_similarity": semantic_similarity(first, second),
         "temporal_proximity": temporal_proximity(
             first.observed_at, second.observed_at, temporal_window_hours
         ),
