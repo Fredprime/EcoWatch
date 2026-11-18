@@ -165,11 +165,7 @@ class CorrelationService:
             )
 
         relationship = self._require_reviewable(principal, relationshipId)
-
-        for observationId in (relationship.observationAId, relationship.observationBId):
-            observation = self._repo.get_observation(observationId)
-            if observation is not None:
-                ensure_not_self_submitted(principal, observation.submittedByUserId)
+        self._ensure_not_self_submitted(principal, relationship)
 
         if relationship.status != RelationshipStatus.SUGGESTED.value:
             raise DomainError(
@@ -245,6 +241,15 @@ class CorrelationService:
             )
         return relationship
 
+    def _ensure_not_self_submitted(
+        self, principal: Principal, relationship: EvidenceRelationship
+    ) -> None:
+        """Apply the same separation of duties to every reviewer action."""
+        for observationId in (relationship.observationAId, relationship.observationBId):
+            observation = self._repo.get_observation(observationId)
+            if observation is not None:
+                ensure_not_self_submitted(principal, observation.submittedByUserId)
+
     def reopen(
         self,
         principal: Principal,
@@ -263,6 +268,9 @@ class CorrelationService:
         without anyone being able to say why.
         """
         relationship = self._require_reviewable(principal, relationshipId)
+        # Undoing a decision on your own report is review of that report just as
+        # much as making the decision was, so the same rule applies here.
+        self._ensure_not_self_submitted(principal, relationship)
         previous = relationship.status
         if previous == RelationshipStatus.SUGGESTED.value:
             raise DomainError(

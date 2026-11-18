@@ -281,6 +281,38 @@ def test_reopening_returns_a_decided_pair_to_the_queue(dbSession: Session) -> No
     assert dbSession.get(EvidenceRelationship, suggestion.id).status == "accepted"
 
 
+def test_a_submitter_cannot_reopen_a_decision_on_their_own_report(dbSession: Session) -> None:
+    """Separation of duties applies to undoing a decision, not just making one."""
+    from ecowatch.core.errors import DomainError, ErrorCode
+
+    org = create_temp_org(dbSession)
+    submitter = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    other = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
+    mine = make_observation(
+        dbSession, org, description="dead fish at the river bend", submittedBy=submitter
+    )
+    make_observation(dbSession, org, description="dead fish at the river bend")
+
+    service = CorrelationService(dbSession)
+    service.scan_observation(mine.id)
+    suggestion = dbSession.query(EvidenceRelationship).one()
+    service.decide(
+        reviewer_principal(other, org), suggestion.id,
+        RelationshipStatus.REJECTED, reason="different river",
+    )
+
+    with pytest.raises(DomainError) as raised:
+        service.reopen(
+            reviewer_principal(submitter, org), suggestion.id, reason="want another look"
+        )
+    assert raised.value.code is ErrorCode.SELF_REVIEW_FORBIDDEN
+    assert dbSession.get(EvidenceRelationship, suggestion.id).status == "rejected"
+    # The refused action wrote no audit event.
+    assert [event.action for event in dbSession.query(AuditEvent).all()] == [
+        "correlation.rejected"
+    ]
+
+
 def test_reopening_an_open_suggestion_is_refused(dbSession: Session) -> None:
     org = create_temp_org(dbSession)
     viewer = create_temp_user(dbSession, memberships=[(org.id, Role.REVIEWER)])
