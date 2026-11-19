@@ -84,6 +84,7 @@ class VerificationService:
             detail={"code": record.code},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def record_measurement(
@@ -165,6 +166,7 @@ class VerificationService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def create_assessment(
@@ -222,6 +224,7 @@ class VerificationService:
             detail={"conclusion": record.conclusion},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def finalise_assessment(
@@ -268,6 +271,7 @@ class VerificationService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def verify_recovery(
@@ -320,6 +324,7 @@ class VerificationService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def publish_summary(
@@ -362,6 +367,7 @@ class VerificationService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def retract_publication(
@@ -402,4 +408,5 @@ class VerificationService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record

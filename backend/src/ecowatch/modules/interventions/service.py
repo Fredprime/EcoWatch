@@ -87,6 +87,7 @@ class InterventionsService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def add_milestone(
@@ -124,6 +125,7 @@ class InterventionsService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def complete_milestone(
@@ -223,6 +225,7 @@ class InterventionsService:
             detail={"status": record.status, "rationale": rationale.strip()},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def _get_intervention(
@@ -236,4 +239,5 @@ class InterventionsService:
                 statusCode=404,
                 field="interventionId",
             )
+        self._session.commit()
         return record

@@ -62,6 +62,7 @@ class IntelligenceService:
             detail={"name": record.name},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def propose_environmental_relationship(
@@ -141,6 +142,7 @@ class IntelligenceService:
             detail={"relationshipType": record.relationshipType},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def review_environmental_relationship(
@@ -183,6 +185,7 @@ class IntelligenceService:
             detail={"reviewState": record.reviewState},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def queue_analysis_run(
@@ -244,6 +247,7 @@ class IntelligenceService:
             detail={"analysisType": record.analysisType},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def record_analysis_output(
@@ -309,6 +313,7 @@ class IntelligenceService:
             detail={"outputType": record.outputType},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def request_prediction(

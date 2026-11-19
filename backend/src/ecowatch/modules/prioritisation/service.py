@@ -73,6 +73,7 @@ class PrioritisationService:
             targetId=record.id,
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def record_decision(
@@ -135,4 +136,5 @@ class PrioritisationService:
             detail={"decision": record.decision},
             requestId=requestId,
         )
+        self._session.commit()
         return record
