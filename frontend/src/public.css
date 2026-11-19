@@ -131,6 +131,23 @@
   max-width: 60ch;
 }
 
+/* Sign-in: intro and form share one narrow column centred in the page. */
+.public-login {
+  display: grid;
+  justify-items: center;
+}
+.public-login .public-page-header {
+  width: min(100%, 460px);
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+.public-login .public-page-header p {
+  max-width: none;
+}
+.public-login-card {
+  width: min(100%, 460px);
+}
+
 /* Full-width layouts: an intro beside the working area, not a stretched column. */
 .public-split {
   display: grid;

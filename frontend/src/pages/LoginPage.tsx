@@ -37,58 +37,56 @@ export function LoginPage() {
   }
 
   return (
-    <div className="public-page">
-      <div className="public-split">
-        <header className="public-page-header">
-          <h1>Staff sign in</h1>
-          <p>
-            Sign in to view records within your permitted scope. Roles and permissions are enforced by the
-            server, not by this interface. Reporting and tracking do not need an account.
-          </p>
-        </header>
+    <div className="public-page public-login">
+      <header className="public-page-header">
+        <h1>Staff sign in</h1>
+        <p>
+          Sign in to view records within your permitted scope. Roles and permissions are enforced by the
+          server, not by this interface. Reporting and tracking do not need an account.
+        </p>
+      </header>
 
-        <div className="public-split-card">
-          {status === 'authenticated' && (
-            <p className="muted">You are already signed in. Open the <a href="/workspace">staff workspace</a> to continue.</p>
+      <div className="public-login-card">
+        {status === 'authenticated' && (
+          <p className="muted">You are already signed in. Open the <a href="/workspace">staff workspace</a> to continue.</p>
+        )}
+        <form className="card form-grid" onSubmit={onSubmit}>
+          {error && (
+            <p className="notice notice-danger" role="alert">
+              Sign-in failed: {error}
+            </p>
           )}
-          <form className="card form-grid" onSubmit={onSubmit}>
-            {error && (
-              <p className="notice notice-danger" role="alert">
-                Sign-in failed: {error}
-              </p>
-            )}
-            <div className="field">
-              <label htmlFor="login-email">Email</label>
-              <input
-                id="login-email"
-                name="email"
-                type="email"
-                autoComplete="username"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="login-password">Password</label>
-              <input
-                id="login-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <button type="submit" className="btn" disabled={busy} aria-busy={busy}>
-                {busy ? 'Signing in…' : 'Sign in'}
-              </button>
-            </div>
-            <p className="muted">Accounts are provisioned by an administrator. There is no self-service sign-up.</p>
-          </form>
-        </div>
+          <div className="field">
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <button type="submit" className="btn" disabled={busy} aria-busy={busy}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </div>
+          <p className="muted">Accounts are provisioned by an administrator. There is no self-service sign-up.</p>
+        </form>
       </div>
     </div>
   );
