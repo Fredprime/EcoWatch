@@ -80,7 +80,7 @@ export function LoginPage() {
               required
             />
           </div>
-          <div>
+          <div className="login-actions">
             <button type="submit" className="btn" disabled={busy} aria-busy={busy}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>

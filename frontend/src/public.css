@@ -150,6 +150,11 @@
 .public-login-card {
   width: min(100%, 460px);
 }
+/* Centre the submit button in the card; fields keep their left alignment. */
+.public-login .login-actions {
+  display: flex;
+  justify-content: center;
+}
 
 /* Full-width layouts: an intro beside the working area, not a stretched column. */
 .public-split {
