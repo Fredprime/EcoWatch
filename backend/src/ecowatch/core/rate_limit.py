@@ -1,5 +1,6 @@
-"""Database-backed rate limiting and tracking-code attempt lockout."""
+"""Database-backed rate limiting, burst abuse logging, and tracking-code attempt lockout."""
 
+import logging
 import math
 from datetime import UTC, datetime, timedelta
 
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import Base, utc_now
+
+_logger = logging.getLogger("ecowatch")
 
 
 class RateLimitBucket(Base):
@@ -64,6 +67,15 @@ def check_and_increment_limit(
         )
         if lockedUntil > current:
             retryAfter = max(1, math.ceil((lockedUntil - current).total_seconds()))
+            _logger.warning(
+                "abuse_burst_detected",
+                extra={
+                    "structured": {
+                        "statusCode": status.HTTP_429_TOO_MANY_REQUESTS,
+                        "errorCode": lockoutCode.value,
+                    }
+                },
+            )
             raise DomainError(
                 lockoutCode,
                 "Too many attempts; please wait before retrying",
@@ -93,6 +105,15 @@ def check_and_increment_limit(
         else:
             retryAfter = max(1, math.ceil(windowSeconds - (current - windowStart).total_seconds()))
         session.flush()
+        _logger.warning(
+            "rate_limit_exceeded",
+            extra={
+                "structured": {
+                    "statusCode": status.HTTP_429_TOO_MANY_REQUESTS,
+                    "errorCode": lockoutCode.value,
+                }
+            },
+        )
         raise DomainError(
             lockoutCode,
             "Rate limit exceeded; please retry later",

@@ -21,6 +21,7 @@ from ecowatch.api.dependencies import (
     get_optional_principal,
     get_request_id,
     get_storage,
+    rate_limit_dependency,
     require_permission,
 )
 from ecowatch.core.config import Settings, get_settings
@@ -46,6 +47,9 @@ def _iter_chunks(data: bytes, chunkSize: int = 65_536) -> Iterator[bytes]:
     "/observations/{observationId}/evidence",
     response_model=EvidenceAssetResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(rate_limit_dependency("upload", "uploadRateLimit", "uploadWindowSeconds"))
+    ],
 )
 async def upload_evidence(
     observationId: uuid.UUID = Path(),
@@ -126,7 +130,11 @@ def download_evidence_derivative(
     return Response(
         content=data,
         media_type=derivative.mimeType,
-        headers={"X-Content-Type-Options": "nosniff"},
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, max-age=300",
+            "Vary": "Authorization",
+        },
     )
 
 

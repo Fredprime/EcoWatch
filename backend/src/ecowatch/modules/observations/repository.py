@@ -82,6 +82,36 @@ class ObservationRepository:
         )
         return list(self._session.scalars(stmt).all())
 
+    def list_versions_for_observations(
+        self, observationIds: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[ObservationVersion]]:
+        """Batch-load versions for multiple observations to prevent N+1 queries."""
+        if not observationIds:
+            return {}
+        stmt = (
+            select(ObservationVersion)
+            .where(ObservationVersion.observationId.in_(observationIds))
+            .order_by(ObservationVersion.versionNumber.asc())
+        )
+        grouped: dict[uuid.UUID, list[ObservationVersion]] = {oid: [] for oid in observationIds}
+        for version in self._session.scalars(stmt).all():
+            grouped.setdefault(version.observationId, []).append(version)
+        return grouped
+
+    def get_sources_for_observations(
+        self, observationIds: list[uuid.UUID]
+    ) -> dict[uuid.UUID, ObservationSource]:
+        """Batch-load isolated source records for multiple observations."""
+        if not observationIds:
+            return {}
+        stmt = select(ObservationSource).where(
+            ObservationSource.observationId.in_(observationIds)
+        )
+        return {
+            source.observationId: source
+            for source in self._session.scalars(stmt).all()
+        }
+
     def has_case_link(self, observationId: uuid.UUID) -> bool:
         """Check whether case_observations links this observation without ORM coupling."""
         bind = self._session.get_bind()

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ecowatch.api.dependencies import (
     get_current_principal,
     get_request_id,
+    rate_limit_dependency,
     require_permission,
 )
 from ecowatch.core.config import Settings, get_settings
@@ -54,7 +55,19 @@ def list_observations(
     )
 
 
-@router.get("/observations/export", response_model=ObservationExportResponse)
+@router.get(
+    "/observations/export",
+    response_model=ObservationExportResponse,
+    dependencies=[
+        Depends(
+            rate_limit_dependency(
+                "obs_export",
+                "expensiveEndpointRateLimit",
+                "expensiveEndpointWindowSeconds",
+            )
+        )
+    ],
+)
 def export_observations(
     organisationId: uuid.UUID = Query(),
     principal: Principal = Depends(get_current_principal),

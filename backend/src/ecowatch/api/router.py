@@ -1,11 +1,12 @@
 """Top-level API router mounting liveness, readiness, and /api/v1 module endpoints."""
 
 from fastapi import APIRouter, Depends, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 
 from ecowatch.core.config import Settings, get_settings
 from ecowatch.core.database import check_database_readiness, get_db
+from ecowatch.core.metrics import metricsRegistry
 from ecowatch.core.schemas import CamelModel
 from ecowatch.modules.audit.router import router as auditRouter
 from ecowatch.modules.cases.router import router as casesRouter
@@ -59,6 +60,16 @@ def health_check(
         database="ok" if dbReady else "unavailable",
         postgisVersion=postgisVersion,
         storageRootReady=settings.storageRoot.exists(),
+    )
+
+
+@apiRouter.get("/metrics", tags=["health"], include_in_schema=False)
+def prometheus_metrics() -> PlainTextResponse:
+    """Expose PII-free operational metrics in Prometheus text format."""
+    return PlainTextResponse(
+        content=metricsRegistry.render_prometheus(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+        headers={"Cache-Control": "no-store, private"},
     )
 
 
