@@ -37,6 +37,11 @@ export function PrioritisationPage() {
         probability, severity or danger level.
       </Notice>
 
+      <Notice variant="info" role="note" title="No spatial view:">
+        This read API exposes no geometry, so no map is rendered here. The list below is the
+        accessible view of every stored record in your permitted scope.
+      </Notice>
+
       <div style={{ marginTop: '1rem' }}>
         {!authenticated ? (
           <div className="card">

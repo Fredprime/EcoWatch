@@ -34,9 +34,9 @@ Prototype frontend aligned to the EcoWatch documentation baseline in `../docs/`.
 
 Public pages never show contributor identity, exact locations or automated findings. A receipt confirms durable storage only; a published status is a human-reviewed record, not an automated finding.
 
-## Proposed stack (not yet approved)
+## Stack decisions
 
-Consistent with ADR candidates in `docs/20_Technical_Decision_Records.md`: React + TypeScript (ADR-014), MapLibre later (ADR-017), IndexedDB offline queue later (ADR-018). React + TypeScript + Vite are in use for the built slice; MapLibre and the IndexedDB offline queue remain future work. Confirm/record decisions via ADR before treating as final.
+React + TypeScript + Vite (ADR-014) are in use. The offline report queue uses native IndexedDB with no new dependency (ADR-018, ADR-036). MapLibre GL JS (ADR-017, ADR-038) renders only stored WKT geometry on a local blank style: no basemap, tile service, API key or external request. It is lazy-loaded and only mounts for Analysis, Monitoring and Interventions records that actually carry geometry; Prioritisation and Verification expose no geometry and keep their accessible list views. The tile-provider and projected-CRS choices remain open. Confirm any new provider decision via ADR before treating it as final.
 
 ## Run locally
 

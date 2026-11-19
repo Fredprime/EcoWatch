@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { WorkspacePage } from './WorkspacePage';
 import { Notice } from '../components/Notice';
 import { SignInPrompt } from '../components/SignInPrompt';
+import { LazyWktMap } from '../components/LazyWktMap';
+import { featuresFromWkt } from '../components/wkt';
 import {
   ReadOnlyListCard,
   RecordPicker,
@@ -57,6 +59,18 @@ export function InterventionsPage() {
         }))
       : [];
 
+  const spatial = useMemo(
+    () => featuresFromWkt(
+      interventions.state.status === 'success'
+        ? interventions.state.data.items.map((intervention) => ({
+            wkt: intervention.location,
+            label: intervention.objective.slice(0, 60),
+          }))
+        : [],
+    ),
+    [interventions.state],
+  );
+
   return (
     <WorkspacePage
       title="Interventions"
@@ -73,9 +87,18 @@ export function InterventionsPage() {
         </div>
       ) : (
         <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
+          <div className="card">
+            <h2>Stored intervention locations</h2>
+            <LazyWktMap
+              features={spatial.features}
+              skipped={spatial.skipped}
+              ariaLabel="Stored intervention location geometry"
+              emptyNote="No stored intervention location geometry is available in your permitted scope. The intervention list below is unchanged."
+            />
+          </div>
           <ReadOnlyListCard<InterventionResponse>
             title="Intervention records"
-            note="Approved actions with their recorded accountable owner and status. Responsible organisation and lead are recorded on the server, not exposed as a public view."
+            note="Approved actions with their recorded accountable owner and status. Stored locations are drawn on the map above when present; this list remains the accessible alternative. Responsible organisation and lead are recorded on the server, not exposed as a public view."
             state={interventions.state}
             emptyTitle="No interventions in your permitted scope."
             columns={interventionColumns}
