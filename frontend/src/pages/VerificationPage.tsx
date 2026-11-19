@@ -87,6 +87,11 @@ export function VerificationPage() {
         only display what has been recorded on the server.
       </Notice>
 
+      <Notice variant="info" role="note" title="No spatial view:">
+        These read APIs expose no geometry, so no map is rendered here. The lists below are the
+        accessible view of every stored record in your permitted scope.
+      </Notice>
+
       {!authenticated ? (
         <div className="card" style={{ marginTop: '1rem' }}>
           <SignInPrompt what="Verification records require an authenticated account." />
