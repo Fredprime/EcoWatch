@@ -1,34 +1,108 @@
+import { useCallback, useState } from 'react';
 import { WorkspacePage } from './WorkspacePage';
 import { Notice } from '../components/Notice';
-import { EmptyState } from '../components/EmptyState';
+import { SignInPrompt } from '../components/SignInPrompt';
+import {
+  ReadOnlyListCard,
+  RecordPicker,
+  type ListColumn,
+} from '../components/Phase3Views';
+import { displayText, formatTime } from '../components/phase3Format';
+import { useAuth } from '../auth/authContext';
+import { useApiResource } from '../hooks/useApiResource';
+import { listInterventions, listMilestones } from '../api/phase3';
+import type { InterventionResponse, MilestoneResponse } from '../api/types';
+
+const interventionColumns: ListColumn<InterventionResponse>[] = [
+  { header: 'Objective', cell: (row) => row.objective },
+  { header: 'Status', cell: (row) => row.status.replaceAll('_', ' ') },
+  { header: 'Case', cell: (row) => row.caseId.slice(0, 8) },
+  { header: 'Planned start', cell: (row) => formatTime(row.plannedStartAt) },
+  { header: 'Baseline', cell: (row) => displayText(row.baselineSummary) },
+  { header: 'Intended outcome', cell: (row) => displayText(row.intendedOutcome) },
+  { header: 'Created', cell: (row) => formatTime(row.createdAt) },
+];
+
+const milestoneColumns: ListColumn<MilestoneResponse>[] = [
+  { header: 'Milestone', cell: (row) => row.name },
+  { header: 'Status', cell: (row) => row.status.replaceAll('_', ' ') },
+  { header: 'Planned', cell: (row) => formatTime(row.plannedAt) },
+  { header: 'Completed', cell: (row) => formatTime(row.completedAt) },
+  { header: 'Description', cell: (row) => displayText(row.description) },
+];
 
 export function InterventionsPage() {
+  const { status } = useAuth();
+  const authenticated = status === 'authenticated';
+
+  const loadInterventions = useCallback(() => listInterventions(), []);
+  const interventions = useApiResource(loadInterventions, 'interventions', authenticated);
+
+  const [selectedInterventionId, setSelectedInterventionId] = useState('');
+  const loadMilestones = useCallback(
+    () => listMilestones(selectedInterventionId),
+    [selectedInterventionId],
+  );
+  const milestones = useApiResource(
+    loadMilestones,
+    `intervention-milestones:${selectedInterventionId}`,
+    authenticated && Boolean(selectedInterventionId),
+  );
+
+  const interventionOptions =
+    interventions.state.status === 'success'
+      ? interventions.state.data.items.map((intervention) => ({
+          value: intervention.id,
+          label: `${intervention.objective.slice(0, 60)}${intervention.objective.length > 60 ? '…' : ''}`,
+        }))
+      : [];
+
   return (
     <WorkspacePage
       title="Interventions"
       description="Approved actions, owners, milestones and records. Activity completion is distinct from environmental outcome."
     >
       <Notice variant="info" role="note" title="Outcome distinction:">
-        Recording an intervention or completed activity does not demonstrate environmental recovery. Outcomes are assessed separately with suitable evidence.
+        Recording an intervention or completed activity does not demonstrate environmental recovery.
+        Outcomes are assessed separately with suitable evidence by an authorised reviewer.
       </Notice>
-      <div className="grid grid-2" style={{ marginTop: '1rem' }}>
-        <div className="card">
-          <h2>Intervention records</h2>
-          <EmptyState title="No interventions loaded." detail="Approved actions, responsible organisations/owners, approvals, and milestones will appear here when available." />
+
+      {!authenticated ? (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <SignInPrompt what="Intervention records require an authenticated account." />
         </div>
-        <div className="card">
-          <h2>Baselines & intended outcomes</h2>
-          <EmptyState title="No baseline/outcome plan loaded." detail="Baselines, intended outcomes, and monitoring plans must be defined and linked before outcome claims." />
+      ) : (
+        <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
+          <ReadOnlyListCard<InterventionResponse>
+            title="Intervention records"
+            note="Approved actions with their recorded accountable owner and status. Responsible organisation and lead are recorded on the server, not exposed as a public view."
+            state={interventions.state}
+            emptyTitle="No interventions in your permitted scope."
+            columns={interventionColumns}
+            ariaLabel="Interventions table"
+          />
+          <div className="card">
+            <h2>Delivery milestones</h2>
+            <RecordPicker
+              id="intervention-picker"
+              label="Intervention"
+              value={selectedInterventionId}
+              onChange={setSelectedInterventionId}
+              options={interventionOptions}
+              hint="Milestones are stored per intervention. Select an intervention to load its milestones."
+            />
+          </div>
+          <ReadOnlyListCard<MilestoneResponse>
+            title="Milestones for the selected intervention"
+            note="A completed milestone is an activity record, not evidence of an environmental outcome."
+            state={milestones.state}
+            emptyTitle="No milestones recorded for this intervention."
+            columns={milestoneColumns}
+            ariaLabel="Intervention milestones table"
+            idleNote="Choose an intervention above to load its milestones."
+          />
         </div>
-      </div>
-      <div className="card">
-        <h2>Actions (pending backend)</h2>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-secondary" disabled>Record intervention</button>
-          <button type="button" className="btn btn-secondary" disabled>Update milestone</button>
-          <button type="button" className="btn btn-secondary" disabled>Attach evidence</button>
-        </div>
-      </div>
+      )}
     </WorkspacePage>
   );
 }
