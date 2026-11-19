@@ -233,16 +233,36 @@ export interface PublicCaseSummary {
   updatedAt: string;
 }
 
+/** EXIF-stripped derivative metadata. Bytes are fetched separately, never inlined. */
+export interface AssetDerivativeResponse {
+  id: string;
+  parentAssetId: string;
+  derivativeType: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256Checksum: string;
+  exifStripped: boolean;
+  accessClass: string;
+  createdAt: string;
+}
+
 /** Durable upload receipt. Storage keys and file contents are not exposed here. */
 export interface EvidenceAssetResponse {
   id: string;
   observationId: string;
+  organisationId: string;
   originalFilename: string;
+  declaredMimeType: string;
   detectedMimeType: string;
   sizeBytes: number;
   sha256Checksum: string;
   scanStatus: string;
+  metadataExtractionStatus: string;
+  accessClass: string;
   receivedAt: string;
+  createdAt: string;
+  derivatives: AssetDerivativeResponse[];
+  idempotentReplay: boolean;
 }
 
 /** Read-only administration summaries. Only fields safe for a staff view are declared. */
