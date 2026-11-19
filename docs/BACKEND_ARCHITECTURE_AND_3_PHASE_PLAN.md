@@ -271,6 +271,32 @@ Every requirement in `docs/06` is mapped to a phase below, so acceptance tests c
   - `notifications` table + optional lightweight WebSocket invalidation events to Staff dashboards (REST remains authoritative; zero push to unauthenticated public).
   - Governance workflows for data export, correction, and policy-compliant deletion (`FR-057`).
 
+**Split-phase sync contract — as built (ADR-034/036, 2026-11-19).** The plan above
+is the intent; this is the concrete backend contract now enforced on
+`backend/remaining-work`:
+
+| Phase | Call | Idempotency | Success | Replay / conflict |
+|---|---|---|---|---|
+| A — text/coords/timestamps | `POST /api/v1/observations` with a client `idempotencyKey` (UUID body field) | keyed on `idempotencyKey` | `201` with a receipt | same key + same payload returns the original receipt (`idempotentReplay: true`); same key + different payload is `409 IDEMPOTENCY_KEY_CONFLICT` |
+| B — media | `POST /api/v1/observations/{id}/evidence` with an `Idempotency-Key` (UUID request header) | keyed on (observation, idempotency key), unique via migration `0006_evidence_upload_idempotency` | `201` with the asset receipt | same key + same bytes returns the original `assetId` (`idempotentReplay: true`); same key + different bytes is `409 IDEMPOTENCY_KEY_CONFLICT` |
+
+Error classification for both phases (`ADR-036`): every error envelope carries
+`category: permanent | transient`. `4xx` validation, auth and conflict errors are
+**permanent** — an offline queue must stop retrying. Rate-limit (`429`), tracking-
+code lockout (`429`), `EVIDENCE_NOT_READY` (`409`, scan still in flight) and all
+`5xx` are **transient**; `429`/`5xx` also carry a `Retry-After` header and a
+`retryAfterSeconds` body field so clients can back off deterministically. Intake
+latency never includes embedding or scan work — both are enqueued as
+`processing_jobs` in the same transaction.
+
+**Explicitly out of scope (ADR-036):** a server-side observation `syncState`
+column/endpoint and WebSocket invalidation pushes. Durable queueing, explicit
+client sync states and reconnect behaviour belong to the frontend PWA; REST
+remains authoritative. `/observations/export` (OA own org / SA) and
+`POST /observations/{id}/hide` (SA only) complete the `FR-057` governance branch
+of this workstream as tombstone + restrict, never deletion of originals
+(`ADR-034`).
+
 #### 2.2 Phase 2 Acceptance Criteria
 - Observation intake latency does not depend on embedding or correlation execution (`NFR-001`).
 - Correlation suggestions expose component scores, method version, missing signals, and plain-language reasons (`NFR-003`), and are labelled unverified.

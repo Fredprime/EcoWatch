@@ -59,9 +59,7 @@ class CaseRepository:
         """Return True if an active user exists without importing identity models."""
         return self._active_record_exists("users", userId)
 
-    def user_has_active_membership(
-        self, userId: uuid.UUID, organisationId: uuid.UUID
-    ) -> bool:
+    def user_has_active_membership(self, userId: uuid.UUID, organisationId: uuid.UUID) -> bool:
         """Return True if the user has at least one active membership in the organisation."""
         membershipsTable = self._reflected_table(
             "memberships",
@@ -101,9 +99,11 @@ class CaseRepository:
         )
         if obsTable is None or "id" not in obsTable.c or "organisation_id" not in obsTable.c:
             return None
-        row = self._session.execute(
-            select(obsTable).where(obsTable.c.id == observationId)
-        ).mappings().one_or_none()
+        row = (
+            self._session.execute(select(obsTable).where(obsTable.c.id == observationId))
+            .mappings()
+            .one_or_none()
+        )
         return dict(row) if row is not None else None
 
     def list_observation_rows(self, observationIds: list[uuid.UUID]) -> list[dict[str, Any]]:
@@ -127,9 +127,11 @@ class CaseRepository:
         )
         if obsTable is None or "id" not in obsTable.c:
             return []
-        rows = self._session.execute(
-            select(obsTable).where(obsTable.c.id.in_(observationIds))
-        ).mappings().all()
+        rows = (
+            self._session.execute(select(obsTable).where(obsTable.c.id.in_(observationIds)))
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
     def list_evidence_rows_for_observations(
@@ -157,9 +159,13 @@ class CaseRepository:
             or "observation_id" not in evidenceTable.c
         ):
             return []
-        rows = self._session.execute(
-            select(evidenceTable).where(evidenceTable.c.observation_id.in_(observationIds))
-        ).mappings().all()
+        rows = (
+            self._session.execute(
+                select(evidenceTable).where(evidenceTable.c.observation_id.in_(observationIds))
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
     def list_case_audit_rows(
@@ -192,11 +198,15 @@ class CaseRepository:
             whereClause = or_(caseFilter, linkFilter)
         else:
             whereClause = caseFilter
-        rows = self._session.execute(
-            select(auditTable)
-            .where(whereClause)
-            .order_by(auditTable.c.occurred_at.asc(), auditTable.c.id.asc())
-        ).mappings().all()
+        rows = (
+            self._session.execute(
+                select(auditTable)
+                .where(whereClause)
+                .order_by(auditTable.c.occurred_at.asc(), auditTable.c.id.asc())
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
     def get_case(self, caseId: uuid.UUID) -> Case | None:
@@ -318,6 +328,44 @@ class CaseRepository:
                 CaseObservation.observationId == observationId,
             )
         )
+
+    def get_cluster_for_action(
+        self, clusterId: uuid.UUID
+    ) -> tuple[uuid.UUID, list[uuid.UUID]] | None:
+        """Return (organisationId, member observation ids) for a provisional cluster."""
+        clusterTable = self._reflected_table(
+            "correlation_clusters",
+            {"id": Uuid(as_uuid=True), "organisation_id": Uuid(as_uuid=True)},
+        )
+        memberTable = self._reflected_table(
+            "correlation_cluster_members",
+            {"cluster_id": Uuid(as_uuid=True), "observation_id": Uuid(as_uuid=True)},
+        )
+        if clusterTable is None or memberTable is None:
+            return None
+        row = self._session.execute(
+            select(clusterTable.c.organisation_id).where(clusterTable.c.id == clusterId)
+        ).one_or_none()
+        if row is None:
+            return None
+        memberRows = self._session.execute(
+            select(memberTable.c.observation_id).where(memberTable.c.cluster_id == clusterId)
+        ).all()
+        return row.organisation_id, [member.observation_id for member in memberRows]
+
+    def move_case_observation(self, linkId: uuid.UUID, targetCaseId: uuid.UUID) -> None:
+        """Repoint an existing case-observation link to another case."""
+        link = self._session.get(CaseObservation, linkId)
+        if link is not None:
+            link.caseId = targetCaseId
+            self._session.flush()
+
+    def delete_case_observation(self, linkId: uuid.UUID) -> None:
+        """Remove a duplicate link row after its observation was moved elsewhere."""
+        link = self._session.get(CaseObservation, linkId)
+        if link is not None:
+            self._session.delete(link)
+            self._session.flush()
 
     def list_case_observations(self, caseId: uuid.UUID) -> list[CaseObservation]:
         return list(

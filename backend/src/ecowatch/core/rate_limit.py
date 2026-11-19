@@ -1,5 +1,6 @@
 """Database-backed rate limiting and tracking-code attempt lockout."""
 
+import math
 from datetime import UTC, datetime, timedelta
 
 from fastapi import status
@@ -62,10 +63,12 @@ def check_and_increment_limit(
             else bucket.lockedUntil
         )
         if lockedUntil > current:
+            retryAfter = max(1, math.ceil((lockedUntil - current).total_seconds()))
             raise DomainError(
                 lockoutCode,
                 "Too many attempts; please wait before retrying",
                 statusCode=status.HTTP_429_TOO_MANY_REQUESTS,
+                retryAfterSeconds=retryAfter,
             )
         bucket.lockedUntil = None
         bucket.windowStartedAt = current
@@ -84,13 +87,17 @@ def check_and_increment_limit(
 
     bucket.attemptCount += 1
     if bucket.attemptCount > maxAttempts:
+        retryAfter = lockoutSeconds
         if lockoutSeconds is not None:
             bucket.lockedUntil = current + timedelta(seconds=lockoutSeconds)
+        else:
+            retryAfter = max(1, math.ceil(windowSeconds - (current - windowStart).total_seconds()))
         session.flush()
         raise DomainError(
             lockoutCode,
             "Rate limit exceeded; please retry later",
             statusCode=status.HTTP_429_TOO_MANY_REQUESTS,
+            retryAfterSeconds=max(1, int(retryAfter)),
         )
     session.flush()
 

@@ -1,8 +1,8 @@
 # EcoWatch Phase 3 Integration Contract
 
 **Owner:** Randy
-**Date:** 2026-11-18
-**Branch:** `feat/Randy_Branch` (merged with latest `origin/master`)
+**Date:** 2026-11-19
+**Branch:** `feat/Randy_Branch` (merged with latest `origin/master`; Phase 3 HTTP API added)
 **Scope:** Phase 3 of `BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` — environmental intelligence, prioritisation, interventions and verification. Documentation `docs/00`–`24` remains the source of truth for behaviour.
 
 ## 1. What exists
@@ -11,17 +11,17 @@ Application files under `backend/src/ecowatch/modules/`, using the Phase 1 core 
 
 | Module | Files | Tables |
 |---|---|---|
-| `catalogue` | `rules.py`, `models.py`, `service.py` | `datasets`, `dataset_versions` |
-| `intelligence` | `enums.py`, `rules.py`, `models.py`, `service.py` | `environmental_entities`, `environmental_relationships`, `analysis_runs`, `analysis_outputs` |
-| `prioritisation` | `enums.py`, `rules.py`, `models.py`, `service.py` | `prioritisation_assessments` |
-| `interventions` | `enums.py`, `rules.py`, `models.py`, `service.py` | `interventions`, `intervention_milestones` |
-| `verification` | `enums.py`, `rules.py`, `models.py`, `service.py` | `indicator_definitions`, `indicator_measurements`, `verification_assessments`, `publications` |
+| `catalogue` | `rules.py`, `models.py`, `service.py`, `schemas.py`, `router.py` | `datasets`, `dataset_versions` |
+| `intelligence` | `enums.py`, `rules.py`, `models.py`, `service.py`, `schemas.py`, `router.py` | `environmental_entities`, `environmental_relationships`, `analysis_runs`, `analysis_outputs` |
+| `prioritisation` | `enums.py`, `rules.py`, `models.py`, `service.py`, `schemas.py`, `router.py` | `prioritisation_assessments` |
+| `interventions` | `enums.py`, `rules.py`, `models.py`, `service.py`, `schemas.py`, `router.py` | `interventions`, `intervention_milestones` |
+| `verification` | `enums.py`, `rules.py`, `models.py`, `service.py`, `schemas.py`, `router.py` | `indicator_definitions`, `indicator_measurements`, `verification_assessments`, `publications` |
 | shared | `phase3Contracts.py` | none |
-| tests | `backend/tests/unit/phase3/test_phase3Rules.py` | none |
+| tests | `backend/tests/unit/phase3/test_phase3Rules.py`, `backend/tests/integration/test_phase3_endpoints.py` | none |
 | migration | `backend/alembic/versions/0003_phase3_schema.py` | all 13 tables |
-| wiring | `backend/alembic/env.py` imports all Phase 3 models | none |
+| wiring | `backend/alembic/env.py` imports all Phase 3 models; `api/router.py` mounts all five routers | none |
 
-Not built here (owned by later work): FastAPI routers for Phase 3 endpoints, frontend integration, and any Phase 2 correlation code.
+Not built here (owned by later work): frontend integration and any Phase 2 correlation code.
 
 ## 2. Naming and type conventions (aligned to Phase 1)
 
@@ -93,12 +93,12 @@ Permission guard semantics:
 2. **Recovery criteria document does not exist.** The code gates `recovery_verified` behind `criteriaApproved=True`; nothing in the product may pass `True` until a criteria document is approved. This keeps the product's central claim honest.
 3. **Prioritisation factor vocabulary is proposed, not agreed.** It follows `docs/13` §2. Domain experts must confirm it, and decide whether a composite rank is ever allowed.
 4. **Imagery pipeline is undecided.** `analysis_outputs` stores summary plus an optional `storage_key`; no COG/STAC layout, cloud masking method or storage-cost model is committed (`BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` §3.1).
-5. **Phase 3 API surface is not built.** Services are ready, but routers, request/response schemas and endpoint tests are pending.
+5. **Phase 3 route paths are an implementation decision, not owner-approved policy.** The paths, status codes and payload shapes below follow the Phase 1/2 conventions and can be amended without changing the domain rules.
 
 ## 8. Requirement coverage
 
-Implemented as domain rules/services: `FR-016`, `FR-034`–`FR-045`, `FR-058`.
-Referenced but not implemented: Phase 3 HTTP endpoints, `FR-055` audit query surface, `FR-053` endpoint RBAC wiring, `FR-057` export/deletion workflows.
+Implemented as domain rules/services and HTTP endpoints: `FR-016`, `FR-034`–`FR-045`, `FR-058`.
+Referenced but not implemented: `FR-055` audit query surface, `FR-057` export/deletion workflows.
 
 ## 9. Verification performed
 
@@ -107,7 +107,8 @@ Run from `backend` with a Python 3.13 temp venv and dependencies installed direc
 - `ruff check` over all Phase 3 modules, `phase3Contracts.py`, the Phase 3 tests and migration — passed.
 - `python -m compileall` over `src`, `alembic` and `tests` — passed.
 - `pytest backend/tests/unit/phase3 -q` — 16 passed (rule tests plus SQLite metadata and catalogue-service integration smoke tests).
-- `pytest backend/tests -q -m "not postgis"` — 65 passed, 2 deselected (Phase 1 + Phase 2 + Phase 3).
+- `pytest backend/tests -q -m "not postgis"` — 65 passed, 2 deselected (Phase 1 + Phase 2 + Phase 3), at `52ab50e`.
+- After adding the HTTP layer: `ruff check backend` — all checks passed; `pytest backend -q` — 112 passed, 4 skipped (Phase 1 + Phase 2 + Phase 3, including six new Phase 3 endpoint integration tests).
 - `alembic history` — confirms `base -> 0001_phase1_initial_schema -> 0002_phase2_correlation -> 0003_phase3_schema (head)`.
 - `alembic upgrade head` then `alembic downgrade base` on a temporary SQLite database — both passed, creating and dropping all Phase 1, Phase 2 and Phase 3 tables.
 - `alembic check` on the upgraded SQLite database detected no Phase 2 or Phase 3 drift; its only report is the pre-existing Phase 1 index `ix_audit_events_target`, which is unrelated to this branch.
@@ -115,6 +116,24 @@ Run from `backend` with a Python 3.13 temp venv and dependencies installed direc
 ## 10. Next steps
 
 1. Approve or amend §7, especially the permissions matrix and recovery criteria.
-2. Add Phase 3 FastAPI routers and endpoint tests once the Phase 3 API surface is agreed.
+2. Review the route paths and payload shapes recorded in §11 and approve them as the stable API contract.
 3. Run the PostgreSQL/PostGIS migration integration test (`-m postgis`) against a live database before merge.
 4. Move the temporary `PYTHONPATH=src` test procedure to the project's supported Python version once available.
+
+## 11. HTTP API surface (added 2026-11-19)
+
+All routes are mounted under `/api/v1` by `backend/src/ecowatch/api/router.py`. Every mutating service method now commits its own transaction, matching the Phase 1 service convention; without this, request-scoped sessions rolled back every Phase 3 write. Each route uses the FastAPI `require_permission(Permission.X)` dependency for the coarse check, and the service repeats the check with organisation scope so cross-tenant access returns 404.
+
+| Prefix | Method and path | Permission |
+| --- | --- | --- |
+| `/catalogue` | `POST /datasets`, `POST /datasets/{datasetId}/versions` | `CATALOGUE_WRITE` |
+| `/intelligence` | `POST /entities`, `POST /relationships`, `POST /analyses`, `POST /analyses/{analysisRunId}/outputs` | `INTELLIGENCE_WRITE` |
+| `/intelligence` | `POST /relationships/{relationshipId}/review` | `INTELLIGENCE_REVIEW` |
+| `/intelligence` | `POST /predictions/check` | `INTELLIGENCE_WRITE` (gate only; no prediction produced) |
+| `/prioritisation` | `POST /assessments`, `POST /assessments/{assessmentId}/decision` | `PRIORITISATION_WRITE` |
+| `/interventions` | `POST /interventions`, `POST /interventions/{interventionId}/milestones`, `POST /milestones/{milestoneId}/complete`, `POST /interventions/{interventionId}/transition` | `INTERVENTION_WRITE` |
+| `/verification` | `POST /indicators`, `POST /assessments/{assessmentId}/finalise`, `POST /assessments/{assessmentId}/recovery` | `VERIFICATION_APPROVE` |
+| `/verification` | `POST /measurements/{indicatorDefinitionId}`, `POST /assessments` | `VERIFICATION_WRITE` |
+| `/verification` | `POST /publications`, `POST /publications/{publicationId}/retract` | `PUBLICATION_WRITE` |
+
+`organisationId` is carried in every request body, as in the Phase 1 `CreateCaseRequest` pattern. Request and response models live in each module's `schemas.py`, inherit `CamelModel`, validate WKT geometry and enum values, and forbid unknown fields. `POST /analyses` returns 202 because the run is queued, not executed in the request. `POST /predictions/check` returns `{"allowed": true}` only when the validated-model, validation-report, representative-data and target preconditions pass; it never returns a prediction.

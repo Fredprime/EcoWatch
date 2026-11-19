@@ -65,7 +65,9 @@ class EvidenceService:
             )
         return obs
 
-    def _to_asset_response(self, asset: EvidenceAsset) -> EvidenceAssetResponse:
+    def _to_asset_response(
+        self, asset: EvidenceAsset, *, idempotentReplay: bool = False
+    ) -> EvidenceAssetResponse:
         derivatives = self._repo.list_derivatives_for_asset(asset.id)
         return EvidenceAssetResponse(
             id=asset.id,
@@ -84,6 +86,7 @@ class EvidenceService:
             receivedAt=asset.receivedAt,
             createdAt=asset.createdAt,
             derivatives=[AssetDerivativeResponse.model_validate(d) for d in derivatives],
+            idempotentReplay=idempotentReplay,
         )
 
     def _authorize_upload(
@@ -140,6 +143,7 @@ class EvidenceService:
         declaredMimeType: str | None,
         accessClass: AccessClass = AccessClass.RESTRICTED,
         trackingCode: str | None = None,
+        idempotencyKey: uuid.UUID | None = None,
         settings: Settings,
         requestId: str | None = None,
     ) -> EvidenceAssetResponse:
@@ -173,10 +177,22 @@ class EvidenceService:
             )
         assert detectedMime is not None
 
+        checksum = hashlib.sha256(rawBytes).hexdigest()
+        if idempotencyKey is not None:
+            existing = self._repo.get_asset_by_idempotency_key(obs.id, idempotencyKey)
+            if existing is not None:
+                if existing.sha256Checksum != checksum:
+                    raise DomainError(
+                        ErrorCode.IDEMPOTENCY_KEY_CONFLICT,
+                        "Idempotency key was already used for different content",
+                        statusCode=status.HTTP_409_CONFLICT,
+                        field="idempotencyKey",
+                    )
+                return self._to_asset_response(existing, idempotentReplay=True)
+
         now = utc_now()
         assetId = uuid.uuid4()
         storageKey = f"originals/{now:%Y}/{now:%m}/{assetId}"
-        checksum = hashlib.sha256(rawBytes).hexdigest()
         safeName = sanitize_filename(filename)
 
         self._storage.put_bytes(storageKey, rawBytes)
@@ -185,6 +201,7 @@ class EvidenceService:
             id=assetId,
             observationId=obs.id,
             organisationId=obs.organisationId,
+            idempotencyKey=idempotencyKey,
             storageKey=storageKey,
             originalFilename=safeName,
             declaredMimeType=normalizedDeclared,

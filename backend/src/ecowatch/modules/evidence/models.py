@@ -5,7 +5,16 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ecowatch.core.models import Base, UUIDPrimaryKeyMixin, utc_now
@@ -41,6 +50,13 @@ class EvidenceAsset(Base, UUIDPrimaryKeyMixin):
     """Original untouched evidence file record under restricted application-mediated access."""
 
     __tablename__ = "evidence_assets"
+    __table_args__ = (
+        UniqueConstraint(
+            "observation_id",
+            "idempotency_key",
+            name="uq_evidence_assets_observation_idempotency",
+        ),
+    )
 
     observationId: Mapped[uuid.UUID] = mapped_column(
         "observation_id",
@@ -55,6 +71,9 @@ class EvidenceAsset(Base, UUIDPrimaryKeyMixin):
         ForeignKey("organisations.id"),
         nullable=False,
         index=True,
+    )
+    idempotencyKey: Mapped[uuid.UUID | None] = mapped_column(
+        "idempotency_key", Uuid(as_uuid=True), nullable=True
     )
     storageKey: Mapped[str] = mapped_column(
         "storage_key", String(255), unique=True, nullable=False

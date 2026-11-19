@@ -6,7 +6,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from ecowatch.core.schemas import ErrorDetail, ErrorResponse
+from ecowatch.core.schemas import ErrorCategory, ErrorDetail, ErrorResponse
+
+DEFAULT_RETRY_AFTER_SECONDS = 30
 
 
 class ErrorCode(StrEnum):
@@ -32,6 +34,28 @@ class ErrorCode(StrEnum):
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
+# A retry can plausibly succeed for these codes even when the HTTP status alone
+# would suggest a permanent failure (EVIDENCE_NOT_READY is a 409 but scan
+# completion resolves it). Everything else is permanent unless the status is
+# 429 or 5xx, which is classified by classify_error() below.
+_TRANSIENT_ERROR_CODES = frozenset(
+    {
+        ErrorCode.RATE_LIMIT_EXCEEDED,
+        ErrorCode.TRACKING_CODE_LOCKED,
+        ErrorCode.EVIDENCE_NOT_READY,
+    }
+)
+
+
+def classify_error(code: ErrorCode, statusCode: int) -> ErrorCategory:
+    """Classify a domain error as permanent (do not retry) or transient (retry)."""
+    if statusCode >= 500 or statusCode == status.HTTP_429_TOO_MANY_REQUESTS:
+        return ErrorCategory.TRANSIENT
+    if code in _TRANSIENT_ERROR_CODES:
+        return ErrorCategory.TRANSIENT
+    return ErrorCategory.PERMANENT
+
+
 class DomainError(Exception):
     """Application exception mapped cleanly to a finite HTTP error response."""
 
@@ -43,6 +67,8 @@ class DomainError(Exception):
         statusCode: int = status.HTTP_400_BAD_REQUEST,
         field: str | None = None,
         details: list[ErrorDetail] | None = None,
+        category: ErrorCategory | None = None,
+        retryAfterSeconds: int | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
@@ -50,6 +76,8 @@ class DomainError(Exception):
         self.statusCode = statusCode
         self.field = field
         self.details = details or []
+        self.category = category or classify_error(code, statusCode)
+        self.retryAfterSeconds = retryAfterSeconds
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -64,8 +92,17 @@ def register_exception_handlers(app: FastAPI) -> None:
             field=exc.field,
             details=exc.details,
             requestId=requestId,
+            category=exc.category,
+            retryAfterSeconds=exc.retryAfterSeconds,
         )
-        return JSONResponse(status_code=exc.statusCode, content=body.model_dump(by_alias=True))
+        headers = {}
+        if exc.retryAfterSeconds is not None:
+            headers["Retry-After"] = str(exc.retryAfterSeconds)
+        return JSONResponse(
+            status_code=exc.statusCode,
+            content=body.model_dump(by_alias=True),
+            headers=headers,
+        )
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(
@@ -85,6 +122,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             message="Request validation failed",
             details=details,
             requestId=requestId,
+            category=ErrorCategory.PERMANENT,
         )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -98,8 +136,11 @@ def register_exception_handlers(app: FastAPI) -> None:
             code=ErrorCode.INTERNAL_ERROR.value,
             message="An unexpected error occurred",
             requestId=requestId,
+            category=ErrorCategory.TRANSIENT,
+            retryAfterSeconds=DEFAULT_RETRY_AFTER_SECONDS,
         )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=body.model_dump(by_alias=True),
+            headers={"Retry-After": str(DEFAULT_RETRY_AFTER_SECONDS)},
         )

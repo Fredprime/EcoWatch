@@ -24,6 +24,17 @@ class EvidenceRepository:
         self._session.flush()
         return asset
 
+    def get_asset_by_idempotency_key(
+        self, observationId: uuid.UUID, idempotencyKey: uuid.UUID
+    ) -> EvidenceAsset | None:
+        """Return the asset created for a replayed media upload, if any."""
+        return self._session.scalar(
+            select(EvidenceAsset).where(
+                EvidenceAsset.observationId == observationId,
+                EvidenceAsset.idempotencyKey == idempotencyKey,
+            )
+        )
+
     def list_assets_for_observation(
         self, observationId: uuid.UUID
     ) -> list[EvidenceAsset]:
