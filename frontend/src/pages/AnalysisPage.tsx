@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { WorkspacePage } from './WorkspacePage';
 import { Notice } from '../components/Notice';
 import { SignInPrompt } from '../components/SignInPrompt';
+import { LazyWktMap } from '../components/LazyWktMap';
+import { featuresFromWkt } from '../components/wkt';
 import {
   ReadOnlyListCard,
   RecordPicker,
@@ -81,6 +83,18 @@ export function AnalysisPage() {
         }))
       : [];
 
+  const spatial = useMemo(
+    () => featuresFromWkt(
+      entities.state.status === 'success'
+        ? entities.state.data.items.map((entity) => ({
+            wkt: entity.geometry,
+            label: entity.name,
+          }))
+        : [],
+    ),
+    [entities.state],
+  );
+
   return (
     <WorkspacePage
       title="Analysis"
@@ -98,9 +112,18 @@ export function AnalysisPage() {
         </div>
       ) : (
         <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
+          <div className="card">
+            <h2>Stored entity geometry</h2>
+            <LazyWktMap
+              features={spatial.features}
+              skipped={spatial.skipped}
+              ariaLabel="Stored environmental entity geometry"
+              emptyNote="No stored entity geometry is available in your permitted scope. The entity list below is unchanged."
+            />
+          </div>
           <ReadOnlyListCard<EnvironmentalEntityResponse>
             title="Environmental entities"
-            note="Named areas or features referenced by analyses. Precise geometry is not rendered in this list."
+            note="Named areas or features referenced by analyses. Stored geometry is drawn on the map above when present; this list remains the accessible alternative."
             state={entities.state}
             emptyTitle="No environmental entities in your permitted scope."
             columns={entityColumns}

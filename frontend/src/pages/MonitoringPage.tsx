@@ -1,6 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { WorkspacePage } from './WorkspacePage';
 import { SignInPrompt } from '../components/SignInPrompt';
+import { LazyWktMap } from '../components/LazyWktMap';
+import { featuresFromWkt } from '../components/wkt';
 import {
   ReadOnlyListCard,
   RecordPicker,
@@ -59,6 +61,18 @@ export function MonitoringPage() {
         }))
       : [];
 
+  const spatial = useMemo(
+    () => featuresFromWkt(
+      datasets.state.status === 'success'
+        ? datasets.state.data.items.map((dataset) => ({
+            wkt: dataset.coverageGeometry,
+            label: dataset.name,
+          }))
+        : [],
+    ),
+    [datasets.state],
+  );
+
   return (
     <WorkspacePage
       title="Environmental Monitoring"
@@ -66,13 +80,13 @@ export function MonitoringPage() {
     >
       <div className="grid grid-2">
         <div className="card">
-          <h2>Map view (placeholder)</h2>
-          <div className="placeholder-map" role="note" aria-label="Monitoring map placeholder">
-            <div>
-              <p><strong>Spatial layers placeholder</strong></p>
-              <p>Monitored areas, observations, and selected indicators would be rendered here with uncertainty/quality cues. No map is rendered in this read-only view.</p>
-            </div>
-          </div>
+          <h2>Stored coverage geometry</h2>
+          <LazyWktMap
+            features={spatial.features}
+            skipped={spatial.skipped}
+            ariaLabel="Stored dataset coverage geometry"
+            emptyNote="No stored coverage geometry is available in your permitted scope. The dataset list below is unchanged."
+          />
         </div>
         <div className="card">
           <h2>List and detail alternative</h2>
@@ -90,7 +104,7 @@ export function MonitoringPage() {
           <>
             <ReadOnlyListCard<DatasetResponse>
               title="Datasets"
-              note="Each dataset records its licence, attribution and permitted use. Precise coverage geometry is not rendered in this list."
+              note="Each dataset records its licence, attribution and permitted use. Stored coverage geometry is drawn on the map above when present; this list remains the accessible alternative."
               state={datasets.state}
               emptyTitle="No datasets in your permitted scope."
               columns={datasetColumns}
