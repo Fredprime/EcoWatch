@@ -2,11 +2,12 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.orm import Session
 
 from ecowatch.api.dependencies import get_request_id, require_permission
 from ecowatch.core.database import get_db
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.prioritisation.schemas import (
     AssessmentResponse,
@@ -45,3 +46,17 @@ def record_decision(
         principal, assessmentId=assessmentId, **payload.model_dump(), requestId=requestId
     )
     return AssessmentResponse.model_validate(record)
+
+
+@router.get("/assessments", response_model=CursorPage[AssessmentResponse])
+def list_assessments(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.PRIORITISATION_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[AssessmentResponse]:
+    """List assessments and recorded decisions within the caller's organisations."""
+    return PrioritisationService(db).list_assessments(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
