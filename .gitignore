@@ -28,3 +28,7 @@ uploads/
 .vscode/
 .idea/
 .DS_Store
+
+# Personal local chat log (owner's file, never commit)
+**/chat history/
+**/ecosense chat history.txt
