@@ -11,6 +11,8 @@ Instructions for any AI coding agent working in this repository. Read this file 
 5. `docs/OWNER_RULES.md` — the owner's standing instructions for this repository.
 6. `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` — the backend build plan (read before writing backend code).
 7. `docs/PHASE2_CORRELATION.md` — Phase 2 correlation: what is built, and the exact Phase 1 contract it needs.
+8. `docs/PHASE3_PROGRESS_LOG.md` — current Phase 3 branch/PR state, decisions, verification history and open items. Read before resuming Phase 3 work.
+9. `C:\Users\RANDY\Desktop\chat history\ecosense chat history.txt` — running plain-text log of the latest working session. Read it to recover recent conversation context, and append each substantive exchange plus update CURRENT STATE before ending a turn.
 
 ## Precedence when instructions conflict
 

@@ -73,6 +73,7 @@ class CatalogueService:
             detail={"name": record.name},
             requestId=requestId,
         )
+        self._session.commit()
         return record
 
     def add_dataset_version(
@@ -156,4 +157,5 @@ class CatalogueService:
             detail={"datasetId": str(datasetId), "versionLabel": record.versionLabel},
             requestId=requestId,
         )
+        self._session.commit()
         return record
