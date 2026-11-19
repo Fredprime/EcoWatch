@@ -1,7 +1,15 @@
-import { request } from './client';
+import { jsonBody, request } from './client';
 import type {
+  AddDatasetVersionRequest,
+  AddMilestoneRequest,
   AnalysisOutputResponse,
   AnalysisRunResponse,
+  CreateDatasetRequest,
+  CreateEntityRequest,
+  CreateIndicatorRequest,
+  CreateInterventionRequest,
+  CreatePrioritisationAssessmentRequest,
+  CreateVerificationAssessmentRequest,
   CursorPage,
   DatasetResponse,
   DatasetVersionResponse,
@@ -12,7 +20,14 @@ import type {
   MeasurementResponse,
   MilestoneResponse,
   PrioritisationAssessmentResponse,
+  ProposeRelationshipRequest,
   PublicationResponse,
+  PublishSummaryRequest,
+  QueueAnalysisRequest,
+  RecordMeasurementRequest,
+  RecordPrioritisationDecisionRequest,
+  TransitionInterventionRequest,
+  UnitResponse,
   VerificationAssessmentResponse,
 } from './types';
 
@@ -127,4 +142,146 @@ export function listPublications(cursor?: string | null): Promise<CursorPage<Pub
   return request<CursorPage<PublicationResponse>>(
     `${BASE}/verification/publications${pageQuery(cursor)}`,
   );
+}
+
+export function listUnits(): Promise<CursorPage<UnitResponse>> {
+  return request<CursorPage<UnitResponse>>(`${BASE}/units?limit=100`);
+}
+
+// Phase 3 write helpers
+export function createDataset(payload: CreateDatasetRequest): Promise<DatasetResponse> {
+  return request<DatasetResponse>(`${BASE}/catalogue/datasets`, jsonBody(payload));
+}
+
+export function addDatasetVersion(
+  datasetId: string,
+  payload: AddDatasetVersionRequest,
+): Promise<DatasetVersionResponse> {
+  return request<DatasetVersionResponse>(
+    `${BASE}/catalogue/datasets/${encodeURIComponent(datasetId)}/versions`,
+    jsonBody(payload),
+  );
+}
+
+export function createEntity(payload: CreateEntityRequest): Promise<EnvironmentalEntityResponse> {
+  return request<EnvironmentalEntityResponse>(`${BASE}/intelligence/entities`, jsonBody(payload));
+}
+
+export function proposeRelationship(
+  payload: ProposeRelationshipRequest,
+): Promise<EnvironmentalRelationshipResponse> {
+  return request<EnvironmentalRelationshipResponse>(
+    `${BASE}/intelligence/relationships`,
+    jsonBody(payload),
+  );
+}
+
+export function reviewRelationship(
+  relationshipId: string,
+  organisationId: string,
+  reviewState: string,
+): Promise<EnvironmentalRelationshipResponse> {
+  return request<EnvironmentalRelationshipResponse>(
+    `${BASE}/intelligence/relationships/${encodeURIComponent(relationshipId)}/review`,
+    jsonBody({ organisationId, reviewState }),
+  );
+}
+
+export function queueAnalysisRun(payload: QueueAnalysisRequest): Promise<AnalysisRunResponse> {
+  return request<AnalysisRunResponse>(`${BASE}/intelligence/analyses`, jsonBody(payload));
+}
+
+export function createPrioritisationAssessment(
+  payload: CreatePrioritisationAssessmentRequest,
+): Promise<PrioritisationAssessmentResponse> {
+  return request<PrioritisationAssessmentResponse>(
+    `${BASE}/prioritisation/assessments`,
+    jsonBody(payload),
+  );
+}
+
+export function recordPrioritisationDecision(
+  assessmentId: string,
+  payload: RecordPrioritisationDecisionRequest,
+): Promise<PrioritisationAssessmentResponse> {
+  return request<PrioritisationAssessmentResponse>(
+    `${BASE}/prioritisation/assessments/${encodeURIComponent(assessmentId)}/decision`,
+    jsonBody(payload),
+  );
+}
+
+export function createIntervention(
+  payload: CreateInterventionRequest,
+): Promise<InterventionResponse> {
+  return request<InterventionResponse>(
+    `${BASE}/interventions/interventions`,
+    jsonBody(payload),
+  );
+}
+
+export function addMilestone(
+  interventionId: string,
+  payload: AddMilestoneRequest,
+): Promise<MilestoneResponse> {
+  return request<MilestoneResponse>(
+    `${BASE}/interventions/interventions/${encodeURIComponent(interventionId)}/milestones`,
+    jsonBody(payload),
+  );
+}
+
+export function completeMilestone(
+  milestoneId: string,
+  organisationId: string,
+): Promise<MilestoneResponse> {
+  return request<MilestoneResponse>(
+    `${BASE}/interventions/milestones/${encodeURIComponent(milestoneId)}/complete`,
+    jsonBody({ organisationId, evidenceAssetIds: [] }),
+  );
+}
+
+export function transitionIntervention(
+  interventionId: string,
+  payload: TransitionInterventionRequest,
+): Promise<InterventionResponse> {
+  return request<InterventionResponse>(
+    `${BASE}/interventions/interventions/${encodeURIComponent(interventionId)}/transition`,
+    jsonBody(payload),
+  );
+}
+
+export function createIndicator(payload: CreateIndicatorRequest): Promise<IndicatorResponse> {
+  return request<IndicatorResponse>(`${BASE}/verification/indicators`, jsonBody(payload));
+}
+
+export function recordMeasurement(
+  indicatorId: string,
+  payload: RecordMeasurementRequest,
+): Promise<MeasurementResponse> {
+  return request<MeasurementResponse>(
+    `${BASE}/verification/indicators/${encodeURIComponent(indicatorId)}/measurements`,
+    jsonBody(payload),
+  );
+}
+
+export function createVerificationAssessment(
+  payload: CreateVerificationAssessmentRequest,
+): Promise<VerificationAssessmentResponse> {
+  return request<VerificationAssessmentResponse>(
+    `${BASE}/verification/assessments`,
+    jsonBody(payload),
+  );
+}
+
+export function finaliseVerificationAssessment(
+  assessmentId: string,
+  organisationId: string,
+): Promise<VerificationAssessmentResponse> {
+  return request<VerificationAssessmentResponse>(
+    `${BASE}/verification/assessments/${encodeURIComponent(assessmentId)}/finalise`,
+    jsonBody({ organisationId }),
+  );
+}
+
+export function publishSummary(payload: PublishSummaryRequest): Promise<PublicationResponse> {
+  return request<PublicationResponse>(`${BASE}/verification/publications`, jsonBody(payload));
 }

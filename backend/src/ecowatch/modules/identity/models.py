@@ -56,3 +56,22 @@ class Membership(Base, UUIDPrimaryKeyMixin):
     createdAt: Mapped[datetime] = mapped_column(
         "created_at", DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class RevokedToken(Base):
+    """Server-side bearer token revocation record created on logout."""
+
+    __tablename__ = "revoked_tokens"
+
+    tokenId: Mapped[uuid.UUID] = mapped_column(
+        "token_id", Uuid(as_uuid=True), primary_key=True
+    )
+    userId: Mapped[uuid.UUID] = mapped_column(
+        "user_id", Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    revokedAt: Mapped[datetime] = mapped_column(
+        "revoked_at", DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    expiresAt: Mapped[datetime] = mapped_column(
+        "expires_at", DateTime(timezone=True), nullable=False, index=True
+    )

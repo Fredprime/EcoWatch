@@ -3,6 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Path, Query, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from ecowatch.api.dependencies import (
@@ -23,6 +24,7 @@ from ecowatch.modules.identity.schemas import (
     CreateUserRequest,
     LoginRequest,
     LoginResponse,
+    LogoutResponse,
     MembershipResponse,
     OrganisationResponse,
     UserResponse,
@@ -30,6 +32,7 @@ from ecowatch.modules.identity.schemas import (
 from ecowatch.modules.identity.service import IdentityService
 
 router = APIRouter(tags=["identity"])
+_bearerScheme = HTTPBearer(auto_error=False)
 
 
 @router.post("/auth/login", response_model=LoginResponse)
@@ -43,6 +46,21 @@ def login(
     """Authenticate with email and password to receive a bearer token."""
     clientIp = request.client.host if request.client else "unknown"
     return IdentityService(db, settings).login(payload, authProvider, clientIp=clientIp)
+
+
+@router.post("/auth/logout", response_model=LogoutResponse)
+def logout(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearerScheme),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    authProvider: AuthProvider = Depends(get_auth_provider),
+    requestId: str | None = Depends(get_request_id),
+) -> LogoutResponse:
+    """Revoke the caller's active bearer token server-side."""
+    token = credentials.credentials if credentials is not None else ""
+    return IdentityService(db).logout(
+        principal, token, authProvider, requestId=requestId
+    )
 
 
 @router.get("/auth/me", response_model=AuthMeResponse)

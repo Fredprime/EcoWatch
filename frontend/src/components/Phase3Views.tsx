@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import type { CursorPage } from '../api/types';
 import type { AsyncState } from '../hooks/useApiResource';
-import { ResourceState } from './ResourceState';
 import { EmptyState } from './EmptyState';
+import { Notice } from './Notice';
+import { ResourceState } from './ResourceState';
 
 export interface ListColumn<T> {
   header: string;
@@ -108,5 +109,54 @@ export function RecordPicker({
       </select>
       {hint && <p className="field-hint">{hint}</p>}
     </div>
+  );
+}
+
+export function ActionPanel({
+  title,
+  summary,
+  statusMessage,
+  errorMessageText,
+  submitting,
+  submitLabel,
+  onSubmit,
+  children,
+}: {
+  title: string;
+  summary?: string;
+  statusMessage?: string | null;
+  errorMessageText?: string | null;
+  submitting: boolean;
+  submitLabel: string;
+  onSubmit: (event: FormEvent) => void;
+  children: ReactNode;
+}) {
+  return (
+    <details className="card">
+      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{title}</summary>
+      {summary && (
+        <p className="muted" style={{ marginTop: '0.5rem' }}>
+          {summary}
+        </p>
+      )}
+      <form onSubmit={onSubmit} style={{ marginTop: '0.75rem', display: 'grid', gap: '0.75rem' }}>
+        {errorMessageText && (
+          <Notice variant="danger" role="alert" title="Action failed:">
+            {errorMessageText}
+          </Notice>
+        )}
+        {statusMessage && (
+          <Notice variant="info" role="status" title="Saved:">
+            {statusMessage}
+          </Notice>
+        )}
+        {children}
+        <div>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? 'Submitting…' : submitLabel}
+          </button>
+        </div>
+      </form>
+    </details>
   );
 }
