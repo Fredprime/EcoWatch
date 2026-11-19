@@ -54,6 +54,7 @@ class TokenClaims:
     userId: uuid.UUID
     issuedAt: int
     expiresAt: int
+    tokenId: uuid.UUID | None = None
 
 
 class AuthProvider(Protocol):
@@ -72,7 +73,12 @@ class LocalTokenAuthProvider:
 
     def issue_token(self, userId: uuid.UUID) -> str:
         now = int(time.time())
-        payload = {"sub": str(userId), "iat": now, "exp": now + self._ttlSeconds}
+        payload = {
+            "sub": str(userId),
+            "jti": str(uuid.uuid4()),
+            "iat": now,
+            "exp": now + self._ttlSeconds,
+        }
         encoded = base64.urlsafe_b64encode(
             json.dumps(payload, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
@@ -92,8 +98,10 @@ class LocalTokenAuthProvider:
             userId = uuid.UUID(payload["sub"])
             iat = int(payload["iat"])
             exp = int(payload["exp"])
+            rawJti = payload.get("jti")
+            tokenId = uuid.UUID(rawJti) if rawJti is not None else None
         except (ValueError, KeyError, TypeError, json.JSONDecodeError):
             return None
         if exp < int(time.time()):
             return None
-        return TokenClaims(userId=userId, issuedAt=iat, expiresAt=exp)
+        return TokenClaims(userId=userId, issuedAt=iat, expiresAt=exp, tokenId=tokenId)

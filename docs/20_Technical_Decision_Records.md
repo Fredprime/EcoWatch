@@ -148,3 +148,15 @@ Do not erase a superseded decision. Add a new record and explain why the decisio
 - **Verification method:** `npm run lint` and `npm run build`; a Node self-check of the WKT parser over POINT/LINESTRING/POLYGON/multi forms and malformed input; a manual local check that each map renders only stored geometry, makes no external requests, and that list/detail views remain available. No accuracy, completeness or basemap-licence claim is made.
 - **Affected documents:** `docs/20_Technical_Decision_Records.md` (ADR-017 promoted), `docs/PROJECT_TRACKING.md`, `frontend/README.md`.
 - **Review date:** 2026-12-19.
+
+### ADR-039 — Server-side token revocation on logout
+
+- **ID:** ADR-039
+- **Title:** Server-side token revocation (`revoked_tokens`) on logout
+- **Date:** 2026-11-19
+- **Status:** Approved
+- **Context:** ADR-032 accepted client-only logout clearing as a Phase 1 limitation, leaving stateless HMAC bearer tokens valid until their 12-hour expiry unless the user account was deactivated.
+- **Decision:** Add a `jti` UUID claim (`tokenId`) to tokens issued by `LocalTokenAuthProvider`, store revoked `token_id`s in a `revoked_tokens` table (migration `0007_token_revocation`), expose `POST /api/v1/auth/logout` (authenticated, audited as `auth.logout`), reject any revoked `tokenId` with `401 UNAUTHORIZED` in `get_optional_principal`, and update `frontend` `AuthProvider.logout` to call `POST /api/v1/auth/logout` before clearing memory state.
+- **Rationale:** Minimal, DB-backed revocation using the existing PostgreSQL store avoids adding Redis while closing the post-logout token replay window.
+- **Affected documents:** `docs/20_Technical_Decision_Records.md`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md`.
+- **Review date:** 2026-12-19.

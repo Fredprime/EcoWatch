@@ -61,6 +61,13 @@ def get_optional_principal(
         )
 
     repo = IdentityRepository(db)
+    if claims.tokenId is not None and repo.is_token_revoked(claims.tokenId):
+        raise DomainError(
+            ErrorCode.UNAUTHORIZED,
+            "Authentication token has been revoked",
+            statusCode=status.HTTP_401_UNAUTHORIZED,
+        )
+
     user = repo.get_user_by_id(claims.userId)
     if user is None or not user.isActive:
         raise DomainError(

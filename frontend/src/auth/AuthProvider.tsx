@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { getMe, login as loginRequest } from '../api/auth';
+import { getMe, login as loginRequest, logout as logoutRequest } from '../api/auth';
 import { setAuthToken, setUnauthorizedHandler } from '../api/client';
 import type { AuthMeResponse } from '../api/types';
 import { AuthContext } from './authContext';
@@ -18,6 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    void logoutRequest().catch(() => {});
     setAuthToken(null);
     setMe(null);
   }, []);

@@ -53,6 +53,12 @@ class LoginResponse(CamelModel):
     user: UserResponse
 
 
+class LogoutResponse(CamelModel):
+    """Confirmation that the current bearer token has been revoked server-side."""
+
+    revoked: bool = True
+
+
 class CreateUserRequest(CamelModel):
     """System-admin payload to create a user account."""
 

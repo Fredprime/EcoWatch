@@ -1,12 +1,13 @@
 """SQLAlchemy repository for users, organisations, and memberships."""
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ecowatch.core.pagination import paginate_descending
-from ecowatch.modules.identity.models import Membership, Organisation, User
+from ecowatch.modules.identity.models import Membership, Organisation, RevokedToken, User
 
 
 class IdentityRepository:
@@ -21,6 +22,22 @@ class IdentityRepository:
     def get_user_by_email(self, email: str) -> User | None:
         normalized = email.strip().lower()
         return self._session.scalar(select(User).where(User.email == normalized))
+
+    def is_token_revoked(self, tokenId: uuid.UUID) -> bool:
+        """Return True if a bearer token's jti has been explicitly revoked."""
+        return self._session.get(RevokedToken, tokenId) is not None
+
+    def revoke_token(
+        self, tokenId: uuid.UUID, userId: uuid.UUID, expiresAt: datetime
+    ) -> RevokedToken:
+        """Idempotently record a token revocation."""
+        existing = self._session.get(RevokedToken, tokenId)
+        if existing is not None:
+            return existing
+        record = RevokedToken(tokenId=tokenId, userId=userId, expiresAt=expiresAt)
+        self._session.add(record)
+        self._session.flush()
+        return record
 
     def create_user(
         self,

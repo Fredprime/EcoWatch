@@ -1,17 +1,25 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type FormEvent } from 'react';
 import { WorkspacePage } from './WorkspacePage';
 import { SignInPrompt } from '../components/SignInPrompt';
 import { LazyWktMap } from '../components/LazyWktMap';
 import { featuresFromWkt } from '../components/wkt';
 import {
+  ActionPanel,
   ReadOnlyListCard,
   RecordPicker,
   type ListColumn,
 } from '../components/Phase3Views';
+import { useOrganisationOptions } from '../hooks/useOrganisationOptions';
 import { formatTime } from '../components/phase3Format';
 import { useAuth } from '../auth/authContext';
 import { useApiResource } from '../hooks/useApiResource';
-import { listDatasetVersions, listDatasets } from '../api/phase3';
+import { errorMessage } from '../api/client';
+import {
+  addDatasetVersion,
+  createDataset,
+  listDatasetVersions,
+  listDatasets,
+} from '../api/phase3';
 import type { DatasetResponse, DatasetVersionResponse } from '../api/types';
 
 const datasetColumns: ListColumn<DatasetResponse>[] = [
@@ -41,6 +49,7 @@ const versionColumns: ListColumn<DatasetVersionResponse>[] = [
 export function MonitoringPage() {
   const { status } = useAuth();
   const authenticated = status === 'authenticated';
+  const { options: orgOptions, defaultOrgId } = useOrganisationOptions(authenticated);
 
   const loadDatasets = useCallback(() => listDatasets(), []);
   const datasets = useApiResource(loadDatasets, 'catalogue-datasets', authenticated);
@@ -52,6 +61,92 @@ export function MonitoringPage() {
     `dataset-versions:${selectedDatasetId}`,
     authenticated && Boolean(selectedDatasetId),
   );
+
+  const [dsOrgId, setDsOrgId] = useState('');
+  const [dsName, setDsName] = useState('');
+  const [dsOwner, setDsOwner] = useState('');
+  const [dsLicence, setDsLicence] = useState('CC-BY-4.0');
+  const [dsAttribution, setDsAttribution] = useState('');
+  const [dsPermittedUse, setDsPermittedUse] = useState('Monitoring and research');
+  const [dsCrs, setDsCrs] = useState('EPSG:4326');
+  const [dsGeometry, setDsGeometry] = useState('');
+  const [dsBusy, setDsBusy] = useState(false);
+  const [dsStatus, setDsStatus] = useState<string | null>(null);
+  const [dsError, setDsError] = useState<string | null>(null);
+
+  const [verLabel, setVerLabel] = useState('v1.0');
+  const [verResolution, setVerResolution] = useState('10m');
+  const [verMethod, setVerMethod] = useState('');
+  const [verAcquiredAt, setVerAcquiredAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [verLimitations, setVerLimitations] = useState('');
+  const [verBusy, setVerBusy] = useState(false);
+  const [verStatus, setVerStatus] = useState<string | null>(null);
+  const [verError, setVerError] = useState<string | null>(null);
+
+  const resolvedOrgId = dsOrgId || defaultOrgId;
+
+  async function handleCreateDataset(event: FormEvent) {
+    event.preventDefault();
+    setDsBusy(true);
+    setDsStatus(null);
+    setDsError(null);
+    try {
+      const created = await createDataset({
+        organisationId: resolvedOrgId,
+        name: dsName,
+        owner: dsOwner,
+        licence: dsLicence,
+        attribution: dsAttribution,
+        permittedUse: dsPermittedUse,
+        crs: dsCrs,
+        coverageGeometry: dsGeometry || null,
+      });
+      setDsName('');
+      setDsOwner('');
+      setDsAttribution('');
+      setDsGeometry('');
+      setSelectedDatasetId(created.id);
+      setDsStatus(`Dataset "${created.name}" registered.`);
+      datasets.reload();
+    } catch (err) {
+      setDsError(errorMessage(err));
+    } finally {
+      setDsBusy(false);
+    }
+  }
+
+  async function handleAddVersion(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedDatasetId) {
+      setVerError('Select a dataset above first.');
+      return;
+    }
+    setVerBusy(true);
+    setVerStatus(null);
+    setVerError(null);
+    try {
+      const created = await addDatasetVersion(selectedDatasetId, {
+        organisationId: resolvedOrgId,
+        versionLabel: verLabel,
+        sourceAcquisitionAt: new Date(verAcquiredAt).toISOString(),
+        resolution: verResolution,
+        crs: dsCrs,
+        method: verMethod,
+        licence: dsLicence,
+        attribution: dsAttribution || 'Dataset owner attribution',
+        permittedUse: dsPermittedUse,
+        limitations: verLimitations || null,
+      });
+      setVerMethod('');
+      setVerLimitations('');
+      setVerStatus(`Version "${created.versionLabel}" recorded.`);
+      versions.reload();
+    } catch (err) {
+      setVerError(errorMessage(err));
+    } finally {
+      setVerBusy(false);
+    }
+  }
 
   const datasetOptions =
     datasets.state.status === 'success'
@@ -130,6 +225,83 @@ export function MonitoringPage() {
               ariaLabel="Dataset versions table"
               idleNote="Choose a dataset above to load its versions."
             />
+
+            <ActionPanel
+              title="Register dataset"
+              summary="Record a dataset with rights, attribution, permitted use, and CRS."
+              statusMessage={dsStatus}
+              errorMessageText={dsError}
+              submitting={dsBusy}
+              submitLabel="Register dataset"
+              onSubmit={handleCreateDataset}
+            >
+              <RecordPicker
+                id="mon-ds-org"
+                label="Organisation"
+                value={resolvedOrgId}
+                onChange={setDsOrgId}
+                options={orgOptions}
+              />
+              <div className="field">
+                <label htmlFor="mon-ds-name">Dataset name</label>
+                <input id="mon-ds-name" value={dsName} onChange={(e) => setDsName(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ds-owner">Owner / provider</label>
+                <input id="mon-ds-owner" value={dsOwner} onChange={(e) => setDsOwner(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ds-licence">Licence</label>
+                <input id="mon-ds-licence" value={dsLicence} onChange={(e) => setDsLicence(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ds-attr">Attribution</label>
+                <input id="mon-ds-attr" value={dsAttribution} onChange={(e) => setDsAttribution(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ds-use">Permitted use</label>
+                <input id="mon-ds-use" value={dsPermittedUse} onChange={(e) => setDsPermittedUse(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ds-crs">CRS</label>
+                <input id="mon-ds-crs" value={dsCrs} onChange={(e) => setDsCrs(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ds-geom">Coverage geometry WKT (optional)</label>
+                <input id="mon-ds-geom" value={dsGeometry} onChange={(e) => setDsGeometry(e.target.value)} placeholder="POINT(-1.6244 6.6885)" />
+              </div>
+            </ActionPanel>
+
+            <ActionPanel
+              title="Append dataset version"
+              summary="Record an immutable provenance snapshot for the selected dataset above."
+              statusMessage={verStatus}
+              errorMessageText={verError}
+              submitting={verBusy}
+              submitLabel="Add version"
+              onSubmit={handleAddVersion}
+            >
+              <div className="field">
+                <label htmlFor="mon-ver-label">Version label</label>
+                <input id="mon-ver-label" value={verLabel} onChange={(e) => setVerLabel(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ver-acquired">Source acquisition time</label>
+                <input id="mon-ver-acquired" type="datetime-local" value={verAcquiredAt} onChange={(e) => setVerAcquiredAt(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ver-res">Resolution</label>
+                <input id="mon-ver-res" value={verResolution} onChange={(e) => setVerResolution(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ver-method">Method</label>
+                <input id="mon-ver-method" value={verMethod} onChange={(e) => setVerMethod(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="mon-ver-lim">Limitations (optional)</label>
+                <input id="mon-ver-lim" value={verLimitations} onChange={(e) => setVerLimitations(e.target.value)} />
+              </div>
+            </ActionPanel>
           </>
         )}
       </div>

@@ -544,3 +544,171 @@ export interface PublicationResponse {
   retractionReason: string | null;
   createdAt: string;
 }
+
+export interface UnitResponse {
+  id: string;
+  symbol: string;
+  name: string;
+  dimension: string;
+  ucumCode: string | null;
+}
+
+export interface CreateOrganisationRequest {
+  name: string;
+  orgType: string;
+  isActive?: boolean;
+}
+
+export interface CreateUserRequest {
+  email: string;
+  displayName: string;
+  password: string;
+  systemRole?: string | null;
+  isActive?: boolean;
+}
+
+export interface AssignMembershipRequest {
+  userId: string;
+  role: string;
+  isActive?: boolean;
+  reason?: string | null;
+}
+
+export interface CreateDatasetRequest {
+  organisationId: string;
+  name: string;
+  owner: string;
+  licence: string;
+  attribution: string;
+  permittedUse: string;
+  crs: string;
+  description?: string | null;
+  coverageGeometry?: string | null;
+}
+
+export interface AddDatasetVersionRequest {
+  organisationId: string;
+  versionLabel: string;
+  sourceAcquisitionAt: string;
+  resolution: string;
+  crs: string;
+  method: string;
+  licence: string;
+  attribution: string;
+  permittedUse: string;
+  limitations?: string | null;
+  qualityNotes?: string | null;
+}
+
+export interface CreateEntityRequest {
+  organisationId: string;
+  entityType: string;
+  name: string;
+  crs?: string;
+  description?: string | null;
+  geometry?: string | null;
+}
+
+export interface ProposeRelationshipRequest {
+  organisationId: string;
+  relationshipType: string;
+  evidenceSummary: string;
+  uncertainty: string;
+  uncertaintyNote: string;
+  alternativeExplanations: string;
+  methodName: string;
+  methodVersion: string;
+  fromEntityId?: string | null;
+  toEntityId?: string | null;
+}
+
+export interface QueueAnalysisRequest {
+  organisationId: string;
+  question: string;
+  analysisType: string;
+  methodName: string;
+  methodVersion: string;
+  inputDatasetVersionIds: string[];
+  crs: string;
+  limitations: string;
+  caseId?: string | null;
+}
+
+export interface CreatePrioritisationAssessmentRequest {
+  organisationId: string;
+  caseId: string;
+  methodName: string;
+  methodVersion: string;
+  compositeRank?: number | null;
+  rankingMethodRef?: string | null;
+  rankIsNotSeverity?: boolean | null;
+}
+
+export interface RecordPrioritisationDecisionRequest {
+  organisationId: string;
+  decision: string;
+  rationale: string;
+}
+
+export interface CreateInterventionRequest {
+  organisationId: string;
+  caseId: string;
+  objective: string;
+  responsibleOrganisationId: string;
+  authorisedLeadUserId: string;
+  rationale?: string | null;
+  location?: string | null;
+}
+
+export interface AddMilestoneRequest {
+  organisationId: string;
+  name: string;
+  description?: string | null;
+}
+
+export interface TransitionInterventionRequest {
+  organisationId: string;
+  targetStatus: string;
+  rationale: string;
+}
+
+export interface CreateIndicatorRequest {
+  organisationId: string;
+  code: string;
+  name: string;
+  domain: string;
+  unitId: string;
+  methodName: string;
+  methodVersion: string;
+  description?: string | null;
+}
+
+export interface RecordMeasurementRequest {
+  organisationId: string;
+  measuredAt: string;
+  qualifier: string;
+  unitId: string;
+  methodName: string;
+  methodVersion: string;
+  value?: number | null;
+  detectionLimit?: number | null;
+  interventionId?: string | null;
+}
+
+export interface CreateVerificationAssessmentRequest {
+  organisationId: string;
+  interventionId: string;
+  comparisonMethod: string;
+  direction: string;
+  baselineValues?: number[];
+  followUpValues?: number[];
+  confounders?: string | null;
+  uncertaintyNote?: string | null;
+}
+
+export interface PublishSummaryRequest {
+  organisationId: string;
+  publishedText: string;
+  verificationAssessmentId?: string | null;
+  caseId?: string | null;
+}

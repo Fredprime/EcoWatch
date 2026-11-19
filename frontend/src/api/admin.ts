@@ -1,11 +1,41 @@
-import { request } from './client';
-import type { AuditEventSummary, CursorPage, JobSummaryResponse, OrganisationSummary } from './types';
+import { jsonBody, request } from './client';
+import type {
+  AssignMembershipRequest,
+  AuditEventSummary,
+  CreateOrganisationRequest,
+  CreateUserRequest,
+  CursorPage,
+  JobSummaryResponse,
+  MembershipResponse,
+  OrganisationSummary,
+  UserResponse,
+} from './types';
 
 const BASE = '/api/v1';
 
-/** Read-only admin reads. Permissions and scoping are enforced by the server. */
+/** Admin reads and writes. Permissions and scoping are enforced by the server. */
 export function listOrganisations(): Promise<CursorPage<OrganisationSummary>> {
   return request<CursorPage<OrganisationSummary>>(`${BASE}/organisations?limit=50`);
+}
+
+export function createOrganisation(
+  payload: CreateOrganisationRequest,
+): Promise<OrganisationSummary> {
+  return request<OrganisationSummary>(`${BASE}/organisations`, jsonBody(payload));
+}
+
+export function createUser(payload: CreateUserRequest): Promise<UserResponse> {
+  return request<UserResponse>(`${BASE}/users`, jsonBody(payload));
+}
+
+export function assignMembership(
+  organisationId: string,
+  payload: AssignMembershipRequest,
+): Promise<MembershipResponse> {
+  return request<MembershipResponse>(
+    `${BASE}/organisations/${encodeURIComponent(organisationId)}/memberships`,
+    jsonBody(payload),
+  );
 }
 
 export function listAuditEvents(): Promise<CursorPage<AuditEventSummary>> {

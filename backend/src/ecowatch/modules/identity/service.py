@@ -2,6 +2,7 @@
 
 import hashlib
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import status
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from ecowatch.modules.identity.schemas import (
     CreateUserRequest,
     LoginRequest,
     LoginResponse,
+    LogoutResponse,
     MembershipResponse,
     OrganisationResponse,
     UserResponse,
@@ -83,6 +85,37 @@ class IdentityService:
             accessToken=token,
             user=UserResponse.model_validate(user),
         )
+
+    def logout(
+        self,
+        principal: Principal,
+        token: str,
+        authProvider: AuthProvider,
+        *,
+        requestId: str | None = None,
+    ) -> LogoutResponse:
+        """Revoke the caller's current bearer token server-side and audit the logout."""
+        claims = authProvider.verify_token(token)
+        if claims is None or claims.tokenId is None or principal.userId != claims.userId:
+            raise DomainError(
+                ErrorCode.UNAUTHORIZED,
+                "Invalid or missing authentication token",
+                statusCode=status.HTTP_401_UNAUTHORIZED,
+            )
+        expiresAt = datetime.fromtimestamp(claims.expiresAt, tz=UTC)
+        self._repo.revoke_token(claims.tokenId, claims.userId, expiresAt)
+        record_audit_event(
+            self._session,
+            actorUserId=principal.userId,
+            actorRole=principal.primary_role_label,
+            organisationId=None,
+            action="auth.logout",
+            targetType="user",
+            targetId=claims.userId,
+            requestId=requestId,
+        )
+        self._session.commit()
+        return LogoutResponse(revoked=True)
 
     def get_me(self, principal: Principal) -> AuthMeResponse:
         """Return the authenticated user's profile and active organisation memberships."""
