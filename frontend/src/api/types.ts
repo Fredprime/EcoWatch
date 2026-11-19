@@ -244,3 +244,38 @@ export interface EvidenceAssetResponse {
   scanStatus: string;
   receivedAt: string;
 }
+
+/** Read-only administration summaries. Only fields safe for a staff view are declared. */
+export interface OrganisationSummary {
+  id: string;
+  name: string;
+  orgType: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AuditEventSummary {
+  id: string;
+  occurredAt: string;
+  actorRole: string;
+  action: string;
+  targetType: string;
+}
+
+export interface JobTypeSummary {
+  jobType: string;
+  pending: number;
+  processing: number;
+  processed: number;
+  failed: number;
+  dead: number;
+}
+
+export interface JobSummaryResponse {
+  totalPending: number;
+  totalProcessing: number;
+  totalProcessed: number;
+  totalFailed: number;
+  totalDead: number;
+  byType: JobTypeSummary[];
+}
