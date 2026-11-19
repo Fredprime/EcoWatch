@@ -53,7 +53,7 @@ def list_assessments(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.PRIORITISATION_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.PRIORITISATION_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[AssessmentResponse]:
     """List assessments and recorded decisions within the caller's organisations."""

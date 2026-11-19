@@ -383,7 +383,7 @@ class IntelligenceService:
         limit: int = 50,
     ) -> CursorPage[EntityResponse]:
         """List environmental entities scoped to the caller's organisations."""
-        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_READ)
         stmt = scope_statement(
             select(models.EnvironmentalEntity),
             models.EnvironmentalEntity,
@@ -408,7 +408,7 @@ class IntelligenceService:
         limit: int = 50,
     ) -> CursorPage[RelationshipResponse]:
         """List proposed and reviewed relationships, including their review state."""
-        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_READ)
         stmt = scope_statement(
             select(models.EnvironmentalRelationship),
             models.EnvironmentalRelationship,
@@ -433,7 +433,7 @@ class IntelligenceService:
         limit: int = 50,
     ) -> CursorPage[AnalysisRunResponse]:
         """List queued and completed analysis runs with their method provenance."""
-        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_READ)
         stmt = scope_statement(
             select(models.AnalysisRun),
             models.AnalysisRun,
@@ -458,7 +458,7 @@ class IntelligenceService:
         limit: int = 50,
     ) -> CursorPage[AnalysisOutputResponse]:
         """List outputs of one in-scope analysis run; the parent carries the org scope."""
-        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_READ)
         load_scoped_parent(
             self._session,
             models.AnalysisRun,

@@ -254,7 +254,7 @@ class InterventionsService:
         limit: int = 50,
     ) -> CursorPage[InterventionResponse]:
         """List interventions scoped to the caller's organisations."""
-        allowedOrgIds = read_scope(principal, Permission.INTERVENTION_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.INTERVENTION_READ)
         stmt = scope_statement(
             select(models.Intervention), models.Intervention, allowedOrgIds, organisationId
         )
@@ -276,7 +276,7 @@ class InterventionsService:
         limit: int = 50,
     ) -> CursorPage[MilestoneResponse]:
         """List milestones of one in-scope intervention; the parent carries scope."""
-        allowedOrgIds = read_scope(principal, Permission.INTERVENTION_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.INTERVENTION_READ)
         load_scoped_parent(
             self._session,
             models.Intervention,

@@ -152,7 +152,7 @@ class PrioritisationService:
         limit: int = 50,
     ) -> CursorPage[AssessmentResponse]:
         """List prioritisation assessments; rank is a signal, never a severity."""
-        allowedOrgIds = read_scope(principal, Permission.PRIORITISATION_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.PRIORITISATION_READ)
         stmt = scope_statement(
             select(models.PrioritisationAssessment),
             models.PrioritisationAssessment,

@@ -464,3 +464,28 @@ def test_read_api_pagination_uses_next_cursor(
         "/api/v1/catalogue/datasets", headers=headers, params={"cursor": "not-a-cursor"}
     )
     assert invalid.status_code == 400, invalid.text
+
+
+def test_reviewer_can_read_intelligence_without_write_permission(
+    client: TestClient,
+    dbSession: Session,
+    authProvider: LocalTokenAuthProvider,
+) -> None:
+    """ADR-040: reviewer holds INTELLIGENCE_READ without INTELLIGENCE_WRITE."""
+    orgId, reviewerHeaders = _actor(
+        dbSession, authProvider, Role.REVIEWER
+    )
+
+    readResp = client.get("/api/v1/intelligence/analyses", headers=reviewerHeaders)
+    assert readResp.status_code == 200, readResp.text
+
+    writeResp = client.post(
+        "/api/v1/intelligence/entities",
+        headers=reviewerHeaders,
+        json={
+            "organisationId": str(orgId),
+            "entityType": "site",
+            "name": "Blocked Write Site",
+        },
+    )
+    assert writeResp.status_code == 403, writeResp.text

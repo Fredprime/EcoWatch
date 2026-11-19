@@ -143,7 +143,7 @@ def list_indicators(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[IndicatorResponse]:
     """List approved indicator definitions within the caller's organisations."""
@@ -157,7 +157,7 @@ def list_measurements(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[MeasurementResponse]:
     """List qualified measurements within the caller's organisations."""
@@ -171,7 +171,7 @@ def list_assessments(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[AssessmentResponse]:
     """List outcome assessments within the caller's organisations."""
@@ -185,7 +185,7 @@ def list_publications(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[PublicationResponse]:
     """List approved public text records with their retraction state."""
