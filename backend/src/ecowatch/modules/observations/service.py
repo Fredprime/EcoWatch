@@ -469,16 +469,19 @@ class ObservationService:
         require_org_permission(principal, Permission.OBS_EXPORT, organisationId)
 
         observations = self._repo.list_for_export(organisationId)
+        obsIds = [obs.id for obs in observations]
+        versionsByObs = self._repo.list_versions_for_observations(obsIds)
+        sourcesByObs = self._repo.get_sources_for_observations(obsIds)
         records = [
             ObservationExportRecord(
                 observation=ObservationRestrictedResponse.from_orm_record(obs),
                 versions=[
                     ObservationVersionResponse.model_validate(v)
-                    for v in self._repo.list_versions(obs.id)
+                    for v in versionsByObs.get(obs.id, [])
                 ],
                 source=(
                     ObservationSourceResponse.model_validate(source)
-                    if (source := self._repo.get_source_by_observation_id(obs.id)) is not None
+                    if (source := sourcesByObs.get(obs.id)) is not None
                     else None
                 ),
             )

@@ -2,11 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { ApiError, errorMessage } from '../api/client';
 import { uploadEvidence } from '../api/evidence';
+import {
+  discardQueued,
+  enqueueReport,
+  isTransient,
+  listQueued,
+  QUEUE_CHANGE_EVENT,
+  QUEUE_SUBMITTED_EVENT,
+  retryQueued,
+} from '../api/offlineQueue';
 import { createObservation } from '../api/observations';
-import type { IntakeReceiptResponse, LocationPrecision, TimePrecision } from '../api/types';
+import type {
+  CreateObservationRequest,
+  IntakeReceiptResponse,
+  LocationPrecision,
+  TimePrecision,
+} from '../api/types';
+import type { QueuedReport } from '../api/offlineQueue';
 
 type FieldName = 'obsType' | 'description';
-type SubmitState = 'draft' | 'submitting' | 'received' | 'error';
+type SubmitState = 'draft' | 'submitting' | 'queued' | 'received' | 'error';
 type PhotoState = 'pending' | 'uploading' | 'uploaded' | 'failed';
 
 type FormValues = {
@@ -64,6 +79,7 @@ export function ReportPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photosBusy, setPhotosBusy] = useState(false);
+  const [queued, setQueued] = useState<QueuedReport | null>(null);
   const summaryRef = useRef<HTMLDivElement | null>(null);
   const idempotencyRef = useRef<string | null>(null);
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -74,6 +90,27 @@ export function ReportPage() {
     return () => {
       for (const url of urls) URL.revokeObjectURL(url);
     };
+  }, []);
+
+  // Reflect the device queue: queued / syncing / failed are all read from one record.
+  useEffect(() => {
+    const refresh = () => {
+      void listQueued()
+        .then((items) => setQueued(items[0] ?? null))
+        .catch(() => {});
+    };
+    refresh();
+    window.addEventListener(QUEUE_CHANGE_EVENT, refresh);
+    return () => window.removeEventListener(QUEUE_CHANGE_EVENT, refresh);
+  }, []);
+
+  useEffect(() => {
+    const onSubmitted = (event: Event) => {
+      setReceipt((event as CustomEvent<IntakeReceiptResponse>).detail);
+      setSubmitState('received');
+    };
+    window.addEventListener(QUEUE_SUBMITTED_EVENT, onSubmitted);
+    return () => window.removeEventListener(QUEUE_SUBMITTED_EVENT, onSubmitted);
   }, []);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
@@ -166,6 +203,43 @@ export function ReportPage() {
     await sendPhoto(photo, receipt.observationId, receipt.trackingCode);
   }
 
+  function buildPayload(): CreateObservationRequest {
+    const key = idempotencyRef.current ?? crypto.randomUUID();
+    idempotencyRef.current = key;
+    return {
+      idempotencyKey: key,
+      observationType: values.obsType,
+      description: values.description.trim(),
+      timePrecision: values.timePrecision,
+      ...(values.timeWording.trim() ? { originalTimeWording: values.timeWording.trim() } : {}),
+      locationPrecision: values.locationPrecision,
+      ...(values.locationWording.trim() ? { originalLocationWording: values.locationWording.trim() } : {}),
+      accessClass: 'restricted',
+      ...(values.firsthand === 'yes' ? { isFirsthand: true } : values.firsthand === 'no' ? { isFirsthand: false } : {}),
+    };
+  }
+
+  /** Keep the whole report on this device until the driver can send it safely. */
+  async function queueSubmission() {
+    const payload = buildPayload();
+    const report: QueuedReport = {
+      id: payload.idempotencyKey,
+      payload,
+      photos: (receipt ? [] : photos).map((photo) => ({ id: photo.id, file: photo.file })),
+      status: 'queued',
+      attempts: 0,
+      nextAttemptAt: Date.now(),
+      createdAt: new Date().toISOString(),
+    };
+    await enqueueReport(report);
+    setSubmitState('queued');
+    setSubmitError(null);
+    setValues(initialValues);
+    setSubmitAttempted(false);
+    idempotencyRef.current = null;
+    clearPhotos();
+  }
+
   async function submitForm() {
     const nextErrors = validate(values);
     setErrors(nextErrors);
@@ -177,7 +251,7 @@ export function ReportPage() {
       return;
     }
 
-    if (!idempotencyRef.current) idempotencyRef.current = crypto.randomUUID();
+    const payload = buildPayload();
     setSubmitState('submitting');
     setSubmitError(null);
     setReceipt(null);
@@ -185,18 +259,19 @@ export function ReportPage() {
     const pendingPhotos = receipt ? [] : photos; // an existing receipt means this is a new report
     if (receipt) clearPhotos();
 
+    // Never lose a report just because the device has no connection.
+    if (!navigator.onLine) {
+      try {
+        await queueSubmission();
+      } catch (cause) {
+        setSubmitState('error');
+        setSubmitError(errorMessage(cause));
+      }
+      return;
+    }
+
     try {
-      const result = await createObservation({
-        idempotencyKey: idempotencyRef.current,
-        observationType: values.obsType,
-        description: values.description.trim(),
-        timePrecision: values.timePrecision,
-        ...(values.timeWording.trim() ? { originalTimeWording: values.timeWording.trim() } : {}),
-        locationPrecision: values.locationPrecision,
-        ...(values.locationWording.trim() ? { originalLocationWording: values.locationWording.trim() } : {}),
-        accessClass: 'restricted',
-        ...(values.firsthand === 'yes' ? { isFirsthand: true } : values.firsthand === 'no' ? { isFirsthand: false } : {}),
-      });
+      const result = await createObservation(payload);
       setReceipt(result);
       setSubmitState('received');
       setValues(initialValues);
@@ -216,6 +291,15 @@ export function ReportPage() {
         }
       }
     } catch (cause) {
+      // Transient failures keep the same idempotency key; permanent ones are shown inline.
+      if (isTransient(cause)) {
+        try {
+          await queueSubmission();
+          return;
+        } catch {
+          // Local save failed — fall through to the visible error state.
+        }
+      }
       setSubmitState('error');
       setSubmitError(errorMessage(cause));
       if (cause instanceof ApiError) {
@@ -249,7 +333,8 @@ export function ReportPage() {
 
       <div className="notice notice-warn" role="note">
         <strong>Before you submit:</strong> Share only what is safe to share. Sensitive locations may be
-        generalised in later views. Nothing is stored on this device — submission goes straight to the server.
+        generalised in later views. If you are offline, your report is saved on this device and sent
+        automatically when you reconnect; it is removed once the server has accepted it.
       </div>
 
       {submitState !== 'draft' && (
@@ -258,11 +343,13 @@ export function ReportPage() {
           <p role="status">
             <strong>
               {submitState === 'submitting' && 'Submitting…'}
+              {submitState === 'queued' && 'Saved on this device.'}
               {submitState === 'received' && 'Received by server.'}
               {submitState === 'error' && 'Submission failed.'}
             </strong>
           </p>
           {submitState === 'submitting' && <p className="muted">Waiting for a durable server receipt.</p>}
+          {submitState === 'queued' && <p className="muted">It will send automatically when the connection returns.</p>}
           {submitState === 'error' && submitError && <p className="notice notice-danger" role="alert">{submitError}</p>}
           {submitState === 'error' && (
             <button type="button" className="btn btn-secondary" onClick={() => void submitForm()}>
@@ -290,6 +377,32 @@ export function ReportPage() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {queued && (
+        <div className="card">
+          <h2>Queued on this device</h2>
+          <p role="status">
+            <strong>
+              {queued.status === 'queued' && 'Waiting to send.'}
+              {queued.status === 'syncing' && 'Sending now…'}
+              {queued.status === 'failed' && 'Could not send.'}
+            </strong>
+          </p>
+          <p className="muted">
+            Saved {formatTime(queued.createdAt)} · attempt {queued.attempts}
+            {queued.receipt ? ' · text received; photos still pending' : ' · not yet received by server'}
+          </p>
+          {queued.lastError && <p className="notice notice-danger" role="alert">{queued.lastError}</p>}
+          {queued.status === 'failed' && (
+            <button type="button" className="btn btn-secondary" onClick={() => void retryQueued(queued.id)}>
+              Retry sending
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary" onClick={() => void discardQueued(queued.id)}>
+            Discard saved report
+          </button>
         </div>
       )}
 
@@ -431,11 +544,16 @@ export function ReportPage() {
             <button
               type="submit"
               className="btn"
-              disabled={submitState === 'submitting' || photosBusy}
+              disabled={submitState === 'submitting' || photosBusy || Boolean(queued)}
               aria-busy={submitState === 'submitting' || photosBusy}
             >
               {submitState === 'submitting' ? 'Submitting…' : photosBusy ? 'Uploading photos…' : 'Submit observation'}
             </button>
+            {queued && (
+              <p className="field-hint">
+                Send or discard the saved report above before starting another.
+              </p>
+            )}
           </div>
         </div>
 
@@ -458,8 +576,8 @@ export function ReportPage() {
             </span>
           </label>
           <p id="photos-hint" className="field-hint">
-            Photos stay on this device until you submit. They upload only after the server issues your
-            tracking code, and a failed upload can be retried.
+            Photos stay on this device until they are accepted by the server. They upload only after the
+            server issues your tracking code; if you are offline, they wait with the saved report.
           </p>
           {photoError && <p className="notice notice-danger" role="alert">{photoError}</p>}
           {photos.length > 0 && (

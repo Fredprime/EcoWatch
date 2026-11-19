@@ -12,6 +12,8 @@ export interface ErrorResponse {
   field?: string | null;
   details: ApiErrorDetail[];
   requestId?: string;
+  category?: 'permanent' | 'transient';
+  retryAfterSeconds?: number | null;
 }
 
 export interface CursorPage<T> {
