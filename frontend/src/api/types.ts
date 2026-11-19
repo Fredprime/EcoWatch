@@ -299,3 +299,246 @@ export interface JobSummaryResponse {
   totalDead: number;
   byType: JobTypeSummary[];
 }
+
+/** Phase 3 read DTOs (ADR-037). Geometry WKT and storage keys are server metadata. */
+
+export interface EnvironmentalEntityResponse {
+  id: string;
+  organisationId: string;
+  entityType: string;
+  name: string;
+  description: string | null;
+  geometry: string | null;
+  crs: string;
+  parentEntityId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EnvironmentalRelationshipResponse {
+  id: string;
+  organisationId: string;
+  relationshipType: string;
+  fromEntityId: string | null;
+  fromObservationId: string | null;
+  toEntityId: string | null;
+  toObservationId: string | null;
+  spatialScope: string | null;
+  temporalStartAt: string | null;
+  temporalEndAt: string | null;
+  evidenceSummary: string;
+  supportingEvidenceAssetIds: string[];
+  methodName: string;
+  methodVersion: string;
+  uncertainty: string;
+  uncertaintyNote: string;
+  alternativeExplanations: string;
+  reviewState: string;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface AnalysisRunResponse {
+  id: string;
+  organisationId: string;
+  caseId: string | null;
+  question: string;
+  analysisType: string;
+  methodName: string;
+  methodVersion: string;
+  parameters: Record<string, unknown>;
+  inputDatasetVersionIds: string[];
+  crs: string;
+  qualityMaskNotes: string | null;
+  seasonalContext: string | null;
+  limitations: string;
+  status: string;
+  requestedByUserId: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  failureReason: string | null;
+  createdAt: string;
+}
+
+export interface AnalysisOutputResponse {
+  id: string;
+  analysisRunId: string;
+  outputType: string;
+  summary: string;
+  storageKey: string | null;
+  isDerived: boolean;
+  derivedFromObservationIds: string[];
+  interpretationState: string;
+  limitations: string;
+  createdAt: string;
+}
+
+export interface DatasetResponse {
+  id: string;
+  organisationId: string;
+  name: string;
+  description: string | null;
+  owner: string;
+  licence: string;
+  attribution: string;
+  permittedUse: string;
+  crs: string;
+  coverageStartAt: string | null;
+  coverageEndAt: string | null;
+  coverageGeometry: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DatasetVersionResponse {
+  id: string;
+  datasetId: string;
+  versionLabel: string;
+  sourceAcquisitionAt: string;
+  resolution: string;
+  crs: string;
+  method: string;
+  limitations: string | null;
+  qualityNotes: string | null;
+  licenceSnapshot: string;
+  attributionSnapshot: string;
+  permittedUseSnapshot: string;
+  checksum: string | null;
+  storageKey: string | null;
+  createdAt: string;
+}
+
+export interface PrioritisationAssessmentResponse {
+  id: string;
+  organisationId: string;
+  caseId: string;
+  assessmentAt: string;
+  methodName: string;
+  methodVersion: string;
+  factors: Record<string, unknown>;
+  missingInputs: string[];
+  compositeRank: number | null;
+  rankingMethodRef: string | null;
+  rankIsNotSeverity: boolean | null;
+  decision: string | null;
+  decisionRationale: string | null;
+  decidedByUserId: string | null;
+  reviewerUserId: string | null;
+  decidedAt: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InterventionResponse {
+  id: string;
+  organisationId: string;
+  caseId: string;
+  additionalCaseIds: string[];
+  objective: string;
+  rationale: string | null;
+  responsibleOrganisationId: string;
+  authorisedLeadUserId: string;
+  approvalReference: string | null;
+  location: string | null;
+  affectedAreaNotes: string | null;
+  plannedStartAt: string | null;
+  plannedEndAt: string | null;
+  actualStartAt: string | null;
+  actualEndAt: string | null;
+  status: string;
+  resourcesNotes: string | null;
+  intendedOutcome: string | null;
+  baselineSummary: string | null;
+  risks: string | null;
+  limitations: string | null;
+  followUpSchedule: string | null;
+  indicatorDefinitionIds: string[];
+  verificationAssessmentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MilestoneResponse {
+  id: string;
+  interventionId: string;
+  name: string;
+  description: string | null;
+  plannedAt: string | null;
+  completedAt: string | null;
+  status: string;
+  evidenceAssetIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IndicatorResponse {
+  id: string;
+  organisationId: string;
+  unitId: string;
+  code: string;
+  name: string;
+  domain: string;
+  description: string | null;
+  methodName: string;
+  methodVersion: string;
+  criteriaVersion: string | null;
+  approvedByUserId: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MeasurementResponse {
+  id: string;
+  organisationId: string;
+  indicatorDefinitionId: string;
+  unitId: string;
+  interventionId: string | null;
+  caseId: string | null;
+  observationId: string | null;
+  measuredAt: string;
+  value: number | null;
+  qualifier: string;
+  detectionLimit: number | null;
+  methodName: string;
+  methodVersion: string;
+  qualityControls: string | null;
+  uncertaintyNote: string | null;
+  source: string | null;
+  createdAt: string;
+}
+
+export interface VerificationAssessmentResponse {
+  id: string;
+  organisationId: string;
+  interventionId: string;
+  baselineMeasurementIds: string[];
+  followUpMeasurementIds: string[];
+  comparisonMethod: string;
+  conclusion: string;
+  status: string;
+  confounders: string | null;
+  seasonalityNotes: string | null;
+  uncertaintyNote: string | null;
+  criteriaVersion: string | null;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublicationResponse {
+  id: string;
+  organisationId: string;
+  verificationAssessmentId: string | null;
+  caseId: string | null;
+  publishedText: string;
+  approvedByUserId: string;
+  approvedRole: string;
+  approvedAt: string;
+  retractedAt: string | null;
+  retractionReason: string | null;
+  createdAt: string;
+}
