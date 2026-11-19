@@ -34,9 +34,10 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
     const background = token('--color-surface-alt', '#e9eee8');
     const accent = token('--color-accent', '#1f6f8b');
 
+    const configuredStyleUrl = import.meta.env.VITE_MAP_STYLE_URL?.trim();
     const map = new maplibregl.Map({
       container: host,
-      style: {
+      style: configuredStyleUrl || {
         version: 8 as const,
         sources: {},
         layers: [

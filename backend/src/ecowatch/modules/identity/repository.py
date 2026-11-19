@@ -1,11 +1,12 @@
 """SQLAlchemy repository for users, organisations, and memberships."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from ecowatch.core.models import utc_now
 from ecowatch.core.pagination import paginate_descending
 from ecowatch.modules.identity.models import Membership, Organisation, RevokedToken, User
 
@@ -38,6 +39,16 @@ class IdentityRepository:
         self._session.add(record)
         self._session.flush()
         return record
+
+    def purge_expired_revoked_tokens(self, now: datetime | None = None) -> int:
+        """Delete expired rows from revoked_tokens and return removed row count."""
+        cutoff = now or utc_now()
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.replace(tzinfo=UTC)
+        result = self._session.execute(
+            delete(RevokedToken).where(RevokedToken.expiresAt < cutoff)
+        )
+        return int(result.rowcount or 0)
 
     def create_user(
         self,

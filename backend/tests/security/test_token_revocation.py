@@ -1,10 +1,13 @@
 """Security tests for server-side bearer token revocation on logout."""
 
+import uuid
+from datetime import UTC, datetime, timedelta
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from ecowatch.core.security import hash_password
-from ecowatch.modules.identity.models import User
+from ecowatch.modules.identity.models import RevokedToken, User
 
 
 def test_logout_revokes_token_server_side(
@@ -51,3 +54,40 @@ def test_logout_revokes_token_server_side(
         ).status_code
         == 200
     )
+
+
+def test_logout_prunes_expired_revoked_tokens(
+    client: TestClient, dbSession: Session
+) -> None:
+    user = User(
+        email="prune_test@ecowatch.test",
+        displayName="Prune User",
+        passwordHash=hash_password("StrongPass123!"),
+        isActive=True,
+    )
+    dbSession.add(user)
+    dbSession.flush()
+
+    expiredId = uuid.uuid4()
+    dbSession.add(
+        RevokedToken(
+            tokenId=expiredId,
+            userId=user.id,
+            revokedAt=datetime.now(UTC) - timedelta(days=2),
+            expiresAt=datetime.now(UTC) - timedelta(days=1),
+        )
+    )
+    dbSession.commit()
+
+    loginResp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "prune_test@ecowatch.test", "password": "StrongPass123!"},
+    )
+    assert loginResp.status_code == 200
+    token = loginResp.json()["accessToken"]
+
+    logoutResp = client.post(
+        "/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert logoutResp.status_code == 200
+    assert dbSession.get(RevokedToken, expiredId) is None

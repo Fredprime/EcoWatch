@@ -104,6 +104,7 @@ class IdentityService:
             )
         expiresAt = datetime.fromtimestamp(claims.expiresAt, tz=UTC)
         self._repo.revoke_token(claims.tokenId, claims.userId, expiresAt)
+        self._repo.purge_expired_revoked_tokens()
         record_audit_event(
             self._session,
             actorUserId=principal.userId,

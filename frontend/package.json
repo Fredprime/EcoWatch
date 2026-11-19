@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "./node_modules/.bin/esbuild tests/frontend_core.test.ts --bundle --platform=node --format=esm --outfile=.test-dist/frontend_core.test.mjs && node --test .test-dist/frontend_core.test.mjs",
+    "test": "./node_modules/.bin/esbuild tests/frontend_core.test.ts --bundle --platform=node --format=esm --jsx=automatic --packages=external --outfile=.test-dist/frontend_core.test.mjs && node --test .test-dist/frontend_core.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
