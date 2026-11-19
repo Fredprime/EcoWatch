@@ -28,6 +28,16 @@ make reset       # stop, delete local data
 
 No compose provider? `pipx install podman-compose`. Same `compose.yaml` works with `podman-compose`, `podman compose`, or `docker compose`.
 
+### Run the whole system
+
+Once the venv and frontend dependencies are installed (`.venv/bin/pip install -e "backend[dev]"` and `cd frontend && npm ci`):
+
+```bash
+make dev
+```
+
+This starts the database, applies Alembic migrations, then runs the API with its job worker enabled and the Vite frontend. The API serves on `127.0.0.1:8000` and the frontend on `127.0.0.1:5173`; a phone-check tunnel can keep pointing at 5173. Ctrl-C stops the API and frontend but leaves the database up (`make down`). The worker is enabled through `ECOWATCH_WORKER_ENABLED=true` in `.env` and exported by `scripts/dev.sh`; without it, jobs queue but never run. A separate worker process can be used instead by disabling it in `.env`.
+
 ## Branches
 
 | Branch | Role |

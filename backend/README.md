@@ -31,11 +31,13 @@ make up
 cd backend && ../.venv/bin/alembic upgrade head && cd ..
 ```
 
-Run the API and optional background worker:
+Run the API with its background worker enabled (jobs queue but never run without this):
 
 ```bash
-.venv/bin/uvicorn ecowatch.main:app --app-dir backend/src --reload
+ECOWATCH_WORKER_ENABLED=true .venv/bin/uvicorn ecowatch.main:app --app-dir backend/src --reload
 ```
+
+From the repository root, `make dev` starts the database, applies migrations, and runs both the API + worker and the frontend in one command.
 
 Run lint and tests:
 
