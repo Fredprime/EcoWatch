@@ -2,11 +2,12 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.orm import Session
 
 from ecowatch.api.dependencies import get_request_id, require_permission
 from ecowatch.core.database import get_db
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.intelligence.schemas import (
     AnalysisOutputResponse,
@@ -113,3 +114,61 @@ def check_prediction_gate(
     """Check prediction release preconditions; no prediction is produced here."""
     IntelligenceService(db).request_prediction(principal, **payload.model_dump())
     return PredictionCheckResponse(allowed=True)
+
+
+@router.get("/entities", response_model=CursorPage[EntityResponse])
+def list_entities(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[EntityResponse]:
+    """List environmental entities visible within the caller's organisations."""
+    return IntelligenceService(db).list_entities(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
+
+
+@router.get("/relationships", response_model=CursorPage[RelationshipResponse])
+def list_relationships(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[RelationshipResponse]:
+    """List relationships with their recorded review state (decision support only)."""
+    return IntelligenceService(db).list_relationships(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
+
+
+@router.get("/analyses", response_model=CursorPage[AnalysisRunResponse])
+def list_analysis_runs(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[AnalysisRunResponse]:
+    """List analysis runs; status is a processing state, not an environmental finding."""
+    return IntelligenceService(db).list_analysis_runs(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
+
+
+@router.get(
+    "/analyses/{analysisRunId}/outputs", response_model=CursorPage[AnalysisOutputResponse]
+)
+def list_analysis_outputs(
+    analysisRunId: uuid.UUID = Path(),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[AnalysisOutputResponse]:
+    """List derived outputs of one in-scope analysis run, awaiting human interpretation."""
+    return IntelligenceService(db).list_analysis_outputs(
+        principal, analysisRunId, cursor=cursor, limit=limit
+    )
