@@ -6,12 +6,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 
 from ecowatch.api.router import apiRouter
 from ecowatch.core.config import Settings, get_settings
 from ecowatch.core.database import get_session_factory
 from ecowatch.core.errors import register_exception_handlers
 from ecowatch.core.logging import RequestIdMiddleware, configure_logging
+from ecowatch.core.middleware import RequestLimitsAndHeadersMiddleware
 from ecowatch.core.storage import LocalFilesystemStorage
 from ecowatch.modules.jobs.worker import worker_loop
 
@@ -53,6 +55,8 @@ def create_app(settingsOverride: Settings | None = None) -> FastAPI:
         debug=settings.debug,
         lifespan=lifespan,
     )
+    application.add_middleware(RequestLimitsAndHeadersMiddleware, settings=settings)
+    application.add_middleware(GZipMiddleware, minimum_size=settings.gzipMinimumSize)
     application.add_middleware(RequestIdMiddleware, logger=logger)
     register_exception_handlers(application)
     application.include_router(apiRouter)

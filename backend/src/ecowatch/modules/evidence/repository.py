@@ -58,6 +58,22 @@ class EvidenceRepository:
         )
         return list(self._session.scalars(stmt).all())
 
+    def list_derivatives_for_assets(
+        self, parentAssetIds: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[AssetDerivative]]:
+        """Batch-load derivatives for multiple assets to prevent N+1 queries."""
+        if not parentAssetIds:
+            return {}
+        stmt = (
+            select(AssetDerivative)
+            .where(AssetDerivative.parentAssetId.in_(parentAssetIds))
+            .order_by(AssetDerivative.createdAt.asc())
+        )
+        grouped: dict[uuid.UUID, list[AssetDerivative]] = {aid: [] for aid in parentAssetIds}
+        for derivative in self._session.scalars(stmt).all():
+            grouped.setdefault(derivative.parentAssetId, []).append(derivative)
+        return grouped
+
     def create_derivative(self, **fields: Any) -> AssetDerivative:
         derivative = AssetDerivative(**fields)
         self._session.add(derivative)

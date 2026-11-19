@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ecowatch.core.config import Settings, get_settings
 from ecowatch.core.database import get_db
 from ecowatch.core.errors import DomainError, ErrorCode
+from ecowatch.core.rate_limit import check_and_increment_limit
 from ecowatch.core.security import AuthProvider, LocalTokenAuthProvider
 from ecowatch.core.storage import LocalFilesystemStorage, StorageProvider
 from ecowatch.modules.identity.permissions import Permission, Principal, Role, SystemRole
@@ -111,5 +112,39 @@ def require_permission(permission: Permission) -> Callable[[Principal], Principa
             f"Missing required permission: {permission.value}",
             statusCode=status.HTTP_403_FORBIDDEN,
         )
+
+    return _dependency
+
+
+def rate_limit_dependency(
+    scope: str,
+    maxAttemptsAttr: str,
+    windowSecondsAttr: str,
+) -> Callable[..., None]:
+    """Build a FastAPI dependency enforcing DB-backed rate limits by user or client IP."""
+
+    def _dependency(
+        request: Request,
+        principal: Principal = Depends(get_optional_principal),
+        db: Session = Depends(get_db),
+        settings: Settings = Depends(get_settings),
+    ) -> None:
+        actorKey = (
+            f"user:{principal.userId}"
+            if principal.isAuthenticated and principal.userId is not None
+            else f"ip:{request.client.host if request.client else 'unknown'}"
+        )
+        bucketKey = f"rl:{scope}:{actorKey}"
+        try:
+            check_and_increment_limit(
+                db,
+                bucketKey,
+                maxAttempts=getattr(settings, maxAttemptsAttr),
+                windowSeconds=getattr(settings, windowSecondsAttr),
+            )
+            db.commit()
+        except DomainError:
+            db.commit()
+            raise
 
     return _dependency

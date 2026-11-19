@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import random
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -58,12 +59,23 @@ def run_once(
         job = repo.get_by_id(claimed.id)
         if job is None:
             continue
+        started = time.perf_counter()
         try:
             _execute_job(session, storage, job)
             job.status = JobStatus.PROCESSED.value
             job.completedAt = utc_now()
             job.lastError = None
             session.commit()
+            _logger.info(
+                "job_processed",
+                extra={
+                    "structured": {
+                        "jobId": str(job.id),
+                        "jobType": job.jobType,
+                        "durationMs": round((time.perf_counter() - started) * 1000, 2),
+                    }
+                },
+            )
         except Exception as exc:
             session.rollback()
             failedJob = repo.get_by_id(claimed.id)
@@ -77,14 +89,16 @@ def run_once(
             if failedJob.attempts >= effectiveLimit:
                 failedJob.status = JobStatus.DEAD.value
                 failedJob.completedAt = currentTime
+                eventName = "job_dead_lettered"
             else:
                 backoff = min(300.0, float(2 ** min(failedJob.attempts, 8)))
                 jitter = random.uniform(0.0, 1.0)
                 failedJob.status = JobStatus.FAILED.value
                 failedJob.availableAt = currentTime + timedelta(seconds=backoff + jitter)
+                eventName = "job_failed"
             session.commit()
             _logger.warning(
-                "job_failed",
+                eventName,
                 extra={
                     "structured": {
                         "jobId": str(failedJob.id),

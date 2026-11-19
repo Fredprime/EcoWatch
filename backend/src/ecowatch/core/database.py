@@ -15,6 +15,11 @@ def build_engine(settings: Settings | None = None) -> Engine:
     if not cfg.databaseUrl.startswith("sqlite"):
         engineKwargs["pool_size"] = cfg.dbPoolSize
         engineKwargs["max_overflow"] = cfg.dbMaxOverflow
+        engineKwargs["pool_timeout"] = cfg.dbPoolTimeoutSeconds
+        engineKwargs["pool_recycle"] = cfg.dbPoolRecycleSeconds
+        engineKwargs["connect_args"] = {
+            "options": f"-c statement_timeout={cfg.dbStatementTimeoutMs}"
+        }
     return create_engine(cfg.databaseUrl, **engineKwargs)
 
 

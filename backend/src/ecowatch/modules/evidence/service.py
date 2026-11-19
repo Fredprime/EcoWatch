@@ -66,9 +66,17 @@ class EvidenceService:
         return obs
 
     def _to_asset_response(
-        self, asset: EvidenceAsset, *, idempotentReplay: bool = False
+        self,
+        asset: EvidenceAsset,
+        *,
+        derivatives: list[AssetDerivative] | None = None,
+        idempotentReplay: bool = False,
     ) -> EvidenceAssetResponse:
-        derivatives = self._repo.list_derivatives_for_asset(asset.id)
+        resolvedDerivatives = (
+            self._repo.list_derivatives_for_asset(asset.id)
+            if derivatives is None
+            else derivatives
+        )
         return EvidenceAssetResponse(
             id=asset.id,
             observationId=asset.observationId,
@@ -85,7 +93,9 @@ class EvidenceService:
             accessClass=AccessClass(asset.accessClass),
             receivedAt=asset.receivedAt,
             createdAt=asset.createdAt,
-            derivatives=[AssetDerivativeResponse.model_validate(d) for d in derivatives],
+            derivatives=[
+                AssetDerivativeResponse.model_validate(d) for d in resolvedDerivatives
+            ],
             idempotentReplay=idempotentReplay,
         )
 
@@ -451,4 +461,8 @@ class EvidenceService:
                 statusCode=status.HTTP_404_NOT_FOUND,
             )
         assets = self._repo.list_assets_for_observation(obs.id)
-        return [self._to_asset_response(asset) for asset in assets]
+        derivativesByAsset = self._repo.list_derivatives_for_assets([a.id for a in assets])
+        return [
+            self._to_asset_response(asset, derivatives=derivativesByAsset.get(asset.id, []))
+            for asset in assets
+        ]

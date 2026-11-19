@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ecowatch.api.dependencies import (
     get_current_principal,
     get_request_id,
+    rate_limit_dependency,
     require_permission,
 )
 from ecowatch.core.database import get_db
@@ -27,6 +28,13 @@ router = APIRouter(tags=["notifications"])
     "/observations/{observationId}/clarifications",
     response_model=ClarificationRequestResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(
+            rate_limit_dependency(
+                "messaging", "messagingRateLimit", "messagingWindowSeconds"
+            )
+        )
+    ],
 )
 def create_clarification(
     payload: CreateClarificationRequest,
