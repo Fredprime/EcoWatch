@@ -5,7 +5,11 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
-from ecowatch.api.dependencies import get_request_id, require_permission
+from ecowatch.api.dependencies import (
+    get_request_id,
+    rate_limit_dependency,
+    require_permission,
+)
 from ecowatch.core.database import get_db
 from ecowatch.modules.correlation.schemas import (
     CorrelationClusterResponse,
@@ -35,6 +39,15 @@ def list_suggestions(
     "/observations/{observationId}/scan",
     response_model=CorrelationScanResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[
+        Depends(
+            rate_limit_dependency(
+                "correlation_scan",
+                "expensiveEndpointRateLimit",
+                "expensiveEndpointWindowSeconds",
+            )
+        )
+    ],
 )
 def scan_observation(
     observationId: uuid.UUID,

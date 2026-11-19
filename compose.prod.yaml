@@ -1,0 +1,28 @@
+# Production compose template: keeps PostgreSQL on a private internal network
+# with zero host ports exposed to the internet.
+services:
+  db:
+    build: .
+    container_name: ecowatch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-ecowatch}
+    networks:
+      - backend_private
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  backend_private:
+    driver: bridge
+    internal: true
+
+volumes:
+  db-data:

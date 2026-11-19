@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ecowatch.api.dependencies import (
     get_current_principal,
     get_request_id,
+    rate_limit_dependency,
     require_permission,
 )
 from ecowatch.core.database import get_db
@@ -219,7 +220,19 @@ def cross_case(
     return CaseService(db).cross_case(principal, payload, requestId=requestId)
 
 
-@router.get("/public/cases", response_model=CursorPage[PublicCaseResponse])
+@router.get(
+    "/public/cases",
+    response_model=CursorPage[PublicCaseResponse],
+    dependencies=[
+        Depends(
+            rate_limit_dependency(
+                "public_cases",
+                "publicApiBurstLimit",
+                "publicApiBurstWindowSeconds",
+            )
+        )
+    ],
+)
 def list_public_cases(
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
@@ -229,7 +242,19 @@ def list_public_cases(
     return CaseService(db).list_public_cases(cursor=cursor, limit=limit)
 
 
-@router.get("/public/cases/{caseId}", response_model=PublicCaseResponse)
+@router.get(
+    "/public/cases/{caseId}",
+    response_model=PublicCaseResponse,
+    dependencies=[
+        Depends(
+            rate_limit_dependency(
+                "public_cases",
+                "publicApiBurstLimit",
+                "publicApiBurstWindowSeconds",
+            )
+        )
+    ],
+)
 def get_public_case(
     caseId: uuid.UUID = Path(),
     db: Session = Depends(get_db),
