@@ -160,3 +160,15 @@ Do not erase a superseded decision. Add a new record and explain why the decisio
 - **Rationale:** Minimal, DB-backed revocation using the existing PostgreSQL store avoids adding Redis while closing the post-logout token replay window.
 - **Affected documents:** `docs/20_Technical_Decision_Records.md`, `docs/PROJECT_TRACKING.md`, `docs/REVIEW_SUMMARY.md`.
 - **Review date:** 2026-12-19.
+
+### ADR-040 — Dedicated Phase 3 `*_READ` permissions
+
+- **ID:** ADR-040
+- **Title:** Dedicated `*_READ` permissions for Phase 3 read APIs
+- **Date:** 2026-11-19
+- **Status:** Approved
+- **Context:** ADR-037 gated the 13 Phase 3 GET endpoints with each module's `*_WRITE` permission as a temporary proxy, which prevented roles such as `reviewer` (holding `INTELLIGENCE_REVIEW` without `INTELLIGENCE_WRITE`) from listing intelligence records.
+- **Decision:** Add five dedicated read permissions (`CATALOGUE_READ`, `INTELLIGENCE_READ`, `PRIORITISATION_READ`, `INTERVENTION_READ`, `VERIFICATION_READ`) to `Permission`, grant them to the appropriate staff roles in `ROLE_PERMISSIONS` (never to anonymous or `registered_contributor`), and update all 13 Phase 3 GET routes and service `require_read_org_ids` calls to gate on `*_READ` instead of `*_WRITE`.
+- **Rationale:** Separates read access from mutation authority in line with least privilege while keeping all org-scoping and `CursorPage` semantics from ADR-037 unchanged.
+- **Affected documents:** `docs/20_Technical_Decision_Records.md`, `docs/PERMISSIONS_MATRIX.md`, `docs/PROJECT_TRACKING.md`.
+- **Review date:** 2026-12-19.

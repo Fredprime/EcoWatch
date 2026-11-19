@@ -92,7 +92,7 @@ def list_interventions(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.INTERVENTION_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INTERVENTION_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[InterventionResponse]:
     """List interventions with their recorded status and accountable owner."""
@@ -108,7 +108,7 @@ def list_milestones(
     interventionId: uuid.UUID = Path(),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.INTERVENTION_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INTERVENTION_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[MilestoneResponse]:
     """List delivery milestones of one in-scope intervention."""

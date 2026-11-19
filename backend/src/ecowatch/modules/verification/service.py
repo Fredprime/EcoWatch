@@ -428,7 +428,7 @@ class VerificationService:
         limit: int = 50,
     ) -> CursorPage[IndicatorResponse]:
         """List approved indicator definitions with their documented criteria."""
-        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_READ)
         stmt = scope_statement(
             select(models.IndicatorDefinition),
             models.IndicatorDefinition,
@@ -453,7 +453,7 @@ class VerificationService:
         limit: int = 50,
     ) -> CursorPage[MeasurementResponse]:
         """List qualified measurements, never filling in censored values."""
-        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_READ)
         stmt = scope_statement(
             select(models.IndicatorMeasurement),
             models.IndicatorMeasurement,
@@ -478,7 +478,7 @@ class VerificationService:
         limit: int = 50,
     ) -> CursorPage[AssessmentResponse]:
         """List outcome assessments; only an authorised human sets recovery verified."""
-        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_READ)
         stmt = scope_statement(
             select(models.VerificationAssessment),
             models.VerificationAssessment,
@@ -503,7 +503,7 @@ class VerificationService:
         limit: int = 50,
     ) -> CursorPage[PublicationResponse]:
         """List approved public text with its retraction state, not public-facing output."""
-        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_READ)
         stmt = scope_statement(
             select(models.Publication), models.Publication, allowedOrgIds, organisationId
         )

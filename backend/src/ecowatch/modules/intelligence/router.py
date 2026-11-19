@@ -121,7 +121,7 @@ def list_entities(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[EntityResponse]:
     """List environmental entities visible within the caller's organisations."""
@@ -135,7 +135,7 @@ def list_relationships(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[RelationshipResponse]:
     """List relationships with their recorded review state (decision support only)."""
@@ -149,7 +149,7 @@ def list_analysis_runs(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[AnalysisRunResponse]:
     """List analysis runs; status is a processing state, not an environmental finding."""
@@ -165,7 +165,7 @@ def list_analysis_outputs(
     analysisRunId: uuid.UUID = Path(),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INTELLIGENCE_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[AnalysisOutputResponse]:
     """List derived outputs of one in-scope analysis run, awaiting human interpretation."""

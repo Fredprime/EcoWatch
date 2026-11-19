@@ -58,7 +58,7 @@ def list_datasets(
     organisationId: uuid.UUID | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.CATALOGUE_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.CATALOGUE_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[DatasetResponse]:
     """List datasets recorded with their licence, attribution and permitted use."""
@@ -74,7 +74,7 @@ def list_dataset_versions(
     datasetId: uuid.UUID = Path(),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    principal: Principal = Depends(require_permission(Permission.CATALOGUE_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.CATALOGUE_READ)),
     db: Session = Depends(get_db),
 ) -> CursorPage[DatasetVersionResponse]:
     """List the immutable provenance snapshots of one in-scope dataset."""

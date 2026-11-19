@@ -172,7 +172,7 @@ class CatalogueService:
         limit: int = 50,
     ) -> CursorPage[DatasetResponse]:
         """List rights-recorded datasets scoped to the caller's organisations."""
-        allowedOrgIds = read_scope(principal, Permission.CATALOGUE_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.CATALOGUE_READ)
         stmt = scope_statement(
             select(models.Dataset), models.Dataset, allowedOrgIds, organisationId
         )
@@ -194,7 +194,7 @@ class CatalogueService:
         limit: int = 50,
     ) -> CursorPage[DatasetVersionResponse]:
         """List provenance snapshots of one in-scope dataset; the parent carries scope."""
-        allowedOrgIds = read_scope(principal, Permission.CATALOGUE_WRITE)
+        allowedOrgIds = read_scope(principal, Permission.CATALOGUE_READ)
         load_scoped_parent(
             self._session,
             models.Dataset,

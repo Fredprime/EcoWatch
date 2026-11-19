@@ -60,11 +60,16 @@ class Permission(StrEnum):
     ORG_MANAGE_USERS = "org:manage_users"
     ADMIN_MANAGE_SYSTEM = "admin:manage_system"
     JOBS_READ = "jobs:read"
+    CATALOGUE_READ = "catalogue:read"
     CATALOGUE_WRITE = "catalogue:write"
+    INTELLIGENCE_READ = "intelligence:read"
     INTELLIGENCE_WRITE = "intelligence:write"
     INTELLIGENCE_REVIEW = "intelligence:review"
+    PRIORITISATION_READ = "prioritisation:read"
     PRIORITISATION_WRITE = "prioritisation:write"
+    INTERVENTION_READ = "intervention:read"
     INTERVENTION_WRITE = "intervention:write"
+    VERIFICATION_READ = "verification:read"
     VERIFICATION_WRITE = "verification:write"
     VERIFICATION_APPROVE = "verification:approve"
     PUBLICATION_WRITE = "publication:write"
@@ -103,7 +108,10 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_BASIC,
             Permission.CORRELATION_READ,
             Permission.CORRELATION_REVIEW,
+            Permission.CATALOGUE_READ,
+            Permission.INTELLIGENCE_READ,
             Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_READ,
         }
     ),
     Role.INVESTIGATOR: frozenset(
@@ -125,9 +133,14 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_CLOSE,
             Permission.CORRELATION_READ,
             Permission.CORRELATION_REVIEW,
+            Permission.CATALOGUE_READ,
+            Permission.INTELLIGENCE_READ,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_READ,
             Permission.PRIORITISATION_WRITE,
+            Permission.INTERVENTION_READ,
+            Permission.VERIFICATION_READ,
             Permission.VERIFICATION_WRITE,
         }
     ),
@@ -145,11 +158,16 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_FIELD_VERIFIED,
             Permission.CORRELATION_READ,
             Permission.CORRELATION_REVIEW,
+            Permission.CATALOGUE_READ,
             Permission.CATALOGUE_WRITE,
+            Permission.INTELLIGENCE_READ,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_READ,
             Permission.PRIORITISATION_WRITE,
+            Permission.INTERVENTION_READ,
             Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_READ,
             Permission.VERIFICATION_WRITE,
             Permission.VERIFICATION_APPROVE,
             Permission.PUBLICATION_WRITE,
@@ -162,7 +180,11 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.EVIDENCE_UPLOAD,
             Permission.EVIDENCE_READ_DERIVATIVE,
             Permission.CASE_READ,
+            Permission.CATALOGUE_READ,
+            Permission.PRIORITISATION_READ,
+            Permission.INTERVENTION_READ,
             Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_READ,
             Permission.VERIFICATION_WRITE,
         }
     ),
@@ -187,11 +209,16 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.ORG_MANAGE_USERS,
             Permission.OBS_EXPORT,
             Permission.CORRELATION_READ,
+            Permission.CATALOGUE_READ,
             Permission.CATALOGUE_WRITE,
+            Permission.INTELLIGENCE_READ,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_READ,
             Permission.PRIORITISATION_WRITE,
+            Permission.INTERVENTION_READ,
             Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_READ,
             Permission.VERIFICATION_WRITE,
             Permission.VERIFICATION_APPROVE,
             Permission.PUBLICATION_WRITE,
@@ -224,11 +251,16 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.JOBS_READ,
             Permission.CORRELATION_READ,
             Permission.CORRELATION_REVIEW,
+            Permission.CATALOGUE_READ,
             Permission.CATALOGUE_WRITE,
+            Permission.INTELLIGENCE_READ,
             Permission.INTELLIGENCE_WRITE,
             Permission.INTELLIGENCE_REVIEW,
+            Permission.PRIORITISATION_READ,
             Permission.PRIORITISATION_WRITE,
+            Permission.INTERVENTION_READ,
             Permission.INTERVENTION_WRITE,
+            Permission.VERIFICATION_READ,
             Permission.VERIFICATION_WRITE,
             Permission.VERIFICATION_APPROVE,
             Permission.PUBLICATION_WRITE,
