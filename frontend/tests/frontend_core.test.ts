@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 import { parseWkt, featuresFromWkt, allPositions } from '../src/components/wkt.ts';
 import { rolesFor, hasAnyRole, CORRELATION_REVIEW_ROLES } from '../src/auth/roles.ts';
 import { displayText, formatTime } from '../src/components/phase3Format.ts';
 import { ApiError } from '../src/api/client.ts';
 import type { AuthMeResponse } from '../src/api/types.ts';
+import { Notice } from '../src/components/Notice.tsx';
+import { EmptyState } from '../src/components/EmptyState.tsx';
+import { ActionPanel, ReadOnlyListCard, RecordPicker } from '../src/components/Phase3Views.tsx';
 
 test('parseWkt parses POINT, LINESTRING, POLYGON and rejects malformed input', () => {
   const pt = parseWkt('POINT(-1.6244 6.6885)');
@@ -87,4 +92,63 @@ test('phase3Format and ApiError preserve absence markers and error categories', 
   assert.equal(err.code, 'RATE_LIMIT_EXCEEDED');
   assert.equal(err.category, 'transient');
   assert.equal(err.retryAfterSeconds, 15);
+});
+
+test('UI components render accessible roles, labels, empty states, and tables', () => {
+  const noticeHtml = renderToStaticMarkup(
+    createElement(Notice, { variant: 'danger', role: 'alert', title: 'Error:' }, 'Denied'),
+  );
+  assert.match(noticeHtml, /role="alert"/);
+  assert.match(noticeHtml, /Error:/);
+  assert.match(noticeHtml, /Denied/);
+
+  const emptyHtml = renderToStaticMarkup(
+    createElement(EmptyState, { title: 'No records', detail: 'Nothing recorded yet.' }),
+  );
+  assert.match(emptyHtml, /No records/);
+  assert.match(emptyHtml, /Nothing recorded yet\./);
+
+  const pickerHtml = renderToStaticMarkup(
+    createElement(RecordPicker, {
+      id: 'org-pick',
+      label: 'Organisation',
+      value: 'o1',
+      onChange: () => {},
+      options: [{ value: 'o1', label: 'Org One' }],
+    }),
+  );
+  assert.match(pickerHtml, /for="org-pick"/);
+  assert.match(pickerHtml, /Org One/);
+
+  const listHtml = renderToStaticMarkup(
+    createElement(ReadOnlyListCard<{ id: string; name: string }>, {
+      title: 'Datasets',
+      state: {
+        status: 'success',
+        data: { items: [{ id: '1', name: 'River Turbidity' }], nextCursor: null, hasMore: false },
+      },
+      emptyTitle: 'None',
+      columns: [{ header: 'Name', cell: (row) => row.name }],
+      ariaLabel: 'Datasets table',
+    }),
+  );
+  assert.match(listHtml, /aria-label="Datasets table"/);
+  assert.match(listHtml, /River Turbidity/);
+
+  const actionHtml = renderToStaticMarkup(
+    createElement(
+      ActionPanel,
+      {
+        title: 'Create record',
+        submitting: false,
+        submitLabel: 'Save',
+        onSubmit: () => {},
+        statusMessage: 'Created ok',
+      },
+      createElement('input', { id: 'f1', type: 'text' }),
+    ),
+  );
+  assert.match(actionHtml, /Create record/);
+  assert.match(actionHtml, /Created ok/);
+  assert.match(actionHtml, /Save/);
 });
