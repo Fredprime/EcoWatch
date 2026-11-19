@@ -15,6 +15,7 @@ import { WORKSPACES } from './types';
 import { useAuth } from './auth/authContext';
 import { AuthProvider } from './auth/AuthProvider';
 import { PublicLayout } from './components/PublicLayout';
+import { ThemeToggle } from './components/ThemeToggle';
 import { PublicHomePage } from './pages/PublicHomePage';
 import { FaqPage } from './pages/FaqPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -183,6 +184,7 @@ function StaffLayout() {
             ) : (
               <NavLink to="/login" className="btn btn-secondary">Sign in</NavLink>
             )}
+            <ThemeToggle />
           </div>
         </header>
         <main id="main-content" className="content" tabIndex={-1}>

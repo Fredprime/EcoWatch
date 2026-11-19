@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="EcoWatch — evidence-led environmental intelligence and response platform." />
     <title>EcoWatch</title>
+    <script>
+      try {
+        var saved = localStorage.getItem('ecowatch-theme');
+        document.documentElement.dataset.theme = saved === 'dark' || saved === 'light'
+          ? saved
+          : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      } catch (_) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

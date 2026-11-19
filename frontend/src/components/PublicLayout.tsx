@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/authContext';
+import { ThemeToggle } from './ThemeToggle';
 import '../public.css';
 
 const PUBLIC_NAV = [
@@ -42,11 +43,12 @@ export function PublicLayout() {
               ))}
             </ul>
           </nav>
-          {status === 'authenticated' && (
-            <div className="public-account">
+          <div className="public-account">
+            {status === 'authenticated' && (
               <NavLink to="/workspace" className="btn btn-secondary">Staff workspace</NavLink>
-            </div>
-          )}
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
