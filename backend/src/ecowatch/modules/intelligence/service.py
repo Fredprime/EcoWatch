@@ -12,7 +12,10 @@ from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.intelligence import enums, models, rules
+from ecowatch.modules.jobs.repository import JobsRepository
 from ecowatch.modules.phase3Contracts import record_event, require_permission, require_text
+
+ANALYSIS_JOB_TYPE = "analysis.run"
 
 
 class IntelligenceService:
@@ -247,8 +250,33 @@ class IntelligenceService:
             detail={"analysisType": record.analysisType},
             requestId=requestId,
         )
+        # Keep inference out of the request: a worker advances this run through
+        # the same durable queue used by correlation and evidence scans.
+        JobsRepository(self._session).enqueue(
+            ANALYSIS_JOB_TYPE,
+            {"analysisRunId": str(record.id)},
+        )
         self._session.commit()
         return record
+
+    def mark_analysis_run_running(self, analysisRunId: UUID) -> models.AnalysisRun:
+        """Worker handler: move a queued run to running; never invent an output.
+
+        Idempotent so a retried job cannot overwrite an already-started run.
+        """
+        run = self._session.get(models.AnalysisRun, analysisRunId)
+        if run is None:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Analysis run not found.",
+                statusCode=404,
+                field="analysisRunId",
+            )
+        if run.status == enums.AnalysisStatus.QUEUED.value:
+            run.status = enums.AnalysisStatus.RUNNING.value
+            run.startedAt = utc_now()
+            self._session.flush()
+        return run
 
     def record_analysis_output(
         self,

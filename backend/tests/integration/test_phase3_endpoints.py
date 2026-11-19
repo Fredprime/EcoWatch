@@ -4,11 +4,15 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ecowatch.core.security import LocalTokenAuthProvider
+from ecowatch.core.storage import StorageProvider
 from ecowatch.modules.identity.permissions import Role
 from ecowatch.modules.intelligence.models import AnalysisRun
+from ecowatch.modules.jobs.models import JobStatus, ProcessingJob
+from ecowatch.modules.jobs.worker import run_once
 from ecowatch.modules.observations.models import Unit
 from tests.conftest import auth_headers, create_temp_org, create_temp_user
 
@@ -80,7 +84,10 @@ def test_catalogue_endpoints_create_dataset_and_version(
 
 
 def test_intelligence_endpoints_entity_relationship_analysis_and_gate(
-    client: TestClient, dbSession: Session, authProvider: LocalTokenAuthProvider
+    client: TestClient,
+    dbSession: Session,
+    authProvider: LocalTokenAuthProvider,
+    storageProvider: StorageProvider,
 ) -> None:
     organisationId, headers = _authenticate(dbSession, authProvider)
     base = "/api/v1/intelligence"
@@ -144,10 +151,25 @@ def test_intelligence_endpoints_entity_relationship_analysis_and_gate(
     runId = analysis.json()["id"]
     assert analysis.json()["status"] == "queued"
 
+    jobs = list(
+        dbSession.scalars(
+            select(ProcessingJob).where(ProcessingJob.jobType == "analysis.run")
+        ).all()
+    )
+    assert len(jobs) == 1
+    assert jobs[0].payload == {"analysisRunId": runId}
+    assert jobs[0].status == JobStatus.PENDING.value
+
+    # The worker advances the queued run; no test reaches into storage to fake it.
+    assert run_once(dbSession, storageProvider) == 1
     run = dbSession.get(AnalysisRun, uuid.UUID(runId))
     assert run is not None
-    run.status = "running"
-    dbSession.commit()
+    assert run.status == "running"
+    assert run.startedAt is not None
+    processed = dbSession.get(ProcessingJob, jobs[0].id)
+    assert processed is not None
+    assert processed.status == JobStatus.PROCESSED.value
+    assert processed.lastError is None
 
     output = client.post(
         f"{base}/analyses/{runId}/outputs",
