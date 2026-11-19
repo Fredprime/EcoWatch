@@ -10,9 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ecowatch.core.errors import DomainError, ErrorCode
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.catalogue import models, rules
+from ecowatch.modules.catalogue.schemas import DatasetResponse, DatasetVersionResponse
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.phase3Contracts import record_event, require_permission, require_text
+from ecowatch.modules.phase3Reads import list_page, load_scoped_parent, read_scope, scope_statement
 
 
 class CatalogueService:
@@ -159,3 +162,53 @@ class CatalogueService:
         )
         self._session.commit()
         return record
+
+    def list_datasets(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[DatasetResponse]:
+        """List rights-recorded datasets scoped to the caller's organisations."""
+        allowedOrgIds = read_scope(principal, Permission.CATALOGUE_WRITE)
+        stmt = scope_statement(
+            select(models.Dataset), models.Dataset, allowedOrgIds, organisationId
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.Dataset, cursor=cursor, limit=limit
+        )
+        return CursorPage[DatasetResponse](
+            items=[DatasetResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_dataset_versions(
+        self,
+        principal: Principal,
+        datasetId: UUID,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[DatasetVersionResponse]:
+        """List provenance snapshots of one in-scope dataset; the parent carries scope."""
+        allowedOrgIds = read_scope(principal, Permission.CATALOGUE_WRITE)
+        load_scoped_parent(
+            self._session,
+            models.Dataset,
+            datasetId,
+            allowedOrgIds,
+            fieldName="datasetId",
+            label="Dataset",
+        )
+        stmt = select(models.DatasetVersion).where(models.DatasetVersion.datasetId == datasetId)
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.DatasetVersion, cursor=cursor, limit=limit
+        )
+        return CursorPage[DatasetVersionResponse](
+            items=[DatasetVersionResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )

@@ -11,9 +11,12 @@ from sqlalchemy.orm import Session
 
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.interventions import enums, models, rules
+from ecowatch.modules.interventions.schemas import InterventionResponse, MilestoneResponse
 from ecowatch.modules.phase3Contracts import record_event, require_permission, require_text
+from ecowatch.modules.phase3Reads import list_page, load_scoped_parent, read_scope, scope_statement
 
 
 class InterventionsService:
@@ -241,3 +244,55 @@ class InterventionsService:
             )
         self._session.commit()
         return record
+
+    def list_interventions(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[InterventionResponse]:
+        """List interventions scoped to the caller's organisations."""
+        allowedOrgIds = read_scope(principal, Permission.INTERVENTION_WRITE)
+        stmt = scope_statement(
+            select(models.Intervention), models.Intervention, allowedOrgIds, organisationId
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.Intervention, cursor=cursor, limit=limit
+        )
+        return CursorPage[InterventionResponse](
+            items=[InterventionResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_milestones(
+        self,
+        principal: Principal,
+        interventionId: UUID,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[MilestoneResponse]:
+        """List milestones of one in-scope intervention; the parent carries scope."""
+        allowedOrgIds = read_scope(principal, Permission.INTERVENTION_WRITE)
+        load_scoped_parent(
+            self._session,
+            models.Intervention,
+            interventionId,
+            allowedOrgIds,
+            fieldName="interventionId",
+            label="Intervention",
+        )
+        stmt = select(models.InterventionMilestone).where(
+            models.InterventionMilestone.interventionId == interventionId
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.InterventionMilestone, cursor=cursor, limit=limit
+        )
+        return CursorPage[MilestoneResponse](
+            items=[MilestoneResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )

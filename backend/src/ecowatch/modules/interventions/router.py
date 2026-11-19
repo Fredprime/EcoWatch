@@ -2,11 +2,12 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.orm import Session
 
 from ecowatch.api.dependencies import get_request_id, require_permission
 from ecowatch.core.database import get_db
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.interventions.schemas import (
     AddMilestoneRequest,
@@ -84,3 +85,33 @@ def transition_intervention(
         principal, interventionId=interventionId, **payload.model_dump(), requestId=requestId
     )
     return InterventionResponse.model_validate(record)
+
+
+@router.get("/interventions", response_model=CursorPage[InterventionResponse])
+def list_interventions(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.INTERVENTION_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[InterventionResponse]:
+    """List interventions with their recorded status and accountable owner."""
+    return InterventionsService(db).list_interventions(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
+
+
+@router.get(
+    "/interventions/{interventionId}/milestones", response_model=CursorPage[MilestoneResponse]
+)
+def list_milestones(
+    interventionId: uuid.UUID = Path(),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.INTERVENTION_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[MilestoneResponse]:
+    """List delivery milestones of one in-scope intervention."""
+    return InterventionsService(db).list_milestones(
+        principal, interventionId, cursor=cursor, limit=limit
+    )
