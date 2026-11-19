@@ -11,6 +11,15 @@ const BASE = '/api/v1';
  * The idempotency key must stay the same across retries of one photo, so the
  * server can return the original asset if a response was lost in transit.
  */
+/** List stored assets and their scan/derivative state for one observation. */
+export function listObservationEvidence(
+  observationId: string,
+): Promise<EvidenceAssetResponse[]> {
+  return request<EvidenceAssetResponse[]>(
+    `${BASE}/observations/${encodeURIComponent(observationId)}/evidence`,
+  );
+}
+
 export function uploadEvidence(
   observationId: string,
   file: File,

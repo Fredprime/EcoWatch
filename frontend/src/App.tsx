@@ -12,6 +12,7 @@ import {
 } from 'react-router-dom';
 import './App.css';
 import { WORKSPACES } from './types';
+import { hasAnyRole } from './auth/roles';
 import { useAuth } from './auth/authContext';
 import { AuthProvider } from './auth/AuthProvider';
 import { PublicLayout } from './components/PublicLayout';
@@ -128,7 +129,7 @@ function StaffLayout() {
         </div>
         <nav id="primary-nav" ref={navRef} aria-label="Primary">
           <ul className="nav-list">
-            {WORKSPACES.map((ws) => (
+            {WORKSPACES.filter((ws) => hasAnyRole(me, ws.roles)).map((ws) => (
               <li key={ws.id}>
                 <NavLink
                   to={ws.path}
@@ -143,7 +144,7 @@ function StaffLayout() {
           </ul>
         </nav>
         <p className="sidebar-note">
-          Navigation lists the documented workspaces. Record access and reviewer actions are enforced server-side.
+          Navigation reflects the roles on your account. Record access and reviewer actions are enforced server-side.
         </p>
         <button type="button" className="btn btn-secondary public-return" onClick={() => navigate('/')}>
           Public site
