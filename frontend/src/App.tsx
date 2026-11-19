@@ -11,6 +11,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import './App.css';
+import { startQueueDriver } from './api/offlineQueue';
 import { WORKSPACES } from './types';
 import { hasAnyRole } from './auth/roles';
 import { useAuth } from './auth/authContext';
@@ -197,6 +198,9 @@ function StaffLayout() {
 }
 
 export default function App() {
+  // Drains locally queued reports on startup, reconnect and new enqueues.
+  useEffect(() => startQueueDriver(), []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
