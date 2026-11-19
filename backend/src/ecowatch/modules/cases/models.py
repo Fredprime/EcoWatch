@@ -66,9 +66,7 @@ class Case(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    caseCode: Mapped[str] = mapped_column(
-        "case_code", String(64), unique=True, nullable=False
-    )
+    caseCode: Mapped[str] = mapped_column("case_code", String(64), unique=True, nullable=False)
     title: Mapped[str] = mapped_column("title", String(200), nullable=False)
     summary: Mapped[str] = mapped_column("summary", Text, nullable=False)
     status: Mapped[str] = mapped_column(
@@ -78,18 +76,14 @@ class Case(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         default=CaseStatus.NEW_UNREVIEWED.value,
         index=True,
     )
-    statusRationale: Mapped[str] = mapped_column(
-        "status_rationale", Text, nullable=False
-    )
+    statusRationale: Mapped[str] = mapped_column("status_rationale", Text, nullable=False)
     areaGeometry: Mapped[Any | None] = mapped_column(
         "area_geometry", GeographyType("GEOMETRY", 4326), nullable=True
     )
     publicGeometry: Mapped[Any | None] = mapped_column(
         "public_geometry", GeographyType("GEOMETRY", 4326), nullable=True
     )
-    areaReference: Mapped[str | None] = mapped_column(
-        "area_reference", String(200), nullable=True
-    )
+    areaReference: Mapped[str | None] = mapped_column("area_reference", String(200), nullable=True)
     leadInvestigatorId: Mapped[uuid.UUID | None] = mapped_column(
         "lead_investigator_id",
         Uuid(as_uuid=True),
@@ -133,9 +127,7 @@ class Case(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     isPublicSummaryApproved: Mapped[bool] = mapped_column(
         "is_public_summary_approved", Boolean, nullable=False, default=False
     )
-    publicSummary: Mapped[str | None] = mapped_column(
-        "public_summary", Text, nullable=True
-    )
+    publicSummary: Mapped[str | None] = mapped_column("public_summary", Text, nullable=True)
     createdByUserId: Mapped[uuid.UUID] = mapped_column(
         "created_by_user_id",
         Uuid(as_uuid=True),
@@ -194,6 +186,4 @@ class CaseObservation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     isContested: Mapped[bool] = mapped_column(
         "is_contested", Boolean, nullable=False, default=False
     )
-    contestedNote: Mapped[str | None] = mapped_column(
-        "contested_note", Text, nullable=True
-    )
+    contestedNote: Mapped[str | None] = mapped_column("contested_note", Text, nullable=True)

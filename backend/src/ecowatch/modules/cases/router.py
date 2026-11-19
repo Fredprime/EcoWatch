@@ -14,14 +14,19 @@ from ecowatch.core.database import get_db
 from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.cases.models import CaseStatus
 from ecowatch.modules.cases.schemas import (
+    CaseActionResponse,
     CaseDetailResponse,
     CaseObservationResponse,
     CaseResponse,
     CreateCaseRequest,
+    CrossCaseRequest,
     FieldVerificationApprovalRequest,
     FieldVerificationApprovalResponse,
     LinkObservationRequest,
+    MergeCaseRequest,
+    PromoteToCaseRequest,
     PublicCaseResponse,
+    SplitCaseRequest,
     TimelineItemResponse,
     TransitionCaseStatusRequest,
     UpdateCaseObservationRequest,
@@ -160,6 +165,58 @@ def get_case_timeline(
 ) -> CursorPage[TimelineItemResponse]:
     """Return a chronological timeline distinguishing observation, evidence, and audit dates."""
     return CaseService(db).get_timeline(principal, caseId, cursor=cursor, limit=limit)
+
+
+@router.post(
+    "/cases/promote-from-cluster",
+    response_model=CaseActionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def promote_case_from_cluster(
+    payload: PromoteToCaseRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> CaseActionResponse:
+    """Promote a reviewed provisional cluster into a case (IV/OA/SA, org-scoped)."""
+    return CaseService(db).promote_to_case(principal, payload, requestId=requestId)
+
+
+@router.post("/cases/{caseId}/merge", response_model=CaseActionResponse)
+def merge_case(
+    payload: MergeCaseRequest,
+    caseId: uuid.UUID = Path(),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> CaseActionResponse:
+    """Move all observation links into a target case, retaining both cases (IV/OA/SA)."""
+    return CaseService(db).merge_cases(principal, caseId, payload, requestId=requestId)
+
+
+@router.post(
+    "/cases/{caseId}/split", response_model=CaseActionResponse, status_code=status.HTTP_201_CREATED
+)
+def split_case(
+    payload: SplitCaseRequest,
+    caseId: uuid.UUID = Path(),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> CaseActionResponse:
+    """Move selected observation links into a new case (IV/OA/SA, org-scoped)."""
+    return CaseService(db).split_case(principal, caseId, payload, requestId=requestId)
+
+
+@router.post("/cases/cross-case", response_model=CaseActionResponse)
+def cross_case(
+    payload: CrossCaseRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> CaseActionResponse:
+    """Move selected observation links between two cases in one organisation (IV/OA/SA)."""
+    return CaseService(db).cross_case(principal, payload, requestId=requestId)
 
 
 @router.get("/public/cases", response_model=CursorPage[PublicCaseResponse])

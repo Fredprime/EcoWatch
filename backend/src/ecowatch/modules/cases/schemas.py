@@ -272,6 +272,85 @@ class CaseDetailResponse(CaseResponse):
     observations: list[CaseObservationResponse] = Field(default_factory=list)
 
 
+class PromoteToCaseRequest(CamelModel):
+    """Promote a provisional correlation cluster into a managed case."""
+
+    clusterId: uuid.UUID
+    title: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=10000)
+    statusRationale: str = Field(
+        default="Promoted from a reviewed cluster", min_length=1, max_length=4000
+    )
+    caseCode: str | None = Field(default=None, min_length=3, max_length=64)
+    accessClass: str = Field(default="internal", min_length=1, max_length=32)
+
+    @field_validator("title", "summary", "statusRationale", "accessClass")
+    @classmethod
+    def validate_required_strings(cls, value: str) -> str:
+        return _strip_required(value)
+
+    @field_validator("caseCode")
+    @classmethod
+    def validate_optional_strings(cls, value: str | None) -> str | None:
+        return _strip_optional(value)
+
+
+class MergeCaseRequest(CamelModel):
+    """Merge a source case into a target case, moving all observation links."""
+
+    targetCaseId: uuid.UUID
+    statusRationale: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("statusRationale")
+    @classmethod
+    def validate_rationale(cls, value: str) -> str:
+        return _strip_required(value)
+
+
+class SplitCaseRequest(CamelModel):
+    """Split selected observation links out of a case into a newly created case."""
+
+    observationIds: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    title: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=10000)
+    statusRationale: str = Field(
+        default="Split from an existing case", min_length=1, max_length=4000
+    )
+    caseCode: str | None = Field(default=None, min_length=3, max_length=64)
+
+    @field_validator("title", "summary", "statusRationale")
+    @classmethod
+    def validate_required_strings(cls, value: str) -> str:
+        return _strip_required(value)
+
+    @field_validator("caseCode")
+    @classmethod
+    def validate_optional_strings(cls, value: str | None) -> str | None:
+        return _strip_optional(value)
+
+
+class CrossCaseRequest(CamelModel):
+    """Move a selected subset of observation links between two cases in one organisation."""
+
+    sourceCaseId: uuid.UUID
+    targetCaseId: uuid.UUID
+    observationIds: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    linkRationale: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("linkRationale")
+    @classmethod
+    def validate_rationale(cls, value: str) -> str:
+        return _strip_required(value)
+
+
+class CaseActionResponse(CamelModel):
+    """Result of a case-side correlation action, with the affected observation set."""
+
+    action: str
+    case: CaseDetailResponse
+    affectedObservationIds: list[uuid.UUID]
+
+
 class TimelineItemResponse(CamelModel):
     """Chronological timeline entry with explicit date semantics, precision, and source."""
 
