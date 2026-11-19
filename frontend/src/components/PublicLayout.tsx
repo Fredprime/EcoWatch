@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/authContext';
 import '../public.css';
 
@@ -16,6 +16,7 @@ const PUBLIC_NAV = [
  */
 export function PublicLayout() {
   const { status } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="public-shell">
@@ -53,12 +54,19 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
+      {location.pathname !== '/faq' && (
+        <NavLink
+          to="/faq"
+          className="public-faq-button"
+          aria-label="Frequently asked questions"
+          title="Frequently asked questions"
+        >
+          ?
+        </NavLink>
+      )}
+
       <footer className="public-footer">
         <div className="public-footer-inner">
-          <p>
-            Automated output is decision support only. It does not establish sources, causation or harm.
-            Published summaries are redacted and reviewed by authorised staff.
-          </p>
           <p className="public-footer-sub">Share only what is safe to share. Sensitive locations are restricted or generalised.</p>
         </div>
       </footer>

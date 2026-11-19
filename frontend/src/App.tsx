@@ -16,6 +16,8 @@ import { useAuth } from './auth/authContext';
 import { AuthProvider } from './auth/AuthProvider';
 import { PublicLayout } from './components/PublicLayout';
 import { PublicHomePage } from './pages/PublicHomePage';
+import { FaqPage } from './pages/FaqPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { PublicUpdatesPage } from './pages/PublicUpdatesPage';
 import { PublicCaseDetailPage } from './pages/PublicCaseDetailPage';
 import { TrackPage } from './pages/TrackPage';
@@ -31,16 +33,6 @@ import { PrioritisationPage } from './pages/PrioritisationPage';
 import { InterventionsPage } from './pages/InterventionsPage';
 import { VerificationPage } from './pages/VerificationPage';
 import { AdminPage } from './pages/AdminPage';
-
-function NotFoundPage() {
-  return (
-    <div className="public-page public-narrow">
-      <h1>Page not found</h1>
-      <p>The page you requested does not exist. Use the navigation above to continue.</p>
-      <p><a href="/">Return to the public home page</a></p>
-    </div>
-  );
-}
 
 /** Staff-only guard. The backend still enforces every permission independently. */
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -208,6 +200,7 @@ export default function App() {
         <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<PublicHomePage />} />
+            <Route path="/faq" element={<FaqPage />} />
             <Route path="/report" element={<ReportPage />} />
             <Route path="/track" element={<TrackPage />} />
             <Route path="/updates" element={<PublicUpdatesPage />} />

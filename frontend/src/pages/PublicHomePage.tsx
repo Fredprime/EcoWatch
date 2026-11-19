@@ -53,21 +53,6 @@ export function PublicHomePage() {
           </article>
         </div>
       </section>
-
-      <section className="public-section" aria-labelledby="public-process-title">
-        <h2 id="public-process-title">How the process works</h2>
-        <ol className="public-steps">
-          <li><strong>Collect</strong> — observations are preserved with their provenance.</li>
-          <li><strong>Analyse</strong> — explainable suggestions help reviewers find related records.</li>
-          <li><strong>Prioritise</strong> — transparent factors and human decisions guide review.</li>
-          <li><strong>Intervene</strong> — approved actions are recorded separately from outcomes.</li>
-          <li><strong>Verify</strong> — outcomes are assessed later with suitable evidence.</li>
-        </ol>
-        <p className="muted">
-          A correlation score is a ranking signal only. No step in this process declares a source, cause or
-          harm on its own.
-        </p>
-      </section>
     </div>
   );
 }

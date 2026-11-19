@@ -16,9 +16,9 @@
 .public-header-inner {
   margin: 0 auto;
   padding: var(--space-2) var(--space-5);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  flex-wrap: wrap;
   gap: var(--space-3);
 }
 
@@ -36,17 +36,18 @@
   color: var(--color-primary);
 }
 .public-brand-subtitle {
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   color: var(--color-text-muted);
 }
 
 .public-nav {
-  flex: 1 1 auto;
+  justify-self: center;
 }
 .public-nav ul {
   list-style: none;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-1);
   margin: 0;
   padding: 0;
@@ -69,12 +70,36 @@
 }
 
 .public-account {
-  margin-left: auto;
+  justify-self: end;
 }
 
 .public-main {
   flex: 1;
   width: 100%;
+}
+
+/* Floating FAQ affordance. Hidden on /faq itself so it never self-links. */
+.public-faq-button {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(24, 33, 29, 0.2);
+}
+.public-faq-button:hover {
+  background: var(--color-primary-hover);
 }
 
 .public-page {
@@ -101,6 +126,9 @@
   font-size: 1rem;
   color: var(--color-text-muted);
   max-width: 62ch;
+}
+.public-not-found p {
+  max-width: 60ch;
 }
 
 /* Full-width layouts: an intro beside the working area, not a stretched column. */
@@ -308,7 +336,8 @@
 .public-footer {
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-  padding: var(--space-4) var(--space-5);
+  /* Extra bottom room keeps the faded line clear of the fixed FAQ button. */
+  padding: var(--space-4) var(--space-5) calc(var(--space-4) + 3rem);
 }
 .public-footer-inner {
   margin: 0 auto;
@@ -340,8 +369,17 @@
   .public-cards {
     grid-template-columns: 1fr;
   }
+  /* Below desktop the tabs wrap to their own centred row. */
+  .public-header-inner {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .public-nav {
+    order: 3;
+    flex: 1 0 100%;
+  }
   .public-account {
-    margin-left: 0;
+    margin-left: auto;
   }
 }
 

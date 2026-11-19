@@ -14,13 +14,15 @@ Prototype frontend aligned to the EcoWatch documentation baseline in `../docs/`.
 - **Public endpoints:** anonymous intake (`POST /observations`), throttled `POST /observations/receipt-lookup` (returns only a PII-free server receipt), and approved redacted `GET /public/cases` list/detail. The report form keeps all existing fields; only wrapper, copy and spacing changed.
 - **Optional photos:** the report form has a native multi-file picker (`image/jpeg`, `image/png`, `image/webp`, 15 MB each) with local previews that are never uploaded themselves. Photos upload only after intake succeeds, through `uploadEvidence` (`POST /observations/{id}/evidence`) using the returned tracking code as `X-Tracking-Code` and `accessClass=restricted`. Uploads are sequential; each photo shows ready / uploading / uploaded / failed, with a retry for failures. "Uploaded" is shown only when the server returns an `EvidenceAssetResponse`; scan status is never presented as a finding. `client.ts` sets the JSON content type only for string bodies so multipart boundaries survive.
 - **Full-width public layout:** the public shell and page wrappers have no hard max-width; narrow-content pages use `.public-split` (intro beside form) and the report form uses `.public-report-form` (fields beside the photo panel), collapsing to one column under 1000px. Cards and text keep their own readable widths.
+- **Public FAQ and safe 404:** the home page's "How the process works" section and the output disclaimer moved to `/faq`, reachable from a fixed question-mark button at the bottom right (hidden on the FAQ page itself so it cannot self-link). The footer keeps only the faded "Share only what is safe to share" line. An unmatched route renders a generic 404 with no paths, errors, request IDs or diagnostics — those belong in administrator logs. The header tabs are centred on desktop and wrap to a centred row on smaller screens; the brand subtitle is reduced in size.
 - Baseline tokens and styles in `src/index.css` and `src/App.css`, with the lighter public theme in `src/public.css` (see `../design-system/ecowatch/MASTER.md`).
 
 ## Route map
 
 | Route | Shell | Access | Data shown |
 |---|---|---|---|
-| `/` | public | no login | service health and process overview |
+| `/` | public | no login | service health and what you can do here |
+| `/faq` | public | no login | process steps, correlation score caveats and output caveats |
 | `/report` | public | no login | anonymous observation intake, with optional photos |
 | `/track` | public | no login | tracking-code receipt lookup |
 | `/updates`, `/updates/:caseId` | public | no login | approved redacted case summaries |
