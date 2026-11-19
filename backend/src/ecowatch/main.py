@@ -32,10 +32,10 @@ def create_app(settingsOverride: Settings | None = None) -> FastAPI:
                 worker_loop(
                     get_session_factory(),
                     storage,
-                    stopEvent,
                     pollIntervalSeconds=settings.workerPollIntervalSeconds,
                     batchSize=settings.workerBatchSize,
                     maxAttempts=settings.workerMaxAttempts,
+                    stopEvent=stopEvent,
                 )
             )
         try:

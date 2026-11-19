@@ -1,6 +1,5 @@
 export type WorkspaceId =
   | 'overview'
-  | 'report'
   | 'evidence'
   | 'monitoring'
   | 'cases'
@@ -9,8 +8,6 @@ export type WorkspaceId =
   | 'interventions'
   | 'verification'
   | 'admin';
-
-export type SubmissionState = 'draft' | 'queued' | 'submitted' | 'received';
 
 export interface Workspace {
   id: WorkspaceId;
@@ -21,8 +18,7 @@ export interface Workspace {
 }
 
 export const WORKSPACES: Workspace[] = [
-  { id: 'overview', label: 'Overview', path: '/', description: 'Active cases, recent observations, assigned work and notices.', roles: ['all'] },
-  { id: 'report', label: 'Report / Collect', path: '/report', description: 'Community reporting and structured field collection.', roles: ['contributor', 'field', 'reviewer'] },
+  { id: 'overview', label: 'Overview', path: '/workspace', description: 'Recent observations and service status within your permitted scope.', roles: ['all'] },
   { id: 'evidence', label: 'Evidence Intelligence', path: '/evidence', description: 'Candidate relationships, duplicate review and evidence context.', roles: ['reviewer', 'investigator'] },
   { id: 'monitoring', label: 'Monitoring', path: '/monitoring', description: 'Maps, monitored areas, indicators and historical layers.', roles: ['specialist', 'investigator', 'reviewer'] },
   { id: 'cases', label: 'Cases', path: '/cases', description: 'Case summary, map, timeline, evidence and review history.', roles: ['investigator', 'reviewer', 'specialist'] },

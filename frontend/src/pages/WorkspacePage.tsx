@@ -15,7 +15,7 @@ export function WorkspacePage({ title, description, children }: Props) {
       </header>
       {children ?? (
         <div className="card">
-          <p className="muted">This workspace is part of the EcoWatch baseline and will be implemented in a later phase. Content, permissions, and data shown here must remain role-scoped and evidence-grounded.</p>
+          <p className="muted">No content is available for this workspace. Content, permissions, and data shown here must remain role-scoped and evidence-grounded.</p>
         </div>
       )}
     </section>
