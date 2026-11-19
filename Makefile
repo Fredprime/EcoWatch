@@ -1,6 +1,7 @@
-.PHONY: help up down reset psql logs venv lint test
+.PHONY: help dev up down reset psql logs venv lint test
 
 help:
+	@echo "dev     one command: DB + migrations + API/worker + frontend"
 	@echo "up      build and start local PostgreSQL + PostGIS + pgvector (podman)"
 	@echo "down    stop it (keeps data)"
 	@echo "reset   stop and DELETE local data"
@@ -9,6 +10,9 @@ help:
 	@echo "venv    create .venv (python3.14)"
 	@echo "lint    ruff (needs backend/)"
 	@echo "test    pytest (needs backend/)"
+
+dev:
+	scripts/dev.sh
 
 up:
 	scripts/compose.sh up -d --wait --build

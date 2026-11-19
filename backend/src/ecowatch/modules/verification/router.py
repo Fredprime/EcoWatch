@@ -2,11 +2,12 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.orm import Session
 
 from ecowatch.api.dependencies import get_request_id, require_permission
 from ecowatch.core.database import get_db
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.verification.schemas import (
     AssessmentResponse,
@@ -135,3 +136,59 @@ def retract_publication(
         principal, publicationId=publicationId, **payload.model_dump(), requestId=requestId
     )
     return PublicationResponse.model_validate(record)
+
+
+@router.get("/indicators", response_model=CursorPage[IndicatorResponse])
+def list_indicators(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[IndicatorResponse]:
+    """List approved indicator definitions within the caller's organisations."""
+    return VerificationService(db).list_indicators(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
+
+
+@router.get("/measurements", response_model=CursorPage[MeasurementResponse])
+def list_measurements(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[MeasurementResponse]:
+    """List qualified measurements within the caller's organisations."""
+    return VerificationService(db).list_measurements(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
+
+
+@router.get("/assessments", response_model=CursorPage[AssessmentResponse])
+def list_assessments(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[AssessmentResponse]:
+    """List outcome assessments within the caller's organisations."""
+    return VerificationService(db).list_assessments(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )
+
+
+@router.get("/publications", response_model=CursorPage[PublicationResponse])
+def list_publications(
+    organisationId: uuid.UUID | None = Query(default=None),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.VERIFICATION_WRITE)),
+    db: Session = Depends(get_db),
+) -> CursorPage[PublicationResponse]:
+    """List approved public text records with their retraction state."""
+    return VerificationService(db).list_publications(
+        principal, organisationId=organisationId, cursor=cursor, limit=limit
+    )

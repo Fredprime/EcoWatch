@@ -6,13 +6,25 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.intelligence import enums, models, rules
+from ecowatch.modules.intelligence.schemas import (
+    AnalysisOutputResponse,
+    AnalysisRunResponse,
+    EntityResponse,
+    RelationshipResponse,
+)
+from ecowatch.modules.jobs.repository import JobsRepository
 from ecowatch.modules.phase3Contracts import record_event, require_permission, require_text
+from ecowatch.modules.phase3Reads import list_page, load_scoped_parent, read_scope, scope_statement
+
+ANALYSIS_JOB_TYPE = "analysis.run"
 
 
 class IntelligenceService:
@@ -247,8 +259,33 @@ class IntelligenceService:
             detail={"analysisType": record.analysisType},
             requestId=requestId,
         )
+        # Keep inference out of the request: a worker advances this run through
+        # the same durable queue used by correlation and evidence scans.
+        JobsRepository(self._session).enqueue(
+            ANALYSIS_JOB_TYPE,
+            {"analysisRunId": str(record.id)},
+        )
         self._session.commit()
         return record
+
+    def mark_analysis_run_running(self, analysisRunId: UUID) -> models.AnalysisRun:
+        """Worker handler: move a queued run to running; never invent an output.
+
+        Idempotent so a retried job cannot overwrite an already-started run.
+        """
+        run = self._session.get(models.AnalysisRun, analysisRunId)
+        if run is None:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Analysis run not found.",
+                statusCode=404,
+                field="analysisRunId",
+            )
+        if run.status == enums.AnalysisStatus.QUEUED.value:
+            run.status = enums.AnalysisStatus.RUNNING.value
+            run.startedAt = utc_now()
+            self._session.flush()
+        return run
 
     def record_analysis_output(
         self,
@@ -335,4 +372,109 @@ class IntelligenceService:
             validationReportRef=validationReportRef,
             representativeDataRef=representativeDataRef,
             targetDefined=targetDefined,
+        )
+
+    def list_entities(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[EntityResponse]:
+        """List environmental entities scoped to the caller's organisations."""
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        stmt = scope_statement(
+            select(models.EnvironmentalEntity),
+            models.EnvironmentalEntity,
+            allowedOrgIds,
+            organisationId,
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.EnvironmentalEntity, cursor=cursor, limit=limit
+        )
+        return CursorPage[EntityResponse](
+            items=[EntityResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_relationships(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[RelationshipResponse]:
+        """List proposed and reviewed relationships, including their review state."""
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        stmt = scope_statement(
+            select(models.EnvironmentalRelationship),
+            models.EnvironmentalRelationship,
+            allowedOrgIds,
+            organisationId,
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.EnvironmentalRelationship, cursor=cursor, limit=limit
+        )
+        return CursorPage[RelationshipResponse](
+            items=[RelationshipResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_analysis_runs(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[AnalysisRunResponse]:
+        """List queued and completed analysis runs with their method provenance."""
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        stmt = scope_statement(
+            select(models.AnalysisRun),
+            models.AnalysisRun,
+            allowedOrgIds,
+            organisationId,
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.AnalysisRun, cursor=cursor, limit=limit
+        )
+        return CursorPage[AnalysisRunResponse](
+            items=[AnalysisRunResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_analysis_outputs(
+        self,
+        principal: Principal,
+        analysisRunId: UUID,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[AnalysisOutputResponse]:
+        """List outputs of one in-scope analysis run; the parent carries the org scope."""
+        allowedOrgIds = read_scope(principal, Permission.INTELLIGENCE_WRITE)
+        load_scoped_parent(
+            self._session,
+            models.AnalysisRun,
+            analysisRunId,
+            allowedOrgIds,
+            fieldName="analysisRunId",
+            label="Analysis run",
+        )
+        stmt = select(models.AnalysisOutput).where(
+            models.AnalysisOutput.analysisRunId == analysisRunId
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.AnalysisOutput, cursor=cursor, limit=limit
+        )
+        return CursorPage[AnalysisOutputResponse](
+            items=[AnalysisOutputResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
         )

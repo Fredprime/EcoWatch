@@ -136,7 +136,9 @@ export function ReportPage() {
       item.id === photo.id ? { ...item, state: 'uploading', error: undefined } : item,
     ));
     try {
-      const asset = await uploadEvidence(observationId, photo.file, trackingCode);
+      // photo.id is a per-photo UUID assigned when picked, so a retry reuses
+      // the same key and the server cannot store the same photo twice.
+      const asset = await uploadEvidence(observationId, photo.file, trackingCode, photo.id);
       setPhotos((previous) => previous.map((item) =>
         item.id === photo.id
           ? { ...item, state: 'uploaded', error: undefined, assetId: asset.id }

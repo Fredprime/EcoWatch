@@ -11,9 +11,17 @@ from sqlalchemy.orm import Session
 
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
+from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.phase3Contracts import record_event, require_permission, require_text
+from ecowatch.modules.phase3Reads import list_page, read_scope, scope_statement
 from ecowatch.modules.verification import enums, models, rules
+from ecowatch.modules.verification.schemas import (
+    AssessmentResponse,
+    IndicatorResponse,
+    MeasurementResponse,
+    PublicationResponse,
+)
 
 
 class VerificationService:
@@ -410,3 +418,100 @@ class VerificationService:
         )
         self._session.commit()
         return record
+
+    def list_indicators(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[IndicatorResponse]:
+        """List approved indicator definitions with their documented criteria."""
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        stmt = scope_statement(
+            select(models.IndicatorDefinition),
+            models.IndicatorDefinition,
+            allowedOrgIds,
+            organisationId,
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.IndicatorDefinition, cursor=cursor, limit=limit
+        )
+        return CursorPage[IndicatorResponse](
+            items=[IndicatorResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_measurements(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[MeasurementResponse]:
+        """List qualified measurements, never filling in censored values."""
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        stmt = scope_statement(
+            select(models.IndicatorMeasurement),
+            models.IndicatorMeasurement,
+            allowedOrgIds,
+            organisationId,
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.IndicatorMeasurement, cursor=cursor, limit=limit
+        )
+        return CursorPage[MeasurementResponse](
+            items=[MeasurementResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_assessments(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[AssessmentResponse]:
+        """List outcome assessments; only an authorised human sets recovery verified."""
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        stmt = scope_statement(
+            select(models.VerificationAssessment),
+            models.VerificationAssessment,
+            allowedOrgIds,
+            organisationId,
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.VerificationAssessment, cursor=cursor, limit=limit
+        )
+        return CursorPage[AssessmentResponse](
+            items=[AssessmentResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def list_publications(
+        self,
+        principal: Principal,
+        *,
+        organisationId: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[PublicationResponse]:
+        """List approved public text with its retraction state, not public-facing output."""
+        allowedOrgIds = read_scope(principal, Permission.VERIFICATION_WRITE)
+        stmt = scope_statement(
+            select(models.Publication), models.Publication, allowedOrgIds, organisationId
+        )
+        rows, nextCursor, hasMore = list_page(
+            self._session, stmt, models.Publication, cursor=cursor, limit=limit
+        )
+        return CursorPage[PublicationResponse](
+            items=[PublicationResponse.model_validate(row) for row in rows],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
