@@ -1,75 +1,106 @@
+import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { WorkspacePage } from './WorkspacePage';
+import { EmptyState } from '../components/EmptyState';
+import { ResourceState } from '../components/ResourceState';
+import { SignInPrompt } from '../components/SignInPrompt';
+import { useAuth } from '../auth/authContext';
+import { useApiResource } from '../hooks/useApiResource';
+import { listCases } from '../api/cases';
 
-const timeline = [
-  { label: 'Event start (reported)', date: 'Approx. 2026-03 — dry season', detail: 'Reporter indicates conditions may have begun earlier; date is uncertain.' },
-  { label: 'Observed', date: '2026-04-12 09:30 local (reported)', detail: 'Community observation recorded with approximate location.' },
-  { label: 'Submitted', date: '2026-04-12 09:42 device time', detail: 'Client submission initiated; device time is not authoritative.' },
-  { label: 'Received', date: '2026-04-12 09:43:10Z server', detail: 'Durable server receipt recorded (authoritative receipt time).' },
-  { label: 'Sampling / acquisition', date: '2026-04-15', detail: 'Field sample collected by authorised contributor (example).' },
-  { label: 'Processing / analysis', date: '2026-04-18', detail: 'Derived analytical artefact linked to source inputs and method version.' },
-  { label: 'Intervention milestone', date: 'Pending', detail: 'Approved actions recorded separately from environmental outcome.' },
-];
+function formatTime(value: string | null | undefined): string {
+  if (!value) return 'Not provided';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
 
 export function CasesPage() {
+  const { status } = useAuth();
+  const [query, setQuery] = useState('');
+  const loadCases = useCallback(() => listCases(), []);
+  const cases = useApiResource(loadCases, 'cases', status === 'authenticated');
+
   return (
     <WorkspacePage
       title="Cases / Investigations"
-      description="Case workspace with evidence-grounded summary, map/geographic context, linked observations, relationships, timeline, hypotheses, gaps, and review history. Shown to authorised roles."
+      description="Case summaries within your permitted scope. Records are grounded in linked evidence and show status with its rationale."
     >
-      <div className="grid grid-2">
-        <div className="card">
-          <h2>Case summary (example)</h2>
-          <p><strong>Status:</strong> Under review</p>
-          <p><strong>Owner:</strong> Assigned investigator (role-scoped)</p>
-          <p className="muted">Summaries must be grounded in linked evidence and distinguish claims, measurements, interpretations, and model outputs. Machine-generated content must be labelled.</p>
-          <h3>Evidence gaps / next actions</h3>
-          <ul>
-            <li>Confirm location precision and permissions for sensitive coordinates.</li>
-            <li>Request additional field verification or sampling where appropriate.</li>
-            <li>Review candidate relationships and alternative explanations.</li>
-          </ul>
-        </div>
+      <div className="card">
+        <h2>Cases (list view)</h2>
+        <p className="muted">Server status is displayed as recorded; it is not an automated determination. Exact locations are not shown in this list.</p>
 
-        <div className="card">
-          <h2>Map and geographic context</h2>
-          <div className="placeholder-map" aria-label="Map placeholder">
-            <div>
-              <p><strong>Map placeholder (MapLibre proposed)</strong></p>
-              <p>Display data quality/uncertainty where relevant. Exact sensitive locations may be restricted or generalised.</p>
+        {status !== 'authenticated' ? (
+          <SignInPrompt what="Case records require an authenticated account." />
+        ) : (
+          <>
+            <div className="toolbar">
+              <div className="field">
+                <label htmlFor="case-filter">Filter this page</label>
+                <input
+                  id="case-filter"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search the current page by code, title or status"
+                  aria-describedby="case-filter-hint"
+                />
+                <p id="case-filter-hint" className="field-hint">Filters only the records already returned by the server.</p>
+              </div>
             </div>
-          </div>
-          <p className="muted" style={{ marginTop: '0.75rem' }}>A map is not the only way to understand a record. Provide list and detail views as alternatives.</p>
-        </div>
-      </div>
 
-      <div className="card">
-        <h2>Timeline</h2>
-        <p className="muted">Timelines distinguish event-start, observation, submission, receipt, acquisition, sampling, processing and intervention dates.</p>
-        <ol className="timeline">
-          {timeline.map((item) => (
-            <li key={item.label}>
-              <time>{item.date}</time>
-              <strong>{item.label}</strong>
-              <div className="muted">{item.detail}</div>
-            </li>
-          ))}
-        </ol>
-      </div>
+            <ResourceState state={cases.state}>
+              {(page) => {
+                const q = query.trim().toLowerCase();
+                const rows = q
+                  ? page.items.filter((item) =>
+                      [item.caseCode, item.title, item.status].some((value) => value.toLowerCase().includes(q)),
+                    )
+                  : page.items;
 
-      <div className="card">
-        <h2>Linked observations & evidence (placeholder)</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Source</th><th>Type</th><th>Time precision</th><th>Location precision</th><th>Relationship</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>Community report</td><td>Observation</td><td>Approximate</td><td>Approximate</td><td>Candidate (explainable) — pending review</td></tr>
-              <tr><td>Field record</td><td>Measurement</td><td>Exact</td><td>Exact (restricted)</td><td>Linked to case by reviewer</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="muted">Original observations/evidence are preserved; links do not overwrite records. Reviewer decisions are audited and reversible through new actions.</p>
+                if (rows.length === 0) {
+                  return (
+                    <EmptyState
+                      title="No cases in your permitted scope yet."
+                      detail="Cases appear here after an authorised reviewer creates them and links observations."
+                    />
+                  );
+                }
+
+                return (
+                  <>
+                    <div className="table-wrap" role="region" aria-label="Cases table" tabIndex={0}>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th scope="col">Case code</th>
+                            <th scope="col">Title</th>
+                            <th scope="col">Server status</th>
+                            <th scope="col">Last reviewed</th>
+                            <th scope="col">Updated</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((item) => (
+                            <tr key={item.id}>
+                              <th scope="row"><Link to={`/cases/${item.id}`}>{item.caseCode}</Link></th>
+                              <td>{item.title}</td>
+                              <td>{item.status.replaceAll('_', ' ')}</td>
+                              <td>{formatTime(item.lastReviewedAt)}</td>
+                              <td>{formatTime(item.updatedAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {page.hasMore && (
+                      <p className="muted">More cases exist. This view shows the first page only.</p>
+                    )}
+                  </>
+                );
+              }}
+            </ResourceState>
+          </>
+        )}
       </div>
     </WorkspacePage>
   );

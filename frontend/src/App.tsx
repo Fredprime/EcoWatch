@@ -1,29 +1,140 @@
-import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import {
+  BrowserRouter,
+  NavLink,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import './App.css';
 import { WORKSPACES } from './types';
-import { OverviewPage } from './pages/OverviewPage';
+import { useAuth } from './auth/authContext';
+import { AuthProvider } from './auth/AuthProvider';
+import { PublicLayout } from './components/PublicLayout';
+import { ThemeToggle } from './components/ThemeToggle';
+import { PublicHomePage } from './pages/PublicHomePage';
+import { FaqPage } from './pages/FaqPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { PublicUpdatesPage } from './pages/PublicUpdatesPage';
+import { PublicCaseDetailPage } from './pages/PublicCaseDetailPage';
+import { TrackPage } from './pages/TrackPage';
+import { LoginPage } from './pages/LoginPage';
 import { ReportPage } from './pages/ReportPage';
+import { OverviewPage } from './pages/OverviewPage';
 import { CasesPage } from './pages/CasesPage';
+import { CaseDetailPage } from './pages/CaseDetailPage';
 import { MonitoringPage } from './pages/MonitoringPage';
-import { SimpleWorkspace } from './pages/SimpleWorkspace';
+import { EvidencePage } from './pages/EvidencePage';
+import { AnalysisPage } from './pages/AnalysisPage';
+import { PrioritisationPage } from './pages/PrioritisationPage';
+import { InterventionsPage } from './pages/InterventionsPage';
+import { VerificationPage } from './pages/VerificationPage';
+import { AdminPage } from './pages/AdminPage';
 
-function Layout() {
+/** Staff-only guard. The backend still enforces every permission independently. */
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { status } = useAuth();
+  const location = useLocation();
+  if (status !== 'authenticated') {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+  return <>{children}</>;
+}
+
+function StaffLayout() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [authAnnouncement, setAuthAnnouncement] = useState('');
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { status, me, logout } = useAuth();
+  const previousStatus = useRef(status);
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => setMenuOpen(false));
+    return () => window.cancelAnimationFrame(id);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (previousStatus.current !== status) {
+      setAuthAnnouncement(
+        status === 'authenticated'
+          ? `Signed in${me ? ` as ${me.displayName}` : ''}.`
+          : 'Signed out.',
+      );
+      previousStatus.current = status;
+    }
+  }, [status, me]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
+
+  function focusMain() {
+    window.requestAnimationFrame(() => document.getElementById('main-content')?.focus());
+  }
+
+  function openMenu() {
+    setMenuOpen(true);
+    window.requestAnimationFrame(() => {
+      navRef.current?.querySelector<HTMLAnchorElement>('.nav-link')?.focus();
+    });
+  }
+
+  function closeMenu() {
+    setMenuOpen(false);
+    menuButtonRef.current?.focus();
+  }
+
+  function navigateFromMenu() {
+    setMenuOpen(false);
+    focusMain();
+  }
+
+  function signOut() {
+    logout();
+    setAuthAnnouncement('Signed out.');
+    navigate('/login');
+    focusMain();
+  }
+
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <aside className="sidebar" aria-label="Workspace navigation">
-        <div className="brand">
-          <p className="brand-title">EcoWatch</p>
-          <p className="brand-subtitle">Evidence-led environmental intelligence</p>
+      <p className="sr-only" role="status">{authAnnouncement}</p>
+      {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Close menu" onClick={closeMenu} />}
+      <aside className={`sidebar${menuOpen ? ' open' : ''}`} aria-label="Workspace navigation">
+        <div className="sidebar-header">
+          <div className="brand">
+            <p className="brand-title">EcoWatch</p>
+            <p className="brand-subtitle">Evidence-led environmental intelligence</p>
+          </div>
+          <button type="button" className="btn btn-secondary menu-close" onClick={closeMenu}>
+            Close
+          </button>
         </div>
-        <nav aria-label="Primary">
+        <nav id="primary-nav" ref={navRef} aria-label="Primary">
           <ul className="nav-list">
             {WORKSPACES.map((ws) => (
               <li key={ws.id}>
                 <NavLink
                   to={ws.path}
-                  end={ws.path === '/'}
+                  end={ws.path === '/workspace'}
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                  onClick={navigateFromMenu}
                 >
                   {ws.label}
                 </NavLink>
@@ -31,30 +142,53 @@ function Layout() {
             ))}
           </ul>
         </nav>
-        <p className="sidebar-note">Workspaces are role-scoped in production. Navigation shown here reflects the documented product baseline.</p>
+        <p className="sidebar-note">
+          Navigation lists the documented workspaces. Record access and reviewer actions are enforced server-side.
+        </p>
+        <button type="button" className="btn btn-secondary public-return" onClick={() => navigate('/')}>
+          Public site
+        </button>
       </aside>
 
       <div className="main">
         <header className="topbar">
-          <div>
-            <strong>Prototype frontend scaffold</strong>
-            <div className="topbar-meta">Design baseline — no backend integration, no live data.</div>
+          <div className="topbar-left">
+            <button
+              type="button"
+              ref={menuButtonRef}
+              className="btn btn-secondary menu-button icon-button"
+              aria-expanded={menuOpen}
+              aria-controls="primary-nav"
+              aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              title={menuOpen ? 'Close menu' : 'Open menu'}
+              onClick={() => (menuOpen ? closeMenu() : openMenu())}
+            >
+              <span aria-hidden="true" className="menu-dots">
+                <span></span><span></span><span></span>
+              </span>
+            </button>
+            <div>
+              <strong>EcoWatch staff workspace</strong>
+              <div className="topbar-meta">Evidence-led environmental intelligence</div>
+            </div>
           </div>
-          <div className="topbar-meta" aria-label="Role context placeholder">Role view: demo (all workspaces visible)</div>
+          <div className="topbar-account">
+            {me ? (
+              <>
+                <div>
+                  <span className="topbar-name">{me.displayName}</span>
+                  <div className="topbar-meta">Signed in</div>
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={signOut}>Sign out</button>
+              </>
+            ) : (
+              <NavLink to="/login" className="btn btn-secondary">Sign in</NavLink>
+            )}
+            <ThemeToggle />
+          </div>
         </header>
         <main id="main-content" className="content" tabIndex={-1}>
-          <Routes>
-            <Route path="/" element={<OverviewPage />} />
-            <Route path="/report" element={<ReportPage />} />
-            <Route path="/evidence" element={<SimpleWorkspace title="Evidence Intelligence" description="Candidate relationships, duplicate review and evidence context. Suggestions must be explainable, reversible, and reviewed by authorised humans." />} />
-            <Route path="/monitoring" element={<MonitoringPage />} />
-            <Route path="/cases" element={<CasesPage />} />
-            <Route path="/analysis" element={<SimpleWorkspace title="Analysis" description="Datasets, methods, outputs and interpretation. Derived artefacts are linked to source data and versions; interpretations are separate reviewed records." />} />
-            <Route path="/prioritisation" element={<SimpleWorkspace title="Prioritisation" description="Transparent factors and human review decisions. The system supports prioritisation; it does not independently decide enforcement or public-safety action." />} />
-            <Route path="/interventions" element={<SimpleWorkspace title="Interventions" description="Approved actions, owners, milestones and records. Activity completion is distinct from environmental outcome." />} />
-            <Route path="/verification" element={<SimpleWorkspace title="Verification" description="Baselines, follow-up measurements and outcome assessments. Recovery claims require suitable evidence, comparison, and qualified review." />} />
-            <Route path="/admin" element={<SimpleWorkspace title="Administration" description="Users, organisations, vocabularies, imports, audit and configuration. Access is restricted and audited in production." />} />
-          </Routes>
+          <Outlet />
         </main>
       </div>
     </div>
@@ -64,7 +198,33 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout />
+      <AuthProvider>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<PublicHomePage />} />
+            <Route path="/faq" element={<FaqPage />} />
+            <Route path="/report" element={<ReportPage />} />
+            <Route path="/track" element={<TrackPage />} />
+            <Route path="/updates" element={<PublicUpdatesPage />} />
+            <Route path="/updates/:caseId" element={<PublicCaseDetailPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+
+          <Route element={<RequireAuth><StaffLayout /></RequireAuth>}>
+            <Route path="/workspace" element={<OverviewPage />} />
+            <Route path="/cases" element={<CasesPage />} />
+            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
+            <Route path="/monitoring" element={<MonitoringPage />} />
+            <Route path="/evidence" element={<EvidencePage />} />
+            <Route path="/analysis" element={<AnalysisPage />} />
+            <Route path="/prioritisation" element={<PrioritisationPage />} />
+            <Route path="/interventions" element={<InterventionsPage />} />
+            <Route path="/verification" element={<VerificationPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

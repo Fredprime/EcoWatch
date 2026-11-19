@@ -70,13 +70,13 @@ docs(adr): record postgis decision
 
 ## 5. Local development
 
-Python 3.14, Postgres 16 + PostGIS 3.4, **podman** for containers (Docker is used only in CI).
+Python 3.14, PostgreSQL 16 + PostGIS 3.7 + pgvector, **podman** for containers (Docker is used only in CI). The DB image is built locally from the root `Dockerfile` (pgvector base + PostGIS) on first `make up`.
 
 ```bash
 cp .env.example .env          # never commit .env
 make venv                     # creates .venv
 .venv/bin/pip install -e "backend[dev]"   # once backend/ exists
-make up                       # start Postgres/PostGIS
+make up                       # build (first run) and start PostgreSQL + PostGIS + pgvector
 make psql                     # psql shell
 make down                     # stop, keep data
 make reset                    # stop and delete local data

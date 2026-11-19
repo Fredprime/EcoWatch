@@ -1,0 +1,28 @@
+import { request } from './client';
+import type { EvidenceAssetResponse } from './types';
+
+const BASE = '/api/v1';
+
+/**
+ * Upload an optional photo to an observation using the tracking code issued at intake.
+ * No account is needed; the server authorises by matching the high-entropy code.
+ * FormData carries its own multipart boundary, so client.ts must not set JSON headers.
+ */
+export function uploadEvidence(
+  observationId: string,
+  file: File,
+  trackingCode: string,
+): Promise<EvidenceAssetResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('accessClass', 'restricted');
+
+  return request<EvidenceAssetResponse>(
+    `${BASE}/observations/${encodeURIComponent(observationId)}/evidence`,
+    {
+      method: 'POST',
+      body: form,
+      headers: { 'X-Tracking-Code': trackingCode },
+    },
+  );
+}

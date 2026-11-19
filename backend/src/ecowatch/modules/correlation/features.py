@@ -51,6 +51,7 @@ class ObservationFeatures:
     location: Location | None = None
     category: str | None = None
     source_ref: str | None = None
+    embedding: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
         if not self.observation_id:

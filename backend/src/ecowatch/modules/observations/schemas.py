@@ -77,7 +77,6 @@ class ObservationPublicSummaryResponse(CamelModel):
     originalTimeWording: str | None = None
     publicLocation: GeoPointSchema | None = None
     locationPrecision: LocationPrecision
-    originalLocationWording: str | None = None
     qualityFlags: list[str]
     accessClass: AccessClass
     isHidden: bool
@@ -108,7 +107,6 @@ class ObservationPublicSummaryResponse(CamelModel):
             originalTimeWording=obs.originalTimeWording,
             publicLocation=parse_point(obs.publicLocation),
             locationPrecision=LocationPrecision(obs.locationPrecision),
-            originalLocationWording=obs.originalLocationWording,
             qualityFlags=list(obs.qualityFlags or []),
             accessClass=AccessClass(obs.accessClass),
             isHidden=obs.isHidden,
@@ -119,9 +117,10 @@ class ObservationPublicSummaryResponse(CamelModel):
 
 
 class ObservationRestrictedResponse(ObservationPublicSummaryResponse):
-    """Restricted staff/owner observation view including exact coordinates (never sources)."""
+    """Restricted staff/owner view with exact coordinates and raw location wording."""
 
     location: GeoPointSchema | None = None
+    originalLocationWording: str | None = None
     submittedByUserId: uuid.UUID | None = None
 
     @classmethod
@@ -131,6 +130,7 @@ class ObservationRestrictedResponse(ObservationPublicSummaryResponse):
         return cls(
             **base.model_dump(),
             location=parse_point(obs.location),
+            originalLocationWording=obs.originalLocationWording,
             submittedByUserId=obs.submittedByUserId,
         )
 

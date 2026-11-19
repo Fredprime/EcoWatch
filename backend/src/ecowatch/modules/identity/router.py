@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, Request, status
 from sqlalchemy.orm import Session
 
 from ecowatch.api.dependencies import (
@@ -11,6 +11,7 @@ from ecowatch.api.dependencies import (
     get_request_id,
     require_permission,
 )
+from ecowatch.core.config import Settings, get_settings
 from ecowatch.core.database import get_db
 from ecowatch.core.schemas import CursorPage
 from ecowatch.core.security import AuthProvider
@@ -34,11 +35,14 @@ router = APIRouter(tags=["identity"])
 @router.post("/auth/login", response_model=LoginResponse)
 def login(
     payload: LoginRequest,
+    request: Request,
     db: Session = Depends(get_db),
     authProvider: AuthProvider = Depends(get_auth_provider),
+    settings: Settings = Depends(get_settings),
 ) -> LoginResponse:
     """Authenticate with email and password to receive a bearer token."""
-    return IdentityService(db).login(payload, authProvider)
+    clientIp = request.client.host if request.client else "unknown"
+    return IdentityService(db, settings).login(payload, authProvider, clientIp=clientIp)
 
 
 @router.get("/auth/me", response_model=AuthMeResponse)
