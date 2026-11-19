@@ -16,7 +16,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from ecowatch.core.spatial import (
@@ -24,9 +24,11 @@ from ecowatch.core.spatial import (
     geography_to_text_expr,
     parse_point_wkt,
 )
+from ecowatch.modules.correlation.embeddings import VECTOR_MODEL_VERSION
 from ecowatch.modules.correlation.models import (
     CorrelationCluster,
     CorrelationClusterMember,
+    CorrelationEmbedding,
     CorrelationTask,
     EvidenceRelationship,
     RelationshipStatus,
@@ -36,7 +38,7 @@ from ecowatch.modules.correlation.scoring import haversine_km
 from ecowatch.modules.identity.models import Organisation
 from ecowatch.modules.observations.models import Observation
 
-METHOD_VERSION = "correlation-1"
+METHOD_VERSION = "correlation-2"
 MAX_CANDIDATES = 200
 
 _DECIDED = (
@@ -97,18 +99,105 @@ class CorrelationRepository:
         expr = geography_to_text_expr(Observation.location, self.dialect_name)
         return self._session.scalar(select(expr).where(Observation.id == observationId))
 
+    def current_embedding(self, observationId: uuid.UUID) -> CorrelationEmbedding | None:
+        """Latest stored vector for the active model version."""
+        return self._session.scalar(
+            select(CorrelationEmbedding)
+            .where(
+                CorrelationEmbedding.observationId == observationId,
+                CorrelationEmbedding.modelVersion == VECTOR_MODEL_VERSION,
+            )
+            .order_by(CorrelationEmbedding.createdAt.desc(), CorrelationEmbedding.id.desc())
+            .limit(1)
+        )
+
+    def embedding_for_observation(
+        self, observationId: uuid.UUID
+    ) -> tuple[float, ...] | None:
+        embedding = self.current_embedding(observationId)
+        return tuple(embedding.embedding) if embedding is not None and embedding.embedding else None
+
+    def store_embedding(
+        self,
+        *,
+        organisationId: uuid.UUID,
+        observationId: uuid.UUID,
+        inputHash: str,
+        embedding: tuple[float, ...],
+    ) -> CorrelationEmbedding:
+        """Insert a vector, or reuse the row when the input has not changed."""
+        existing = self._session.scalar(
+            select(CorrelationEmbedding).where(
+                CorrelationEmbedding.observationId == observationId,
+                CorrelationEmbedding.modelVersion == VECTOR_MODEL_VERSION,
+                CorrelationEmbedding.inputHash == inputHash,
+            )
+        )
+        if existing is not None:
+            return existing
+        row = CorrelationEmbedding(
+            organisationId=organisationId,
+            observationId=observationId,
+            modelVersion=VECTOR_MODEL_VERSION,
+            inputHash=inputHash,
+            embedding=list(embedding),
+        )
+        self._session.add(row)
+        self._session.flush()
+        return row
+
+    def semantic_candidate_ids(
+        self, subject: Observation, *, limit: int = MAX_CANDIDATES
+    ) -> set[uuid.UUID]:
+        """Nearest stored vectors in the same organisation, bounded by `limit`.
+
+        `shortcut: only PostgreSQL has pgvector. SQLite keeps the existing
+        time/space retrieval and the labelled keyword fallback.`
+        """
+        if self.dialect_name != "postgresql":
+            return set()
+        rows = self._session.execute(
+            text(
+                """
+                SELECT candidate.observation_id
+                FROM correlation_embeddings AS subject
+                JOIN correlation_embeddings AS candidate
+                  ON candidate.model_version = subject.model_version
+                JOIN observations AS observation
+                  ON observation.id = candidate.observation_id
+                WHERE subject.observation_id = :subjectId
+                  AND subject.model_version = :modelVersion
+                  AND candidate.observation_id <> :subjectId
+                  AND observation.organisation_id = :organisationId
+                  AND observation.is_hidden IS FALSE
+                ORDER BY subject.embedding <=> candidate.embedding
+                LIMIT :candidateLimit
+                """
+            ),
+            {
+                "subjectId": subject.id,
+                "modelVersion": VECTOR_MODEL_VERSION,
+                "organisationId": subject.organisationId,
+                "candidateLimit": limit,
+            },
+        )
+        return set(rows.scalars().all())
+
     def candidate_rows(
         self,
         subject: Observation,
         *,
         limit: int = MAX_CANDIDATES,
         policy: RetrievalPolicy | None = None,
+        semanticIds: set[uuid.UUID] | None = None,
     ) -> list[tuple[Observation, Any]]:
         """Return bounded candidates for `subject` as (observation, location WKT).
 
         Organisation scoping and the hidden flag are applied here, so a caller
         cannot accidentally retrieve across tenants. The bounds come from the
         subject's category, and tighten when it has no point to measure from.
+        When semantic ids are supplied they narrow the set further; they never
+        widen or bypass the existing bounds.
         """
         subjectPoint = parse_point_wkt(self.location_wkt(subject.id))
         bounds = policy or policy_for(
@@ -147,6 +236,9 @@ class CorrelationRepository:
                     bounds.radius_km * 1000.0,
                 )
             )
+
+        if semanticIds is not None:
+            statement = statement.where(Observation.id.in_(semanticIds))
 
         statement = statement.order_by(Observation.receivedAt.desc()).limit(limit)
 

@@ -4,7 +4,7 @@ Phase 1 modular monolith for EcoWatch (`Core Platform, Intake, Provenance & Case
 
 ## Architecture & Conventions
 
-- **Stack:** Python 3.14, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, PostgreSQL 16 + PostGIS 3.4, Pillow.
+- **Stack:** Python 3.14, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, PostgreSQL 16 + PostGIS 3.7 + pgvector, Pillow.
 - **Naming boundary (`ADR-029`, `docs/AGENT_GUIDE.md` §8):**
   - SQL tables and columns use `lower snake_case`.
   - Python variables, function parameters, ORM/config attributes, and JSON API payloads use `camelCase`.

@@ -19,6 +19,10 @@ from ecowatch.core.models import utc_now
 from ecowatch.core.spatial import parse_point_wkt
 from ecowatch.modules.audit.service import record_audit_event
 from ecowatch.modules.correlation.detectors import TASK_REASONS, task_for
+from ecowatch.modules.correlation.embeddings import (
+    build_embedding,
+    embedding_input_hash,
+)
 from ecowatch.modules.correlation.features import Location, ObservationFeatures
 from ecowatch.modules.correlation.models import (
     CorrelationCluster,
@@ -49,6 +53,7 @@ def features_for(
     locationWkt: Any,
     sourceRef: str | None,
     dialectName: str,
+    embedding: tuple[float, ...] | None = None,
 ) -> ObservationFeatures:
     """Project an observation onto the only fields correlation may compare."""
     point = parse_point_wkt(locationWkt) if locationWkt is not None else None
@@ -59,6 +64,7 @@ def features_for(
         location=Location(lat=point[1], lon=point[0]) if point is not None else None,
         category=observation.observationType or None,
         source_ref=sourceRef,
+        embedding=embedding,
     )
 
 
@@ -68,6 +74,27 @@ class CorrelationService:
     def __init__(self, session: Session) -> None:
         self._session = session
         self._repo = CorrelationRepository(session)
+
+    def _ensure_embedding(
+        self, observation: Observation
+    ) -> tuple[float, ...] | None:
+        """Store a vector only when the text or model version actually changed."""
+        inputHash = embedding_input_hash(observation.description, observation.observationType)
+        current = self._repo.current_embedding(observation.id)
+        if current is not None and current.inputHash == inputHash:
+            if current.embedding:
+                return tuple(current.embedding)
+            return None
+        embedding = build_embedding(observation.description, observation.observationType)
+        if embedding is None:
+            return None
+        self._repo.store_embedding(
+            organisationId=observation.organisationId,
+            observationId=observation.id,
+            inputHash=inputHash,
+            embedding=embedding,
+        )
+        return embedding
 
     def scan_observation(self, observationId: uuid.UUID) -> int:
         """Score one observation against its bounded candidate set.
@@ -84,11 +111,13 @@ class CorrelationService:
             )
 
         dialectName = self._repo.dialect_name
+        subjectEmbedding = self._ensure_embedding(subject)
         subjectFeatures = features_for(
             subject,
             locationWkt=self._repo.location_wkt(subject.id),
             sourceRef=subject.sourceRef,
             dialectName=dialectName,
+            embedding=subjectEmbedding,
         )
 
         # One policy for retrieval and scoring, so a candidate cannot be
@@ -97,15 +126,17 @@ class CorrelationService:
             subject.observationType, has_location=subjectFeatures.location is not None
         )
 
+        semanticIds = self._repo.semantic_candidate_ids(subject, limit=MAX_CANDIDATES)
         candidateFeatures = [
             features_for(
                 candidate,
                 locationWkt=candidateWkt,
                 sourceRef=candidate.sourceRef,
                 dialectName=dialectName,
+                embedding=self._repo.embedding_for_observation(candidate.id),
             )
             for candidate, candidateWkt in self._repo.candidate_rows(
-                subject, limit=MAX_CANDIDATES, policy=bounds
+                subject, limit=MAX_CANDIDATES, policy=bounds, semanticIds=semanticIds or None
             )
         ]
 

@@ -9,7 +9,7 @@ export function MonitoringPage() {
       <div className="grid grid-2">
         <div className="card">
           <h2>Map view (placeholder)</h2>
-          <div className="placeholder-map" aria-label="Monitoring map placeholder">
+          <div className="placeholder-map" role="note" aria-label="Monitoring map placeholder">
             <div>
               <p><strong>Spatial layers placeholder</strong></p>
               <p>Monitored areas, observations, and selected indicators rendered with uncertainty/quality cues.</p>
@@ -19,15 +19,13 @@ export function MonitoringPage() {
         <div className="card">
           <h2>List and detail alternative</h2>
           <p className="muted">Map is not the only way to understand records. Provide accessible list, filter, and detail views.</p>
-          <ul>
-            <li><strong>Area:</strong> Pilot area (to be selected) — boundary and source version recorded.</li>
-            <li><strong>Indicator:</strong> Example indicator — method, period, and baseline defined before interpretation.</li>
-            <li><strong>Quality:</strong> Coverage/seasonality/method limitations must be visible.</li>
-          </ul>
+          <p className="muted">
+            No monitored areas or indicators are available in your permitted scope. Method, period, baseline, coverage and seasonality are shown with each record when present.
+          </p>
         </div>
       </div>
       <div className="card notice notice-info" role="note">
-        Geospatial/environmental analysis capabilities are developed in phases. Deterministic methods and validated datasets come before sophisticated models (per docs).
+        Geospatial and environmental analysis capabilities are developed in phases. Deterministic methods and validated datasets come before sophisticated models.
       </div>
     </WorkspacePage>
   );

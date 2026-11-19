@@ -24,6 +24,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ecowatch.core.models import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from ecowatch.core.vector import VectorType
+from ecowatch.modules.correlation.embeddings import VECTOR_DIMENSIONS, VECTOR_MODEL_VERSION
 
 
 class CorrelationTask(StrEnum):
@@ -46,6 +48,47 @@ class RelationshipStatus(StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     AMBIGUOUS = "ambiguous"
+
+
+class CorrelationEmbedding(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """One stored text vector for an observation, model version and input hash.
+
+    The input hash is what makes a rescan skip re-writing an unchanged vector.
+    Nothing here claims the vector is a semantic truth: it is an input to a
+    reviewer-facing candidate prefilter only.
+    """
+
+    __tablename__ = "correlation_embeddings"
+    __table_args__ = (
+        UniqueConstraint(
+            "observation_id",
+            "model_version",
+            "input_hash",
+            name="uq_correlation_embeddings_observation_model_input",
+        ),
+    )
+
+    organisationId: Mapped[uuid.UUID] = mapped_column(
+        "organisation_id",
+        Uuid(as_uuid=True),
+        ForeignKey("organisations.id"),
+        nullable=False,
+        index=True,
+    )
+    observationId: Mapped[uuid.UUID] = mapped_column(
+        "observation_id",
+        Uuid(as_uuid=True),
+        ForeignKey("observations.id"),
+        nullable=False,
+        index=True,
+    )
+    modelVersion: Mapped[str] = mapped_column(
+        "model_version", String(32), nullable=False, default=VECTOR_MODEL_VERSION
+    )
+    inputHash: Mapped[str] = mapped_column("input_hash", String(64), nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(
+        "embedding", VectorType(VECTOR_DIMENSIONS), nullable=False
+    )
 
 
 class EvidenceRelationship(Base, UUIDPrimaryKeyMixin, TimestampMixin):

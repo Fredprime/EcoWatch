@@ -1,0 +1,451 @@
+/* Public site: intentionally lighter than the staff workspace shell. */
+
+.public-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--color-surface-alt) 0, var(--color-bg) 22rem);
+}
+
+.public-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-primary);
+}
+
+.public-header-inner {
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-5);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.public-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-decoration: none;
+  min-width: 0;
+}
+.public-brand-title {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.public-brand-subtitle {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+}
+
+.public-nav {
+  justify-self: center;
+}
+.public-nav ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+}
+.public-nav-link {
+  display: inline-block;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 0.94rem;
+}
+.public-nav-link:hover {
+  background: var(--color-surface-alt);
+}
+.public-nav-link.active {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 600;
+}
+
+.public-account {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.public-main {
+  flex: 1;
+  width: 100%;
+}
+
+/* Floating FAQ affordance. Hidden on /faq itself so it never self-links. */
+.public-faq-button {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: var(--shadow-float);
+}
+.public-faq-button:hover {
+  background: var(--color-primary-hover);
+}
+
+.public-page {
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5);
+}
+/* Full-width by design; text and controls keep readable widths in their own rules. */
+.public-narrow {
+  max-width: none;
+}
+
+/* One padding rhythm for every public card, including notice banners. */
+.public-page .card {
+  padding: var(--space-5);
+}
+.public-page .form-grid {
+  gap: var(--space-3);
+}
+
+.public-page-header {
+  margin-bottom: var(--space-5);
+}
+.public-page-header p {
+  font-size: 1rem;
+  color: var(--color-text-muted);
+  max-width: 62ch;
+}
+.public-not-found p {
+  max-width: 60ch;
+}
+
+/* Sign-in: intro and form share one narrow column centred in the page. */
+.public-login {
+  display: grid;
+  justify-items: center;
+}
+.public-login .public-page-header {
+  width: min(100%, 460px);
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+.public-login .public-page-header p {
+  max-width: none;
+}
+.public-login-card {
+  width: min(100%, 460px);
+}
+/* Centre the submit button in the card; fields keep their left alignment. */
+.public-login .login-actions {
+  display: flex;
+  justify-content: center;
+}
+
+/* Full-width layouts: an intro beside the working area, not a stretched column. */
+.public-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+  gap: var(--space-6);
+  align-items: start;
+}
+.public-split .public-page-header {
+  margin-bottom: 0;
+}
+.public-split-card {
+  min-width: 0;
+}
+
+/* Report form: existing fields and the optional photo panel share the width. */
+.public-report-form {
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  align-items: start;
+}
+.public-report-form > h2,
+.public-report-form > .error-summary {
+  grid-column: 1 / -1;
+}
+.public-report-main,
+.public-report-aside {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Optional photo capture. Native file input stays keyboard reachable. */
+.photo-drop {
+  position: relative;
+}
+.photo-drop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.photo-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 132px;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.photo-drop:hover .photo-drop-zone {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.photo-drop:focus-within .photo-drop-zone {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.photo-drop-title {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.photo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.photo-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.photo-item .btn {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+  min-height: 36px;
+}
+.photo-thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+}
+.photo-meta {
+  flex: 1 1 110px;
+  min-width: 0;
+}
+.photo-name {
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-status {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.photo-status.error {
+  color: var(--color-danger);
+}
+
+.public-hero {
+  padding: var(--space-6) 0 var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+.public-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+.public-lede {
+  font-size: 1.1rem;
+  max-width: 66ch;
+  color: var(--color-text-muted);
+}
+.public-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.public-section {
+  margin-top: var(--space-6);
+}
+.public-section > p {
+  max-width: 70ch;
+}
+
+.public-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.public-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+.public-card p {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.public-steps {
+  max-width: 72ch;
+  padding-left: 1.4rem;
+}
+.public-steps li {
+  margin-bottom: var(--space-1);
+}
+
+.public-case-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+.public-case-list h2 {
+  margin-bottom: var(--space-2);
+}
+
+.public-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+}
+.public-details dt {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+.public-details dd {
+  margin: 0;
+}
+
+.public-after-form {
+  margin-top: var(--space-3);
+}
+
+.public-footer {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-5);
+}
+/* Side room keeps the centred line clear of the fixed FAQ button without a tall footer. */
+.public-footer-inner {
+  margin: 0 auto;
+  max-width: 80ch;
+  padding: 0 3.25rem;
+  text-align: center;
+}
+.public-footer p {
+  font-size: 0.88rem;
+  margin: 0;
+}
+.public-footer-sub {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 1000px) {
+  .public-split,
+  .public-report-form {
+    grid-template-columns: 1fr;
+  }
+  .public-report-form > h2,
+  .public-report-form > .error-summary {
+    grid-column: auto;
+  }
+  .public-split .public-page-header {
+    margin-bottom: var(--space-5);
+  }
+}
+
+@media (max-width: 900px) {
+  .public-cards {
+    grid-template-columns: 1fr;
+  }
+  /* Below desktop the tabs wrap to their own centred row. */
+  .public-header-inner {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .public-nav {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  .public-account {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .public-header-inner {
+    padding: var(--space-2) var(--space-4);
+    gap: var(--space-2);
+  }
+  .public-brand-subtitle {
+    display: none;
+  }
+  .public-nav {
+    order: 3;
+    flex: 1 0 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .public-nav ul {
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+    width: max-content;
+  }
+  .public-nav-link {
+    white-space: nowrap;
+    padding: 0.4rem 0.6rem;
+  }
+  .public-account .btn {
+    min-height: 36px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+  }
+  .public-page {
+    padding: var(--space-4);
+  }
+  .public-lede {
+    font-size: 1rem;
+  }
+  .public-details {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+  .public-details dd {
+    margin-bottom: var(--space-2);
+  }
+}
