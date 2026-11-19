@@ -281,18 +281,43 @@ unavailable locally.
   `docs/PHASE3_PROGRESS_LOG.md` untracked, plus the new API files and doc edits.
   Nothing was committed or pushed in this session.
 
+### Update 2026-11-19 — Phase 3 merged; remaining backend work in flight
+
+- Phase 3 is **merged into `master`** and must not be redone: PR #9
+  (`c3aafd4`, initial Phase 3) followed by PR #21 (`3a13520`, Phase 3 HTTP API).
+  The paragraph above records the state at the time it was written; the branch
+  `feat/Randy_Branch` work it describes has since landed.
+- Separate streams also merged: pgvector PR #19, frontend PR #20, and the
+  earlier Phase 2 PRs #10/#11/#12/#17/#18.
+- **Current active branch:** `backend/remaining-work` off `master`, with three
+  commits pending PR into `master`: `c7218a7` (FR-057 governance erasure/export,
+  ADR-034), `c8bd4cc` (ADR-031 case-side actions, authority clarified by
+  ADR-035), and `67e9c38` (ADR-036 Phase 2 contract hardening).
+- Verification on that branch: `ruff check backend` clean; single Alembic head
+  `0006_evidence_upload_idempotency` with valid upgrade/downgrade SQL;
+  `pytest backend -q` → 123 passed / 4 skipped.
+- The frontend is already merged and verified; keep the phone-check tunnel
+  available and do not fold frontend changes into the backend PR.
+
 ## Open items
 
-1. Obtain owner approval for the Phase 3 permissions matrix.
-2. Obtain owner approval for recovery-verification criteria.
-3. Review and approve the Phase 3 route paths/payload shapes in
-   `backend/phase3Integration.md` §11 as the stable API contract.
+1. ~~Obtain owner approval for the Phase 3 permissions matrix.~~ Resolved by
+   merge of PR #21 into `master`.
+2. ~~Obtain owner approval for recovery-verification criteria.~~ Resolved by
+   merge of PR #21 into `master`.
+3. ~~Review and approve the Phase 3 route paths/payload shapes in
+   `backend/phase3Integration.md` §11 as the stable API contract.~~ Resolved by
+   merge of PR #21 into `master`.
 4. Run the PostGIS migration test locally on a machine with Docker/PostgreSQL;
    CI already passes it.
 5. Decide whether to fix the pre-existing Phase 1 `ix_audit_events_target`
    Alembic drift.
-6. Decide whether to commit/push the local documentation and API changes (no
-   commit was made automatically).
+6. ~~Decide whether to commit/push the local documentation and API changes.~~
+   Phase 3 API changes landed in PR #21; the documentation was committed.
+7. **Current PR (`backend/remaining-work` → `master`) owner decisions:** confirm
+   ADR-034's tombstone-only reading of FR-057 erasure (originals retained per
+   hard boundary), ADR-035's single-actor reading of case-action authority, and
+   the ADR-036 scope boundary (no WebSocket, no server-side sync-state column).
 
 ## Relevant files
 

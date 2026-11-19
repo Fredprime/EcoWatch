@@ -14,18 +14,23 @@ from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
 from ecowatch.core.schemas import CursorPage
 from ecowatch.modules.audit.service import record_audit_event
-from ecowatch.modules.cases.models import Case, CaseStatus, LinkReviewStatus
+from ecowatch.modules.cases.models import Case, CaseStatus, LinkProposedBy, LinkReviewStatus
 from ecowatch.modules.cases.repository import CaseRepository
 from ecowatch.modules.cases.schemas import (
+    CaseActionResponse,
     CaseDetailResponse,
     CaseObservationResponse,
     CaseResponse,
     CreateCaseRequest,
+    CrossCaseRequest,
     FieldVerificationApprovalRequest,
     FieldVerificationApprovalResponse,
     FieldVerificationApprovalRole,
     LinkObservationRequest,
+    MergeCaseRequest,
+    PromoteToCaseRequest,
     PublicCaseResponse,
+    SplitCaseRequest,
     TimelineItemResponse,
     TransitionCaseStatusRequest,
     UpdateCaseObservationRequest,
@@ -146,21 +151,11 @@ _STATUS_ALLOWED_ROLES: dict[CaseStatus, frozenset[Role]] = {
     CaseStatus.FIELD_VERIFICATION_REQUIRED: frozenset(
         {Role.INVESTIGATOR, Role.ORGANISATION_ADMIN, Role.SYSTEM_ADMIN}
     ),
-    CaseStatus.FIELD_VERIFIED: frozenset(
-        {Role.ENVIRONMENTAL_SPECIALIST, Role.ORGANISATION_ADMIN}
-    ),
-    CaseStatus.REFERRED_TO_AUTHORITY: frozenset(
-        {Role.INVESTIGATOR, Role.ORGANISATION_ADMIN}
-    ),
-    CaseStatus.NOT_SUBSTANTIATED: frozenset(
-        {Role.INVESTIGATOR, Role.ORGANISATION_ADMIN}
-    ),
-    CaseStatus.CLOSED: frozenset(
-        {Role.INVESTIGATOR, Role.ORGANISATION_ADMIN, Role.SYSTEM_ADMIN}
-    ),
-    CaseStatus.MERGED: frozenset(
-        {Role.INVESTIGATOR, Role.ORGANISATION_ADMIN, Role.SYSTEM_ADMIN}
-    ),
+    CaseStatus.FIELD_VERIFIED: frozenset({Role.ENVIRONMENTAL_SPECIALIST, Role.ORGANISATION_ADMIN}),
+    CaseStatus.REFERRED_TO_AUTHORITY: frozenset({Role.INVESTIGATOR, Role.ORGANISATION_ADMIN}),
+    CaseStatus.NOT_SUBSTANTIATED: frozenset({Role.INVESTIGATOR, Role.ORGANISATION_ADMIN}),
+    CaseStatus.CLOSED: frozenset({Role.INVESTIGATOR, Role.ORGANISATION_ADMIN, Role.SYSTEM_ADMIN}),
+    CaseStatus.MERGED: frozenset({Role.INVESTIGATOR, Role.ORGANISATION_ADMIN, Role.SYSTEM_ADMIN}),
 }
 
 _STATUS_REQUIRES_RATIONALE = frozenset(
@@ -175,6 +170,11 @@ _STATUS_REQUIRES_RATIONALE = frozenset(
 )
 
 _TERMINAL_CASE_STATUSES = frozenset({CaseStatus.CLOSED.value, CaseStatus.MERGED.value})
+
+# ADR-034/ADR-035: case-side correlation actions are single-actor IV/OA/SA
+# operations (org-scoped, self-review guarded, audited). The two-key ES+OA rule
+# is reserved for §1.7 scientific conclusions (field_verified/recovery_verified).
+_CASE_ACTION_ROLES = frozenset({Role.INVESTIGATOR, Role.ORGANISATION_ADMIN})
 
 _INVESTIGATION_CONTENT_FIELDS = frozenset(
     {
@@ -304,9 +304,7 @@ class CaseService:
                 return candidate
         return f"CASE-{stamp}-{uuid.uuid4().hex[:10].upper()}"
 
-    def _ensure_not_observation_submitter(
-        self, principal: Principal, caseId: uuid.UUID
-    ) -> None:
+    def _ensure_not_observation_submitter(self, principal: Principal, caseId: uuid.UUID) -> None:
         links = self._repo.list_case_observations(caseId)
         obsIds = [link.observationId for link in links]
         for row in self._repo.list_observation_rows(obsIds):
@@ -479,9 +477,7 @@ class CaseService:
 
         contentUpdates = fieldsSet & _INVESTIGATION_CONTENT_FIELDS
         if contentUpdates:
-            self._enforce_content_update_authority(
-                principal, case, orgRoles, contentUpdates
-            )
+            self._enforce_content_update_authority(principal, case, orgRoles, contentUpdates)
             for fieldName in contentUpdates:
                 setattr(case, fieldName, getattr(payload, fieldName))
 
@@ -806,9 +802,7 @@ class CaseService:
         self._session.refresh(case)
         return CaseResponse.model_validate(case)
 
-    def _validate_merge_target(
-        self, case: Case, mergedIntoCaseId: uuid.UUID | None
-    ) -> Case:
+    def _validate_merge_target(self, case: Case, mergedIntoCaseId: uuid.UUID | None) -> Case:
         if mergedIntoCaseId is None:
             raise DomainError(
                 ErrorCode.VALIDATION_ERROR,
@@ -1014,9 +1008,7 @@ class CaseService:
             if payload.reviewStatus is not None
             else LinkReviewStatus(link.reviewStatus)
         )
-        nextContested = (
-            payload.isContested if payload.isContested is not None else link.isContested
-        )
+        nextContested = payload.isContested if payload.isContested is not None else link.isContested
         if (
             payload.reviewStatus in {LinkReviewStatus.ACCEPTED, LinkReviewStatus.REJECTED}
             and "isContested" not in fieldsSet
@@ -1060,9 +1052,7 @@ class CaseService:
         self._session.refresh(link)
         return CaseObservationResponse.model_validate(link)
 
-    def _collect_observation_timeline(
-        self, obsIds: list[uuid.UUID]
-    ) -> list[TimelineItemResponse]:
+    def _collect_observation_timeline(self, obsIds: list[uuid.UUID]) -> list[TimelineItemResponse]:
         items: list[TimelineItemResponse] = []
         for obs in self._repo.list_observation_rows(obsIds):
             obsId = obs["id"]
@@ -1102,9 +1092,7 @@ class CaseService:
                 )
         return items
 
-    def _collect_evidence_timeline(
-        self, obsIds: list[uuid.UUID]
-    ) -> list[TimelineItemResponse]:
+    def _collect_evidence_timeline(self, obsIds: list[uuid.UUID]) -> list[TimelineItemResponse]:
         items: list[TimelineItemResponse] = []
         for asset in self._repo.list_evidence_rows_for_observations(obsIds):
             ts = asset.get("received_at") or asset.get("created_at")
@@ -1179,9 +1167,7 @@ class CaseService:
 
         hasMore = len(items) > limit
         pageItems = items[:limit]
-        nextCursor = (
-            _encode_timeline_cursor(pageItems[-1]) if hasMore and pageItems else None
-        )
+        nextCursor = _encode_timeline_cursor(pageItems[-1]) if hasMore and pageItems else None
         return CursorPage[TimelineItemResponse](
             items=pageItems,
             nextCursor=nextCursor,
@@ -1212,3 +1198,364 @@ class CaseService:
                 statusCode=status.HTTP_404_NOT_FOUND,
             )
         return PublicCaseResponse.model_validate(case)
+
+    # ------------------------------------------------------------------
+    # ADR-031 case-side correlation actions (single-actor IV/OA/SA authority)
+    # ------------------------------------------------------------------
+
+    def _require_case_action_actor(
+        self, principal: Principal, organisationId: uuid.UUID
+    ) -> uuid.UUID:
+        """Require an IV/OA/SA actor scoped to the organisation (404 across orgs)."""
+        userId = self._require_authenticated_user(principal)
+        if principal.is_system_admin:
+            return userId
+        orgRoles = principal.roles_for_org(organisationId)
+        if not orgRoles:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Resource not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+            )
+        if not orgRoles & _CASE_ACTION_ROLES:
+            raise DomainError(
+                ErrorCode.FORBIDDEN,
+                "Case-side correlation actions require investigator, "
+                "organisation_admin or system_admin authority",
+                statusCode=status.HTTP_403_FORBIDDEN,
+            )
+        return userId
+
+    def _ensure_not_submitter_of(
+        self, principal: Principal, observationIds: list[uuid.UUID]
+    ) -> None:
+        """Block an actor from acting on their own submitted observations."""
+        for row in self._repo.list_observation_rows(observationIds):
+            ensure_not_self_submitted(principal, row.get("submitted_by_user_id"))
+
+    def _action_result(
+        self, action: str, case: Case, affectedObservationIds: list[uuid.UUID]
+    ) -> CaseActionResponse:
+        links = self._repo.list_case_observations(case.id)
+        return CaseActionResponse(
+            action=action,
+            case=CaseDetailResponse(
+                **CaseResponse.model_validate(case).model_dump(),
+                observations=[CaseObservationResponse.model_validate(link) for link in links],
+            ),
+            affectedObservationIds=affectedObservationIds,
+        )
+
+    def _resolve_case_code(self, requested: str | None) -> str:
+        if requested is not None:
+            if self._repo.get_case_by_code(requested) is not None:
+                raise DomainError(
+                    ErrorCode.CONFLICT,
+                    "A case with this caseCode already exists",
+                    statusCode=status.HTTP_409_CONFLICT,
+                    field="caseCode",
+                )
+            return requested
+        return self._generate_case_code()
+
+    def promote_to_case(
+        self,
+        principal: Principal,
+        payload: PromoteToCaseRequest,
+        *,
+        requestId: str | None = None,
+    ) -> CaseActionResponse:
+        """Promote a reviewed provisional cluster into a case with its members linked."""
+        cluster = self._repo.get_cluster_for_action(payload.clusterId)
+        if cluster is None:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Cluster not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+                field="clusterId",
+            )
+        organisationId, memberIds = cluster
+        userId = self._require_case_action_actor(principal, organisationId)
+        if not memberIds:
+            raise DomainError(
+                ErrorCode.CONFLICT,
+                "Cannot promote a cluster with no observations",
+                statusCode=status.HTTP_409_CONFLICT,
+                field="clusterId",
+            )
+        self._ensure_not_submitter_of(principal, memberIds)
+
+        case = self._repo.create_case(
+            organisationId=organisationId,
+            caseCode=self._resolve_case_code(payload.caseCode),
+            title=payload.title,
+            summary=payload.summary,
+            statusValue=CaseStatus.NEW_UNREVIEWED.value,
+            statusRationale=payload.statusRationale,
+            areaGeometry=None,
+            publicGeometry=None,
+            areaReference=None,
+            leadInvestigatorId=None,
+            investigationQuestions=[],
+            competingHypotheses=[],
+            evidenceGaps=[],
+            accessClass=payload.accessClass,
+            publicSummary=None,
+            createdByUserId=userId,
+            lastReviewedAt=utc_now(),
+        )
+        for observationId in memberIds:
+            self._repo.create_case_observation(
+                caseId=case.id,
+                observationId=observationId,
+                linkRationale=f"Promoted from cluster {payload.clusterId}",
+                proposedByType=LinkProposedBy.HUMAN.value,
+                proposedByUserId=userId,
+                reviewStatus=LinkReviewStatus.ACCEPTED.value,
+                reviewedByUserId=userId,
+                reviewedAt=utc_now(),
+                isContested=False,
+                contestedNote=None,
+            )
+        record_audit_event(
+            self._session,
+            actorUserId=userId,
+            actorRole=principal.primary_role_label,
+            organisationId=organisationId,
+            action="case.promoted_from_cluster",
+            targetType="case",
+            targetId=case.id,
+            reason=payload.statusRationale,
+            details={
+                "clusterId": str(payload.clusterId),
+                "promotedObservationCount": len(memberIds),
+            },
+            requestId=requestId,
+        )
+        self._session.commit()
+        self._session.refresh(case)
+        return self._action_result("promote_to_case", case, memberIds)
+
+    def merge_cases(
+        self,
+        principal: Principal,
+        caseId: uuid.UUID,
+        payload: MergeCaseRequest,
+        *,
+        requestId: str | None = None,
+    ) -> CaseActionResponse:
+        """Move all links from a source case into a target case, keeping both audited."""
+        source = self._load_scoped_case(principal, caseId, requireNonTerminal=True)
+        userId = self._require_case_action_actor(principal, source.organisationId)
+        target = self._validate_merge_target(source, payload.targetCaseId)
+        sourceLinks = self._repo.list_case_observations(source.id)
+        self._ensure_not_submitter_of(principal, [link.observationId for link in sourceLinks])
+
+        targetObservationIds = {
+            link.observationId for link in self._repo.list_case_observations(target.id)
+        }
+        moved: list[uuid.UUID] = []
+        deduplicated: list[uuid.UUID] = []
+        for link in sourceLinks:
+            if link.observationId in targetObservationIds:
+                self._repo.delete_case_observation(link.id)
+                deduplicated.append(link.observationId)
+            else:
+                self._repo.move_case_observation(link.id, target.id)
+                moved.append(link.observationId)
+
+        source.status = CaseStatus.MERGED.value
+        source.mergedIntoCaseId = target.id
+        source.statusRationale = payload.statusRationale
+        source.lastReviewedAt = utc_now()
+
+        record_audit_event(
+            self._session,
+            actorUserId=userId,
+            actorRole=principal.primary_role_label,
+            organisationId=source.organisationId,
+            action="case.merged",
+            targetType="case",
+            targetId=source.id,
+            reason=payload.statusRationale,
+            details={
+                "mergedIntoCaseId": str(target.id),
+                "movedObservationIds": [str(obsId) for obsId in moved],
+                "deduplicatedObservationIds": [str(obsId) for obsId in deduplicated],
+            },
+            requestId=requestId,
+        )
+        record_audit_event(
+            self._session,
+            actorUserId=userId,
+            actorRole=principal.primary_role_label,
+            organisationId=target.organisationId,
+            action="case.merge_received",
+            targetType="case",
+            targetId=target.id,
+            reason=payload.statusRationale,
+            details={
+                "sourceCaseId": str(source.id),
+                "receivedObservationIds": [str(obsId) for obsId in moved],
+            },
+            requestId=requestId,
+        )
+        self._session.commit()
+        self._session.refresh(target)
+        return self._action_result("merge", target, moved)
+
+    def split_case(
+        self,
+        principal: Principal,
+        caseId: uuid.UUID,
+        payload: SplitCaseRequest,
+        *,
+        requestId: str | None = None,
+    ) -> CaseActionResponse:
+        """Move selected links from a case into a newly created case in the same org."""
+        source = self._load_scoped_case(principal, caseId, requireNonTerminal=True)
+        userId = self._require_case_action_actor(principal, source.organisationId)
+
+        requested = list(dict.fromkeys(payload.observationIds))
+        sourceLinks = self._repo.list_case_observations(source.id)
+        linksByObservation = {link.observationId: link for link in sourceLinks}
+        missing = [obsId for obsId in requested if obsId not in linksByObservation]
+        if missing:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Observation is not linked to this case",
+                statusCode=status.HTTP_404_NOT_FOUND,
+                field="observationIds",
+            )
+        self._ensure_not_submitter_of(principal, requested)
+
+        newCase = self._repo.create_case(
+            organisationId=source.organisationId,
+            caseCode=self._resolve_case_code(payload.caseCode),
+            title=payload.title,
+            summary=payload.summary,
+            statusValue=CaseStatus.NEW_UNREVIEWED.value,
+            statusRationale=payload.statusRationale,
+            areaGeometry=None,
+            publicGeometry=None,
+            areaReference=None,
+            leadInvestigatorId=None,
+            investigationQuestions=[],
+            competingHypotheses=[],
+            evidenceGaps=[],
+            accessClass=source.accessClass,
+            publicSummary=None,
+            createdByUserId=userId,
+            lastReviewedAt=utc_now(),
+        )
+        for observationId in requested:
+            self._repo.move_case_observation(linksByObservation[observationId].id, newCase.id)
+
+        record_audit_event(
+            self._session,
+            actorUserId=userId,
+            actorRole=principal.primary_role_label,
+            organisationId=source.organisationId,
+            action="case.split_source",
+            targetType="case",
+            targetId=source.id,
+            reason=payload.statusRationale,
+            details={
+                "newCaseId": str(newCase.id),
+                "movedObservationIds": [str(obsId) for obsId in requested],
+            },
+            requestId=requestId,
+        )
+        record_audit_event(
+            self._session,
+            actorUserId=userId,
+            actorRole=principal.primary_role_label,
+            organisationId=newCase.organisationId,
+            action="case.split_created",
+            targetType="case",
+            targetId=newCase.id,
+            reason=payload.statusRationale,
+            details={
+                "sourceCaseId": str(source.id),
+                "movedObservationIds": [str(obsId) for obsId in requested],
+            },
+            requestId=requestId,
+        )
+        self._session.commit()
+        self._session.refresh(newCase)
+        return self._action_result("split", newCase, requested)
+
+    def cross_case(
+        self,
+        principal: Principal,
+        payload: CrossCaseRequest,
+        *,
+        requestId: str | None = None,
+    ) -> CaseActionResponse:
+        """Move a selected subset of links between two cases in the same organisation."""
+        source = self._load_scoped_case(principal, payload.sourceCaseId, requireNonTerminal=True)
+        target = self._load_scoped_case(principal, payload.targetCaseId, requireNonTerminal=True)
+        if source.organisationId != target.organisationId:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Target case not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+                field="targetCaseId",
+            )
+        if source.id == target.id:
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR,
+                "Source and target cases must differ",
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                field="targetCaseId",
+            )
+        userId = self._require_case_action_actor(principal, source.organisationId)
+
+        requested = list(dict.fromkeys(payload.observationIds))
+        linksByObservation = {
+            link.observationId: link for link in self._repo.list_case_observations(source.id)
+        }
+        missing = [obsId for obsId in requested if obsId not in linksByObservation]
+        if missing:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Observation is not linked to the source case",
+                statusCode=status.HTTP_404_NOT_FOUND,
+                field="observationIds",
+            )
+        self._ensure_not_submitter_of(principal, requested)
+
+        targetObservationIds = {
+            link.observationId for link in self._repo.list_case_observations(target.id)
+        }
+        moved: list[uuid.UUID] = []
+        deduplicated: list[uuid.UUID] = []
+        for observationId in requested:
+            if observationId in targetObservationIds:
+                self._repo.delete_case_observation(linksByObservation[observationId].id)
+                deduplicated.append(observationId)
+            else:
+                sourceLink = linksByObservation[observationId]
+                sourceLink.linkRationale = payload.linkRationale
+                self._repo.move_case_observation(sourceLink.id, target.id)
+                moved.append(observationId)
+
+        record_audit_event(
+            self._session,
+            actorUserId=userId,
+            actorRole=principal.primary_role_label,
+            organisationId=source.organisationId,
+            action="case.cross_case_moved",
+            targetType="case",
+            targetId=target.id,
+            reason=payload.linkRationale,
+            details={
+                "sourceCaseId": str(source.id),
+                "movedObservationIds": [str(obsId) for obsId in moved],
+                "deduplicatedObservationIds": [str(obsId) for obsId in deduplicated],
+            },
+            requestId=requestId,
+        )
+        self._session.commit()
+        self._session.refresh(target)
+        return self._action_result("cross_case", target, moved)

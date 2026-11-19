@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ecowatch.core.config import Settings
 from ecowatch.core.errors import DomainError, ErrorCode
+from ecowatch.core.models import utc_now
 from ecowatch.core.schemas import CursorPage
 from ecowatch.core.spatial import format_point_wkt
 from ecowatch.modules.audit.service import record_audit_event
@@ -20,7 +21,10 @@ from ecowatch.modules.observations.schemas import (
     CreateCorrectionRequest,
     CreateMethodRequest,
     CreateUnitRequest,
+    HideObservationRequest,
     MethodResponse,
+    ObservationExportRecord,
+    ObservationExportResponse,
     ObservationPublicSummaryResponse,
     ObservationRestrictedResponse,
     ObservationSourceResponse,
@@ -30,6 +34,7 @@ from ecowatch.modules.observations.schemas import (
     coarsen_point,
     normalize_utc,
 )
+from ecowatch.modules.phase3Contracts import require_permission as require_org_permission
 
 
 def _serialize_json_value(value: Any) -> Any:
@@ -413,6 +418,89 @@ class ObservationService:
         )
         self._session.commit()
         return ObservationSourceResponse.model_validate(source)
+
+    def hide_observation(
+        self,
+        principal: Principal,
+        observationId: uuid.UUID,
+        payload: HideObservationRequest,
+        *,
+        requestId: str | None = None,
+    ) -> ObservationRestrictedResponse:
+        """Tombstone an observation (SA only): hide from all views, anonymise source PII, audit."""
+        userId = _require_user_id(principal)
+        obs = self._repo.get_by_id(observationId)
+        if obs is None:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Observation not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+            )
+        require_org_permission(principal, Permission.OBS_HIDE, obs.organisationId)
+
+        if not obs.isHidden:
+            obs.isHidden = True
+            sourceAnonymised = self._repo.anonymise_source(obs.id)
+            record_audit_event(
+                self._session,
+                actorUserId=userId,
+                actorRole=principal.primary_role_label,
+                organisationId=obs.organisationId,
+                action="observation.hidden",
+                targetType="observation",
+                targetId=obs.id,
+                reason=payload.reason.strip(),
+                details={"tombstone": True, "sourcePiiCleared": sourceAnonymised},
+                requestId=requestId,
+            )
+            self._session.commit()
+            self._session.refresh(obs)
+        return ObservationRestrictedResponse.from_orm_record(obs)
+
+    def export_observations(
+        self,
+        principal: Principal,
+        organisationId: uuid.UUID,
+        *,
+        requestId: str | None = None,
+    ) -> ObservationExportResponse:
+        """Export an organisation's observations, versions and source records (OA/SA)."""
+        _require_user_id(principal)
+        require_org_permission(principal, Permission.OBS_EXPORT, organisationId)
+
+        observations = self._repo.list_for_export(organisationId)
+        records = [
+            ObservationExportRecord(
+                observation=ObservationRestrictedResponse.from_orm_record(obs),
+                versions=[
+                    ObservationVersionResponse.model_validate(v)
+                    for v in self._repo.list_versions(obs.id)
+                ],
+                source=(
+                    ObservationSourceResponse.model_validate(source)
+                    if (source := self._repo.get_source_by_observation_id(obs.id)) is not None
+                    else None
+                ),
+            )
+            for obs in observations
+        ]
+        record_audit_event(
+            self._session,
+            actorUserId=principal.userId,
+            actorRole=principal.primary_role_label,
+            organisationId=organisationId,
+            action="observation.exported",
+            targetType="organisation",
+            targetId=organisationId,
+            details={"observationCount": len(records)},
+            requestId=requestId,
+        )
+        self._session.commit()
+        return ObservationExportResponse(
+            organisationId=organisationId,
+            exportedAt=utc_now(),
+            observations=records,
+        )
 
     def list_methods(
         self, *, cursor: str | None = None, limit: int = 50

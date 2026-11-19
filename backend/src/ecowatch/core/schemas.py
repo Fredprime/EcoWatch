@@ -1,5 +1,7 @@
 """Shared Pydantic boundary schemas enforcing camelCase payloads."""
 
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -31,6 +33,13 @@ class ErrorDetail(CamelModel):
     field: str | None = None
 
 
+class ErrorCategory(StrEnum):
+    """Whether retrying the same request can reasonably succeed (ADR-036)."""
+
+    PERMANENT = "permanent"
+    TRANSIENT = "transient"
+
+
 class ErrorResponse(CamelModel):
     """Stable API error envelope without internal stack traces."""
 
@@ -39,3 +48,5 @@ class ErrorResponse(CamelModel):
     field: str | None = None
     details: list[ErrorDetail] = Field(default_factory=list)
     requestId: str | None = None
+    category: ErrorCategory = ErrorCategory.PERMANENT
+    retryAfterSeconds: int | None = None

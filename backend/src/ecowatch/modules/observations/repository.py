@@ -167,6 +167,27 @@ class ObservationRepository:
             limit=limit,
         )
 
+    def list_for_export(self, organisationId: uuid.UUID) -> list[Observation]:
+        """Return every observation for an organisation, hidden records included."""
+        stmt = (
+            select(Observation)
+            .where(Observation.organisationId == organisationId)
+            .order_by(Observation.receivedAt.asc(), Observation.id.asc())
+        )
+        return list(self._session.scalars(stmt).all())
+
+    def anonymise_source(self, observationId: uuid.UUID) -> bool:
+        """Clear contributor identity/contact PII on the isolated source record, keeping the row."""
+        source = self.get_source_by_observation_id(observationId)
+        if source is None:
+            return False
+        source.reporterName = None
+        source.contactChannel = None
+        source.contactValue = None
+        source.clientMetadata = None
+        self._session.flush()
+        return True
+
     def get_method_by_id(self, methodId: uuid.UUID) -> Method | None:
         return self._session.get(Method, methodId)
 

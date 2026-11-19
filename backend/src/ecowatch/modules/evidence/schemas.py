@@ -46,6 +46,7 @@ class EvidenceAssetResponse(CamelModel):
     receivedAt: datetime
     createdAt: datetime
     derivatives: list[AssetDerivativeResponse] = Field(default_factory=list)
+    idempotentReplay: bool = False
 
 
 class EvidenceScanStatusResponse(CamelModel):

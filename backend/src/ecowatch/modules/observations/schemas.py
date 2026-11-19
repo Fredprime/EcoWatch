@@ -189,6 +189,18 @@ class UpdateQualityFlagsRequest(CamelModel):
     reason: str | None = Field(default=None, max_length=1000)
 
 
+class HideObservationRequest(CamelModel):
+    """Request payload to tombstone an observation (hide from all views, keep originals)."""
+
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_reason(self) -> Self:
+        if not self.reason.strip():
+            raise ValueError("reason must not be empty")
+        return self
+
+
 class ObservationSourceResponse(CamelModel):
     """Restricted contributor identity/contact record (OA own org / SA only)."""
 
@@ -202,6 +214,22 @@ class ObservationSourceResponse(CamelModel):
     safetyAck: bool
     clientMetadata: dict[str, Any] | None = None
     createdAt: datetime
+
+
+class ObservationExportRecord(CamelModel):
+    """One observation plus its append-only history and isolated source record."""
+
+    observation: ObservationRestrictedResponse
+    versions: list[ObservationVersionResponse]
+    source: ObservationSourceResponse | None = None
+
+
+class ObservationExportResponse(CamelModel):
+    """Governance export of an organisation's observations (hidden records included)."""
+
+    organisationId: uuid.UUID
+    exportedAt: datetime
+    observations: list[ObservationExportRecord]
 
 
 class CreateMethodRequest(CamelModel):

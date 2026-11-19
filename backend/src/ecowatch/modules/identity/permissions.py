@@ -39,6 +39,7 @@ class Permission(StrEnum):
     OBS_QUALITY_FLAG = "obs:quality_flag"
     OBS_CLARIFY = "obs:clarify"
     OBS_HIDE = "obs:hide"
+    OBS_EXPORT = "obs:export"
     SOURCE_READ = "source:read"
     EVIDENCE_UPLOAD = "evidence:upload"
     EVIDENCE_READ_DERIVATIVE = "evidence:read_derivative"
@@ -184,6 +185,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_CLOSE,
             Permission.AUDIT_READ,
             Permission.ORG_MANAGE_USERS,
+            Permission.OBS_EXPORT,
             Permission.CORRELATION_READ,
             Permission.CATALOGUE_WRITE,
             Permission.INTELLIGENCE_WRITE,
@@ -217,6 +219,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.CASE_TRANSITION_CLOSE,
             Permission.AUDIT_READ,
             Permission.ORG_MANAGE_USERS,
+            Permission.OBS_EXPORT,
             Permission.ADMIN_MANAGE_SYSTEM,
             Permission.JOBS_READ,
             Permission.CORRELATION_READ,

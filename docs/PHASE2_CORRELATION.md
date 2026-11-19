@@ -62,10 +62,11 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 | Missing | Status |
 |---|---|
 | An approved semantic embedding model | ADR-019 is still open. The current vectors are deterministic hashed-word inputs (`hashed-words-v1`) that let the pgvector storage/prefilter path be tested; they are **not** a validated semantic model and carry no accuracy claim. `token_similarity` remains the labelled keyword fallback. |
-| `cross_case` detector | case-side rules and authority owner decided 2026-11-18 (`ADR-031`); not built |
-| `promote_to_case`, `merge`, `split` | owned by the Phase 1 cases module under `ADR-031`; correlation keeps suggestions and provisional clusters only |
+| `cross_case` detector | still not built: the correlation engine emits no cross-case *suggestion signal*. The separate case-side `cross_case` **action** (moving selected links between two cases) is built in the cases module under `ADR-031`/`ADR-035`. |
+| `promote_to_case`, `merge`, `split` case-side actions | **built 2026-11-19** in the Phase 1 cases module under `ADR-031`, with authority clarified by `ADR-035` (single-actor IV/OA/SA, org-scoped, self-review guarded, audited). Correlation itself still keeps suggestions and provisional clusters only — no detector was promoted to a conclusion. |
 | Scored harness run on real labelled reports | needs a consented, human-reviewed set; smoke test approved and run on temporary fixtures only, no accuracy claim |
-| Split-phase intake, notification push | plan §2.1 lists them under Phase 2, but they live in `collection` and `notifications`, which Phase 1 owns |
+| Split-phase intake hardening | **built 2026-11-19** (`ADR-036`): permanent/transient error category, `Retry-After`, and idempotent media re-upload via `Idempotency-Key`. See `BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` §2.1 for the concrete contract. |
+| Notification push / WebSocket invalidation | still not built and explicitly deferred (`ADR-036`); REST remains authoritative. Durable client queueing and sync states belong to the frontend PWA. |
 
 ## 4. Honest limits
 
@@ -74,5 +75,5 @@ Phase 1 (`3713211`) answered the contract questions from code, so the columns ar
 - Thresholds (`0.45` same-event, `0.9` duplicate, 72 hours, 25 km, weights `0.45/0.25/0.20/0.10`) are reasoned defaults, not tuned values. Tuning needs labelled reviewed data, which does not exist yet.
 - Category matching in `policy.py` is an exact normalised string match against a small table. An unknown category gets the default window; this costs recall, never correctness.
 - `evaluate` cannot report reviewer override rate; that needs real reviewer decisions. Reported as absent rather than approximated.
-- Cluster membership grows only when a person acts, but no action yet adds to a cluster beyond creation — `accept` records the relationship without merging clusters, because merging is `merge`, which is not built.
+- Cluster membership grows only when a person acts, but no action yet adds to a cluster beyond creation — `accept` records the relationship without merging clusters. The case-side `merge` action is now built (2026-11-19), but it moves case-observation links; it does not mutate a correlation cluster, which stays a read-only suggestion container.
 - No accuracy claim is made anywhere. Per plan §2.2, a harness on a consented set is the acceptance route; a number in this document would be a fabrication.

@@ -52,6 +52,7 @@ async def upload_evidence(
     file: UploadFile = File(...),
     accessClass: AccessClass = Form(default=AccessClass.RESTRICTED),
     trackingCode: str | None = Header(default=None, alias="X-Tracking-Code"),
+    idempotencyKey: uuid.UUID | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(get_optional_principal),
     db: Session = Depends(get_db),
     storage: StorageProvider = Depends(get_storage),
@@ -68,6 +69,7 @@ async def upload_evidence(
         declaredMimeType=file.content_type,
         accessClass=accessClass,
         trackingCode=trackingCode,
+        idempotencyKey=idempotencyKey,
         settings=settings,
         requestId=requestId,
     )
