@@ -1,13 +1,6 @@
-import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ResourceState } from '../components/ResourceState';
-import { useApiResource } from '../hooks/useApiResource';
-import { getHealth } from '../api/health';
 
 export function PublicHomePage() {
-  const loadHealth = useCallback(() => getHealth(), []);
-  const health = useApiResource(loadHealth, 'public-health');
-
   return (
     <div className="public-page">
       <section className="public-hero">
@@ -20,16 +13,6 @@ export function PublicHomePage() {
         <div className="public-hero-actions">
           <Link to="/report" className="btn">Submit an observation</Link>
           <Link to="/track" className="btn btn-secondary">Track a report</Link>
-        </div>
-        <div className="public-status">
-          <ResourceState state={health.state}>
-            {(data) => (
-              <p className="muted">
-                Service {data.status} · Database {data.database}
-                {data.postgisVersion ? ' · Spatial store available' : ''}
-              </p>
-            )}
-          </ResourceState>
         </div>
       </section>
 

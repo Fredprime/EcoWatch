@@ -21,7 +21,7 @@ Prototype frontend aligned to the EcoWatch documentation baseline in `../docs/`.
 
 | Route | Shell | Access | Data shown |
 |---|---|---|---|
-| `/` | public | no login | service health and what you can do here |
+| `/` | public | no login | what you can do here |
 | `/faq` | public | no login | process steps, correlation score caveats and output caveats |
 | `/report` | public | no login | anonymous observation intake, with optional photos |
 | `/track` | public | no login | tracking-code receipt lookup |
