@@ -44,7 +44,8 @@ async function parseBody(response: Response): Promise<Partial<ErrorResponse> | n
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body !== undefined) headers.set('Content-Type', 'application/json');
+  // JSON bodies are strings; FormData must keep its own multipart boundary.
+  if (typeof init.body === 'string') headers.set('Content-Type', 'application/json');
   if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
 
   const response = await fetch(path, { ...init, headers });

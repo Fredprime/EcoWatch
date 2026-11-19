@@ -10,8 +10,10 @@ Prototype frontend aligned to the EcoWatch documentation baseline in `../docs/`.
 - **Overview / Report:** health and observation list reads, and observation intake with real server receipts. Submission states are draft / submitting / received / error only; nothing is shown as "queued locally" or as received before a server receipt.
 - **Cases / Evidence intelligence:** case list, detail and timeline reads, plus correlation suggestion listing and human accept/reject/ambiguous decisions. A suggestion is ranked decision support with a stated method and reasons, never a source, causation, illegality or harm finding.
 - **Shells:** Analysis, Monitoring, Prioritisation, Interventions, Verification and Administration remain honest staff shells with no API integration. Offline-first PWA collection is not implemented.
-- **Public site vs staff workspace:** `PublicLayout` + `public.css` render the no-login pages with no staff sidebar or record-management actions. Everything else sits behind `RequireAuth` in `StaffLayout` (staff overview moved from `/` to `/workspace`). UI gating is convenience only — the backend enforces permissions.
+- **Public site vs staff workspace:** `PublicLayout` + `public.css` render the no-login pages with no staff sidebar or record-management actions. Anonymous visitors are **not** offered a staff sign-in link or told where `/login` is; only an already-authenticated user sees a "Staff workspace" link. Everything else sits behind `RequireAuth` in `StaffLayout` (staff overview moved from `/` to `/workspace`). UI gating is convenience only — the backend enforces permissions.
 - **Public endpoints:** anonymous intake (`POST /observations`), throttled `POST /observations/receipt-lookup` (returns only a PII-free server receipt), and approved redacted `GET /public/cases` list/detail. The report form keeps all existing fields; only wrapper, copy and spacing changed.
+- **Optional photos:** the report form has a native multi-file picker (`image/jpeg`, `image/png`, `image/webp`, 15 MB each) with local previews that are never uploaded themselves. Photos upload only after intake succeeds, through `uploadEvidence` (`POST /observations/{id}/evidence`) using the returned tracking code as `X-Tracking-Code` and `accessClass=restricted`. Uploads are sequential; each photo shows ready / uploading / uploaded / failed, with a retry for failures. "Uploaded" is shown only when the server returns an `EvidenceAssetResponse`; scan status is never presented as a finding. `client.ts` sets the JSON content type only for string bodies so multipart boundaries survive.
+- **Full-width public layout:** the public shell and page wrappers have no hard max-width; narrow-content pages use `.public-split` (intro beside form) and the report form uses `.public-report-form` (fields beside the photo panel), collapsing to one column under 1000px. Cards and text keep their own readable widths.
 - Baseline tokens and styles in `src/index.css` and `src/App.css`, with the lighter public theme in `src/public.css` (see `../design-system/ecowatch/MASTER.md`).
 
 ## Route map
@@ -19,10 +21,10 @@ Prototype frontend aligned to the EcoWatch documentation baseline in `../docs/`.
 | Route | Shell | Access | Data shown |
 |---|---|---|---|
 | `/` | public | no login | service health and process overview |
-| `/report` | public | no login | anonymous observation intake |
+| `/report` | public | no login | anonymous observation intake, with optional photos |
 | `/track` | public | no login | tracking-code receipt lookup |
 | `/updates`, `/updates/:caseId` | public | no login | approved redacted case summaries |
-| `/login` | public | no login | staff sign-in |
+| `/login` | public | no login | staff sign-in (kept off public navigation; reached from a saved link or the workspace guard) |
 | `/workspace`, `/cases`, `/evidence`, `/monitoring`, `/analysis`, `/prioritisation`, `/interventions`, `/verification`, `/admin` | staff | sign-in required | records within the permitted scope |
 
 Public pages never show contributor identity, exact locations or automated findings. A receipt confirms durable storage only; a published status is a human-reviewed record, not an automated finding.

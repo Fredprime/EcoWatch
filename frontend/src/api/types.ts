@@ -232,3 +232,15 @@ export interface PublicCaseSummary {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Durable upload receipt. Storage keys and file contents are not exposed here. */
+export interface EvidenceAssetResponse {
+  id: string;
+  observationId: string;
+  originalFilename: string;
+  detectedMimeType: string;
+  sizeBytes: number;
+  sha256Checksum: string;
+  scanStatus: string;
+  receivedAt: string;
+}

@@ -12,6 +12,7 @@ const PUBLIC_NAV = [
 /**
  * Lightweight shell for pages that need no account. Deliberately unlike the
  * staff workspace: no sidebar, no role controls, no record-management actions.
+ * Anonymous visitors are never offered a staff sign-in link or told where it is.
  */
 export function PublicLayout() {
   const { status } = useAuth();
@@ -40,13 +41,11 @@ export function PublicLayout() {
               ))}
             </ul>
           </nav>
-          <div className="public-account">
-            {status === 'authenticated' ? (
+          {status === 'authenticated' && (
+            <div className="public-account">
               <NavLink to="/workspace" className="btn btn-secondary">Staff workspace</NavLink>
-            ) : (
-              <NavLink to="/login" className="btn btn-secondary">Staff sign in</NavLink>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </header>
 

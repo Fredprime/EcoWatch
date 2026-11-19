@@ -14,7 +14,6 @@
 }
 
 .public-header-inner {
-  max-width: 1120px;
   margin: 0 auto;
   padding: var(--space-2) var(--space-5);
   display: flex;
@@ -79,12 +78,12 @@
 }
 
 .public-page {
-  max-width: 1120px;
   margin: 0 auto;
   padding: var(--space-6) var(--space-5);
 }
+/* Full-width by design; text and controls keep readable widths in their own rules. */
 .public-narrow {
-  max-width: 760px;
+  max-width: none;
 }
 
 /* One padding rhythm for every public card, including notice banners. */
@@ -102,6 +101,119 @@
   font-size: 1rem;
   color: var(--color-text-muted);
   max-width: 62ch;
+}
+
+/* Full-width layouts: an intro beside the working area, not a stretched column. */
+.public-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+  gap: var(--space-6);
+  align-items: start;
+}
+.public-split .public-page-header {
+  margin-bottom: 0;
+}
+.public-split-card {
+  min-width: 0;
+}
+
+/* Report form: existing fields and the optional photo panel share the width. */
+.public-report-form {
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  align-items: start;
+}
+.public-report-form > h2,
+.public-report-form > .error-summary {
+  grid-column: 1 / -1;
+}
+.public-report-main,
+.public-report-aside {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Optional photo capture. Native file input stays keyboard reachable. */
+.photo-drop {
+  position: relative;
+}
+.photo-drop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.photo-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 132px;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.photo-drop:hover .photo-drop-zone {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.photo-drop:focus-within .photo-drop-zone {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.photo-drop-title {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.photo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.photo-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.photo-item .btn {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+  min-height: 36px;
+}
+.photo-thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+}
+.photo-meta {
+  flex: 1 1 110px;
+  min-width: 0;
+}
+.photo-name {
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-status {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.photo-status.error {
+  color: var(--color-danger);
 }
 
 .public-hero {
@@ -168,6 +280,7 @@
   margin: 0;
   padding: 0;
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-3);
 }
 .public-case-list h2 {
@@ -198,7 +311,6 @@
   padding: var(--space-4) var(--space-5);
 }
 .public-footer-inner {
-  max-width: 1120px;
   margin: 0 auto;
 }
 .public-footer p {
@@ -208,6 +320,20 @@
 }
 .public-footer-sub {
   color: var(--color-text-muted);
+}
+
+@media (max-width: 1000px) {
+  .public-split,
+  .public-report-form {
+    grid-template-columns: 1fr;
+  }
+  .public-report-form > h2,
+  .public-report-form > .error-summary {
+    grid-column: auto;
+  }
+  .public-split .public-page-header {
+    margin-bottom: var(--space-5);
+  }
 }
 
 @media (max-width: 900px) {
