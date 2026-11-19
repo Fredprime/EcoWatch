@@ -18,7 +18,9 @@ from ecowatch.modules.observations.schemas import (
     CreateCorrectionRequest,
     CreateMethodRequest,
     CreateUnitRequest,
+    HideObservationRequest,
     MethodResponse,
+    ObservationExportResponse,
     ObservationPublicSummaryResponse,
     ObservationRestrictedResponse,
     ObservationSourceResponse,
@@ -49,6 +51,19 @@ def list_observations(
         sourceType=sourceType,
         cursor=cursor,
         limit=limit,
+    )
+
+
+@router.get("/observations/export", response_model=ObservationExportResponse)
+def export_observations(
+    organisationId: uuid.UUID = Query(),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> ObservationExportResponse:
+    """Export an organisation's observations with history and source records (OA own org / SA)."""
+    return ObservationService(db).export_observations(
+        principal, organisationId, requestId=requestId
     )
 
 
@@ -133,6 +148,23 @@ def get_observation_source(
 ) -> ObservationSourceResponse:
     """Read isolated contributor identity/contact (OA own org / SA only) with audit event."""
     return ObservationService(db).get_source(principal, observationId, requestId=requestId)
+
+
+@router.post(
+    "/observations/{observationId}/hide",
+    response_model=ObservationRestrictedResponse,
+)
+def hide_observation(
+    payload: HideObservationRequest,
+    observationId: uuid.UUID = Path(),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> ObservationRestrictedResponse:
+    """Tombstone an observation (SA only): hide from all views, clear source PII, audit."""
+    return ObservationService(db).hide_observation(
+        principal, observationId, payload, requestId=requestId
+    )
 
 
 @router.get("/methods", response_model=CursorPage[MethodResponse])

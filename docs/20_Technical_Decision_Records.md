@@ -43,6 +43,9 @@ Approved = explicitly selected. Proposed = recommended. Deferred = postponed. Op
 | ADR-031 | Case-side correlation actions belong to the Phase 1 cases module | Approved 2026-11-18 | Owner assigned `cross_case`, `promote_to_case`, `merge` and `split` to the cases module. Those actions must use the two-key authority rules in `docs/PERMISSIONS_MATRIX.md` §4. Correlation remains decision support: it records suggestions and provisional clusters and never declares case state, source, harm or verification. |
 | ADR-032 | Database-backed login throttling and client-only token clearing | Approved 2026-11-18 | Owner directed "add the rate limiting accordingly and put it in writing". Login failures reuse the existing DB-backed `rate_limit` helper, keyed by SHA-256 of normalised email + client IP so no raw PII is stored in the bucket key; defaults are 5 attempts per 300 s window and a 900 s lockout, configurable through `loginMaxAttempts` / `loginWindowSeconds` / `loginLockoutSeconds` (`ECOWATCH_LOGIN_*`). A successful login resets the bucket. Accepted limitation: logout and 401 clearing are client-only; the stateless HMAC bearer token is not server-side revocable and stays valid until expiry, though deactivated users are rejected on every request. Immediate server-side revocation is deferred. Detail in `docs/REVIEW_SUMMARY.md` §3 item 5. |
 | ADR-033 | Public observation DTO omits raw location wording | Approved 2026-11-18 | Owner selected "remove from public DTO". `ObservationPublicSummaryResponse` no longer exposes `originalLocationWording`, so public/redacted projections cannot leak raw location text; the restricted staff/owner DTO `ObservationRestrictedResponse` still includes it for permitted reviewers. Preserves the identity/location privacy boundary in `docs/AGENT_GUIDE.md` §5 and `docs/OWNER_RULES.md` §6 without altering the stored original observation. Detail in `docs/REVIEW_SUMMARY.md` §3 item 5. |
+| ADR-034 | Governance erasure is tombstone + restrict, keeping originals | Approved 2026-11-19 | FR-057 deletion is implemented as `obs:hide` tombstoning: hide the observation from all public/staff list and detail views and clear safe PII pointers, but never delete the observation row, its versions, evidence files or audit events. Reconciles FR-057 with the immutability hard boundary in `AGENTS.md`. Full record in §5. |
+| ADR-035 | Clarify ADR-031 authority for case-side correlation actions | Approved 2026-11-19 | ADR-031's "two-key authority rules in §4" is clarified to apply to §1.7 scientific conclusions (`field_verified`/`recovery_verified`) only. `promote_to_case`, `merge`, `split` and `cross_case` use the single-actor IV/OA/SA + org-scope + self-review guard + same-transaction audit rules in `docs/PERMISSIONS_MATRIX.md` §3.4/§3.5/§4. Full record in §5. |
+| ADR-036 | Phase 2 backend error taxonomy and idempotent media upload | Approved 2026-11-19 | Backend-only split-phase hardening: classify errors permanent vs transient in the error envelope, send `Retry-After` on 429/5xx, make media re-upload idempotent via an idempotency key, and document the split-phase contract. WebSocket invalidation and a server-side observation sync-state column are out of scope (frontend PWA queue's responsibility). Full record in §5. |
 
 ## 3. Required ADR template
 
@@ -51,3 +54,59 @@ ID, title, date, status, decision owner, context, decision, rationale, alternati
 ## 4. Change rule
 
 Do not erase a superseded decision. Add a new record and explain why the decision changed. Update all affected documents and tests.
+
+## 5. Detailed records (2026-11-19 backend hardening)
+
+### ADR-034 — Governance erasure is tombstone + restrict, keeping originals
+
+- **ID:** ADR-034
+- **Title:** Governance erasure is tombstone + restrict, keeping originals
+- **Date:** 2026-11-19
+- **Status:** Approved
+- **Decision owner:** Owner (Randy)
+- **Context:** `FR-057` requires deletion workflows "consistent with approved policy", while the hard boundary in `AGENTS.md` states that original observations, versions, evidence files and audit events are immutable and that corrections create versions. A literal hard delete would break that boundary. `FR-058` publication is already implemented (`case.isPublicSummaryApproved` + `publications` table + `publish_summary()`), so it is out of scope here.
+- **Decision:** Erasure reuses the existing `obs:hide` permission and `Observation.isHidden` flag. A governance endpoint tombstones an observation: it disappears from all public and staff list/detail views (and from evidence/correlation/receipt-lookup paths, where `isHidden` is already enforced), and safe PII pointers are cleared where possible. No `observations` row, `ObservationVersion`, evidence file or audit event is ever deleted. Data export and the existing append-only correction versions complete the rest of `FR-057`.
+- **Rationale:** Meets the data-subject erasure need at the presentation layer while preserving provenance, auditability and the immutability boundary. No schema migration is required because `isHidden` already exists.
+- **Alternatives considered:** (1) Full hard delete — rejected, breaks the immutability hard boundary. (2) Erasure-request queue only — rejected as insufficient for `FR-057`. (3) Export + correction only — rejected because it leaves no way to remove a record from active views.
+- **Benefits:** Boundary-preserving; small change surface; reversible presentation state; reuses existing privacy enforcement.
+- **Trade-offs / risks:** Tombstoned originals remain stored and could resurface if `isHidden` filtering is bypassed in a new query path; any new observation query must enforce `isHidden`. Erasure metadata (`hiddenAt`/`hiddenBy`/`reason`) is not added now; the audit event is the provenance record.
+- **Dependencies:** `obs:hide` permission grant; `Observation.isHidden`; existing redaction/projection logic; `AuditService`.
+- **Verification method:** Integration tests create temporary users/observations, verify hidden records are absent from list/detail and receipt lookup, verify audit event written, verify original row still present, then delete temporary records.
+- **Affected documents:** `docs/06_Functional_Requirements.md` (FR-057), `docs/REVIEW_SUMMARY.md`, `docs/PROJECT_TRACKING.md`.
+- **Review date:** 2026-12-19.
+
+### ADR-035 — Clarify ADR-031 authority for case-side correlation actions
+
+- **ID:** ADR-035
+- **Title:** Clarify ADR-031 authority for case-side correlation actions
+- **Date:** 2026-11-19
+- **Status:** Approved
+- **Decision owner:** Owner (Randy)
+- **Context:** ADR-031 assigned `cross_case`, `promote_to_case`, `merge` and `split` to the cases module and said they "must use the two-key authority rules in `docs/PERMISSIONS_MATRIX.md` §4". However §4 defines two-key (ES + OA) authority only for the scientific conclusions `field_verified` and `recovery_verified` (§1.7). The same tables list merge/split/promote as single-actor `IV, OA, SA` + audit, and `cross_case` has no separate authority row. ADR-031's wording is therefore ambiguous.
+- **Decision:** ADR-031's "two-key" reference applies only to §1.7 scientific conclusions. The four case-side actions use the single-actor rules in `docs/PERMISSIONS_MATRIX.md` §3.4/§3.5/§4: an investigator (IV), org authority (OA) or system admin (SA) actor, organisation-scoped (cross-org access returns 404), with a self-review guard and a same-transaction audit event. No new approval-slot columns or migration are introduced.
+- **Rationale:** Matches the explicit authority tables and the existing case-status/merge behaviour; avoids inventing a stronger gate than the approved matrix specifies. Keeps correlation strictly decision-support (it records suggestions; it never sets case state).
+- **Alternatives considered:** (1) Generalise ES+OA two-key approval to all four actions — rejected, not in the approved matrix and requires new columns + migration. (2) Two-key only for `promote_to_case` — rejected, no matrix basis; promote is an org-scoped case operation, not a §1.7 scientific conclusion.
+- **Benefits:** Consistent with existing authority enforcement; minimal change surface; no schema change.
+- **Trade-offs / risks:** Single-actor authority is weaker than two-key; mitigated by org-scoping, self-review guard and mandatory audit. `cross_case` has no explicit matrix row so it inherits the case-action single-actor default; revisit if the matrix is amended.
+- **Dependencies:** `docs/PERMISSIONS_MATRIX.md` §3.4/§3.5/§4; cases service permission checks; `AuditService`.
+- **Verification method:** Integration tests assert each action succeeds for IV/OA/SA, is denied for other roles, returns 404 cross-org, is blocked by the self-review guard, and writes exactly one audit event in the same transaction.
+- **Affected documents:** ADR-031 (clarified, not overwritten), `docs/PERMISSIONS_MATRIX.md`, `docs/REVIEW_SUMMARY.md`.
+- **Review date:** 2026-12-19.
+
+### ADR-036 — Phase 2 backend error taxonomy and idempotent media upload
+
+- **ID:** ADR-036
+- **Title:** Phase 2 backend error taxonomy and idempotent media upload
+- **Date:** 2026-11-19
+- **Status:** Approved
+- **Decision owner:** Owner (Randy)
+- **Context:** The Phase 2 offline sync contract has no backend error classification: clients cannot tell a permanent failure (do not retry) from a transient one (retry later), 429 responses do not carry a `Retry-After`, and media re-upload mints a new `assetId` on every call so a retry after a lost response is not idempotent. The plan's "sync states" are largely a frontend PWA queue concern; WebSocket invalidation is marked optional.
+- **Decision:** Backend-contract-only hardening: (1) add a permanent-vs-transient classification to the error envelope; (2) send `Retry-After` on 429 and 5xx, surfacing the existing rate-limit `lockedUntil`/retry seconds; (3) accept an idempotency key on media upload so replay returns the original `assetId`; (4) document the split-phase (text/coords first, media second) contract. WebSocket invalidation and a server-side observation `syncState` column are explicitly out of scope.
+- **Rationale:** Gives offline clients enough information to back off and retry safely without overlapping frontend queue work or adding infrastructure.
+- **Alternatives considered:** (1) Add sync-state column + endpoint + migration — rejected, overlaps frontend PWA queue. (2) Add thin WebSocket push — rejected as optional/deferred. (3) Error taxonomy only — rejected as too narrow; idempotent media replay is needed for correctness.
+- **Benefits:** Small, bounded schema-free change; deterministic retry behaviour; no new datastore or transport.
+- **Trade-offs / risks:** Idempotency keys must be scoped and retained long enough for a realistic retry window; retention policy is bounded in the service. `Retry-After` on 5xx is a conservative hint, not a guarantee of recovery.
+- **Dependencies:** `core/errors.py`, `core/schemas.py`, `core/rate_limit.py`, evidence module, split-phase contract docs.
+- **Verification method:** Integration tests assert Retry-After on 429/5xx and that replaying a media upload with the same key returns the same `assetId` without creating a duplicate asset.
+- **Affected documents:** `docs/BACKEND_ARCHITECTURE_AND_3_PHASE_PLAN.md` §2.1, `docs/PHASE2_CORRELATION.md`, `docs/REVIEW_SUMMARY.md`.
+- **Review date:** 2026-12-19.
