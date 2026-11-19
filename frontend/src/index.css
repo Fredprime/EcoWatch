@@ -4,30 +4,49 @@
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-serif: "IBM Plex Serif", Georgia, serif;
 
-  /* Evidence-led, field-readable palette */
+  /* Evidence-led, field-readable palette. Every colour used by a component lives here. */
   --color-bg: #f4f6f3;
   --color-surface: #ffffff;
   --color-surface-alt: #e9eee8;
   --color-text: #18211d;
   --color-text-muted: #4b5b54;
   --color-border: #c9d3cc;
+  --color-border-strong: #9fb0a7;
   --color-primary: #0f5c4d;
   --color-primary-hover: #0c4a3e;
   --color-on-primary: #ffffff;
   --color-accent: #1f6f8b;
+  --color-accent-strong: #155a72;
   --color-focus: #0b6aa8;
   --color-warning: #8a5a00;
   --color-warning-bg: #fff4db;
+  --color-warning-border: #e7c66b;
   --color-danger: #a1260d;
   --color-danger-bg: #fde8e2;
+  --color-danger-border: #e7a79b;
   --color-success: #1f6b3a;
   --color-success-bg: #e3f3e8;
+  --color-success-border: #9dc7ab;
   --color-info-bg: #e6f2f7;
+  --color-info-border: #9ec6d6;
+  --color-neutral-bg: #eef1f4;
+  --color-neutral-text: #334155;
+  --color-neutral-border: #cbd5e1;
+  --color-input-border: #9fb0a7;
+  --color-backdrop: rgba(24, 33, 29, 0.45);
+  --color-sidebar: #13261f;
+  --color-sidebar-text: #eef5f1;
+  --color-sidebar-muted: #bfd0c8;
+  --color-sidebar-nav: #e3ece7;
+  --color-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --color-sidebar-active: rgba(255, 255, 255, 0.14);
+  --color-sidebar-focus: #8ecbdf;
 
   --radius-sm: 6px;
   --radius-md: 10px;
   --shadow-sm: 0 1px 2px rgba(24, 33, 29, 0.08);
   --shadow-md: 0 8px 24px rgba(24, 33, 29, 0.08);
+  --shadow-float: 0 2px 8px rgba(24, 33, 29, 0.2);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -47,6 +66,49 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #101a16;
+  --color-surface: #17241f;
+  --color-surface-alt: #1f2e28;
+  --color-text: #e8efe9;
+  --color-text-muted: #a9bdb3;
+  --color-border: #33463d;
+  --color-border-strong: #5b7166;
+  --color-primary: #4fbf9f;
+  --color-primary-hover: #6ad1b3;
+  --color-on-primary: #0b1713;
+  --color-accent: #7fc7e0;
+  --color-accent-strong: #a5dcef;
+  --color-focus: #8ecbdf;
+  --color-warning: #e8ba63;
+  --color-warning-bg: #3a2e16;
+  --color-warning-border: #6b5526;
+  --color-danger: #ff9c88;
+  --color-danger-bg: #3a1d18;
+  --color-danger-border: #7a3a30;
+  --color-success: #8fd6a6;
+  --color-success-bg: #183424;
+  --color-success-border: #356b47;
+  --color-info-bg: #16303a;
+  --color-info-border: #2f6072;
+  --color-neutral-bg: #25332e;
+  --color-neutral-text: #c8d4cd;
+  --color-neutral-border: #3c4d45;
+  --color-input-border: #4a5e54;
+  --color-backdrop: rgba(0, 0, 0, 0.6);
+  --color-sidebar: #0d1713;
+  --color-sidebar-text: #e8efe9;
+  --color-sidebar-muted: #9db3a8;
+  --color-sidebar-nav: #cfe0d6;
+  --color-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --color-sidebar-active: rgba(255, 255, 255, 0.14);
+  --color-sidebar-focus: #8ecbdf;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 *, *::before, *::after {
@@ -71,7 +133,12 @@ a {
 }
 
 a:hover {
-  color: #155a72;
+  color: var(--color-accent-strong);
+}
+
+/* Theme changes animate only surfaces and borders; text inherits its colour. */
+body, .app-shell, .sidebar, .topbar, .public-shell, .public-header, .public-footer, .card, .public-card {
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
 h1, h2, h3, h4 {
@@ -129,6 +196,36 @@ button {
 }
 
 .muted { color: var(--color-text-muted); }
+
+/* Both shells share this switch; all colours come from theme tokens or inherit. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 52px;
+  min-height: 36px;
+  padding: 0 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+.theme-toggle[aria-checked='true'] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.theme-toggle-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: currentColor;
+  transition: transform 180ms ease;
+}
+.theme-toggle[aria-checked='true'] .theme-toggle-thumb {
+  transform: translateX(18px);
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

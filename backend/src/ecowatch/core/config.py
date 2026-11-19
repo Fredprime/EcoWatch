@@ -49,18 +49,24 @@ class Settings(BaseModel):
     trackingLookupMaxAttempts: int = Field(default=5, ge=1)
     trackingLookupLockoutSeconds: int = Field(default=900, ge=10)
 
+    loginMaxAttempts: int = Field(default=5, ge=1)
+    loginWindowSeconds: int = Field(default=300, ge=1)
+    loginLockoutSeconds: int = Field(default=900, ge=10)
+
     workerEnabled: bool = Field(default=False)
     workerPollIntervalSeconds: float = Field(default=2.0, ge=0.2)
     workerBatchSize: int = Field(default=5, ge=1, le=50)
     workerMaxAttempts: int = Field(default=5, ge=1, le=20)
 
     @model_validator(mode="after")
-    def validate_production_secret(self) -> Self:
-        if (
-            self.environment.lower() == "production"
-            and self.authSecret == "dev-only-insecure-secret-change-in-production"
-        ):
-            raise ValueError("ECOWATCH_AUTH_SECRET must be set to a strong secret in production")
+    def validate_production_settings(self) -> Self:
+        if self.environment.lower() == "production":
+            if self.authSecret == "dev-only-insecure-secret-change-in-production":
+                raise ValueError(
+                    "ECOWATCH_AUTH_SECRET must be set to a strong secret in production"
+                )
+            if self.debug:
+                raise ValueError("ECOWATCH_DEBUG must be false in production")
         return self
 
     @classmethod
@@ -83,6 +89,9 @@ class Settings(BaseModel):
             "publicIntakeWindowSeconds": "ECOWATCH_PUBLIC_INTAKE_WINDOW_SECONDS",
             "trackingLookupMaxAttempts": "ECOWATCH_TRACKING_LOOKUP_MAX_ATTEMPTS",
             "trackingLookupLockoutSeconds": "ECOWATCH_TRACKING_LOOKUP_LOCKOUT_SECONDS",
+            "loginMaxAttempts": "ECOWATCH_LOGIN_MAX_ATTEMPTS",
+            "loginWindowSeconds": "ECOWATCH_LOGIN_WINDOW_SECONDS",
+            "loginLockoutSeconds": "ECOWATCH_LOGIN_LOCKOUT_SECONDS",
             "workerEnabled": "ECOWATCH_WORKER_ENABLED",
             "workerPollIntervalSeconds": "ECOWATCH_WORKER_POLL_INTERVAL_SECONDS",
             "workerBatchSize": "ECOWATCH_WORKER_BATCH_SIZE",
