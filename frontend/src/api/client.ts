@@ -20,6 +20,8 @@ export class ApiError extends Error {
   readonly field?: string | null;
   readonly details: ErrorResponse['details'];
   readonly requestId?: string;
+  readonly category: 'permanent' | 'transient';
+  readonly retryAfterSeconds: number | null;
 
   constructor(status: number, body: Partial<ErrorResponse>, fallback: string) {
     super(body.message ?? fallback);
@@ -29,6 +31,8 @@ export class ApiError extends Error {
     this.field = body.field;
     this.details = body.details ?? [];
     this.requestId = body.requestId;
+    this.category = body.category ?? 'permanent';
+    this.retryAfterSeconds = body.retryAfterSeconds ?? null;
   }
 }
 
