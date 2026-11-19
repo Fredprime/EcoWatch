@@ -103,7 +103,7 @@
 - [x] Core read + intake integration with the backend: auth (`login`, `auth/me`), health, observations (intake + list), cases (list/detail/timeline) and correlation suggestions with human decisions. Hand-written typed DTOs and a single `fetch` wrapper (no React Query/Axios/Zod); memory-only bearer token (reload requires signing in again; 401 clears auth); same-origin Vite dev proxy to `127.0.0.1:8000` with no backend CORS middleware added.
 - [x] Removal of fake receipts, queued-local/demo state, hardcoded example observations/cases/suggestions and example monitoring/prioritisation rows; no seeded/sample/demo data remains in product source.
 - [ ] Offline-first PWA queue (IndexedDB, client UUIDs, split-phase text-then-media upload, explicit sync states). Not implemented.
-- [ ] MapLibre GL JS rendering and API integration for the Analysis, Monitoring, Prioritisation, Interventions, Verification and Administration workspaces, which remain honest shells with no API integration.
+- [ ] MapLibre GL JS rendering and API integration for the Analysis, Monitoring, Prioritisation, Interventions, Verification workspaces, which remain honest shells with no API integration. Administration now has read-only organisation, queue and audit views but no map.
 - [ ] End-to-end, offline, performance, usability, backup/restore, and legal/governance release-gate verification before any live pilot. Manual end-to-end checks through the Vite proxy covered the integrated read/intake flows and auth/permission errors; this is not release-gate sign-off.
 
 
