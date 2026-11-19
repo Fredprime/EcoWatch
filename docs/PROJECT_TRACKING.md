@@ -61,6 +61,7 @@
 
 - Finalized Phase 1 (`Core Platform, Intake, Provenance & Case Foundation`) inside `backend/` with `camelCase` Python/JSON naming mapped to `lower snake_case` PostgreSQL/PostGIS columns, Ponytail audit cleanup, Ruff lint clean, and full `pytest` verification (`17 passed` including live PostgreSQL 16 + PostGIS 3.4 Alembic `upgrade`/`downgrade` and `FOR UPDATE SKIP LOCKED` tests).
 - Updated repository and architecture documentation (`README.md`, `backend/README.md`, `docs/08_Data_and_Database_Architecture.md`, `docs/22_Change_History_and_References.md`, `docs/23_Implementation_Backlog_and_Acceptance.md`, `docs/PACKAGE_MANIFEST.json`) and synced `prime` with `origin/master` on PR #5 (3/3 CI checks passing).
+- **2026-11-19, `backend/remaining-work` (three commits, pending PR into `master`):** finished the remaining backend work after frontend and Phase 3 landed separately (Phase 3 via PRs #9 and #21 — do not redo). `c7218a7` FR-057 governance export + `obs:hide` tombstone (`ADR-034`); `c8bd4cc` ADR-031 case-side actions with authority clarified by `ADR-035`; `67e9c38` ADR-036 Phase 2 contract hardening (error taxonomy, `Retry-After`, idempotent media upload, migration `0006`, split-phase contract docs). Verification: ruff clean, single head `0006` with valid upgrade/downgrade SQL, `pytest backend -q` → 123 passed / 4 skipped. See `docs/REVIEW_SUMMARY.md` §3 item 6 for owner decision points.
 
 ---
 
@@ -82,21 +83,23 @@
 - [x] Unit, integration, security, and live PostgreSQL/PostGIS tests passing (`17 passed` with `ECOWATCH_RUN_POSTGIS_TESTS=1` against `ecowatch-db`, plus `CI/backend / lint + test` green on PR #5).
 
 ### Step C — Backend Phase 2: Evidence Correlation, Async Worker & Offline Sync Hardening (ECII)
-- [ ] Bounded database-backed worker (`processing_jobs` with `FOR UPDATE SKIP LOCKED` row claiming, retries, bounded concurrency).
-- [ ] Bounded PostGIS/temporal/category-aware candidate retrieval (excluding previously rejected relationships).
-- [ ] Task-specific correlation scoring (semantic, spatial, temporal, context; missing-signal denominator exclusion; deterministic fallback; `evidence_relationships` with component scores & plain-language reason codes).
-- [ ] Source-dependency / duplicate-repost tracking.
-- [ ] Reviewer workflow (accept, reject, mark ambiguous; merge/split with audit; no naive transitive clustering).
-- [ ] Split-phase offline sync contract hardening (text/coords first, media second) and optional thin `notifications` / WebSocket invalidation.
-- [ ] Labelled evaluation harness measuring precision, recall, false links, missed links, and ambiguity.
+- [x] Bounded database-backed worker (`processing_jobs` with `FOR UPDATE SKIP LOCKED` row claiming, retries, bounded concurrency) — built in Phases 1/2.
+- [x] Bounded PostGIS/temporal/category-aware candidate retrieval (excluding previously rejected relationships) — built on `phase2-correlation`.
+- [x] Task-specific correlation scoring (semantic, spatial, temporal, context; missing-signal denominator exclusion; deterministic fallback; `evidence_relationships` with component scores & plain-language reason codes) — built, with pgvector path added in PR #19.
+- [x] Source-dependency / duplicate-repost tracking — built on `phase2-correlation`.
+- [x] Reviewer workflow (accept, reject, mark ambiguous; no naive transitive clustering) — built on `phase2-correlation`.
+- [x] Case-side `promote_from_cluster` / `merge` / `split` / `cross_case` with IV/OA/SA authority, org-scoping, self-review guard and audit (`ADR-031` + `ADR-035`, 2026-11-19).
+- [x] Split-phase offline sync contract hardening: permanent/transient error category, `Retry-After`, idempotent media re-upload (`ADR-036`, 2026-11-19). WebSocket invalidation and server-side observation sync-state column explicitly deferred — client queueing belongs to the frontend PWA.
+- [x] Smoke-test-only evaluation harness wiring (no accuracy claim; real labelled set does not exist).
 
 ### Step D — Backend Phase 3: Environmental Intelligence, Prioritisation, Interventions & Verification
-- [ ] Dataset catalogue & versioning (`datasets`, `dataset_versions` with licence, attribution, coverage, limitations).
-- [ ] Reproducible analysis runs (`analysis_runs`, `analysis_outputs` with CRS, quality masks, seasonality context) and environmental entities/relationships (`environmental_entities`, `environmental_relationships`).
-- [ ] Transparent prioritisation factor records (`prioritisation_assessments`) with human rationale.
-- [ ] Case assignment, referral records, interventions (`interventions`, `intervention_milestones`), and baseline definitions.
-- [ ] Indicator definitions/measurements (`indicator_definitions`, `indicator_measurements`) and `verification_assessments` (separating activity completion, output, outcome, and `"recovery verified"`).
-- [ ] Governance export/correction/deletion endpoints (`FR-057`) and approved public summaries (`FR-058`).
+Phase 3 was completed by a teammate on separate branches and merged via PR #9 (`c3aafd4`) and PR #21 (`3a13520`); it is **not** part of the `backend/remaining-work` PR and must not be redone.
+- [x] Dataset catalogue & versioning (`datasets`, `dataset_versions` with licence, attribution, coverage, limitations).
+- [x] Reproducible analysis runs (`analysis_runs`, `analysis_outputs` with CRS, quality masks, seasonality context) and environmental entities/relationships (`environmental_entities`, `environmental_relationships`).
+- [x] Transparent prioritisation factor records (`prioritisation_assessments`) with human rationale.
+- [x] Case assignment, referral records, interventions (`interventions`, `intervention_milestones`), and baseline definitions.
+- [x] Indicator definitions/measurements (`indicator_definitions`, `indicator_measurements`) and `verification_assessments` (separating activity completion, output, outcome, and `"recovery verified"`).
+- [x] Governance export/hide (`FR-057`, completed on `backend/remaining-work` under `ADR-034`) and approved public summaries (`FR-058`, already present).
 
 ### Step E — Frontend PWA & Release Readiness
 - [x] Multi-role `frontend/` shell (React + TypeScript + Vite, router-based workspace navigation) following the light/clean UI rules.
@@ -136,3 +139,5 @@
 | 2.9 | 2026-11-18 | `test/correlation-evaluation-smoke` | Ran the evaluation harness under the owner's smoke-test-only route with temporary synthetic fixtures. Counts assert scoring-to-evaluation wiring only; no accuracy claim. Ruff clean; 97 passed with PostGIS, 94 passed / 3 skipped without. |
 | 2.10 | 2026-11-18 | `Tazor` | Implemented ADR-030 pgvector support: migration `0005_phase2_embeddings` (`correlation_embeddings` with `vector(384)`, HNSW cosine index on PostgreSQL, JSON fallback on SQLite, unique per observation/model/input hash, skip-on-unchanged); deterministic hashed-word vectors (`hashed-words-v1`, not a semantic model — ADR-019 open, no accuracy claim); `semantic_similarity` uses vector cosine with `token_similarity` fallback; nearest-vector query narrows the org/time/space candidate set. Combined DB image from new root `Dockerfile` (pgvector base + PostGIS 3.7); compose and both CI DB jobs use it and prove both extensions. Ruff clean; 106 passed with live PostgreSQL, 102 passed / 4 skipped without. |
 | 2.11 | 2026-11-18 | `feat/SandyFrontend` (merge `290f386`) | Owner chose merging `master` into the branch rather than rebasing (task-specific override of the standing `prime` rule, recorded in `OWNER_RULES.md` §7). Frontend integrated with the backend for auth, health, observation intake/list, case list/detail/timeline and correlation suggestions/decisions via hand-written typed DTOs, a single `fetch` wrapper, a memory-only bearer token and a same-origin Vite dev proxy (no CORS middleware added). Fake receipts, queued/demo state and example rows removed. Vite 6.2.7 -> 6.4.6 via lockfile only; `npm audit` 0; no new runtime dependencies. Security: DB-backed login rate limiting (5 attempts / 300 s window, 900 s lockout, SHA-256 email+IP bucket key), public DTO no longer exposes `originalLocationWording`, production rejects `debug=true`, worker-startup regression test. Logout/401 clearing client-only; stateless token not server-revocable (deferred). Frontend lint/build clean; backend Ruff clean; pytest 106 passed / 4 skipped without DB, 110 passed with live DB and worker stopped. |
+| 2.12 | 2026-11-19 | `master` (PRs #9/#19/#20/#21) | Remote state audit confirmed Phase 3 merged via PR #9 (`c3aafd4`) and PR #21 (`3a13520`), pgvector via #19, frontend via #20, and earlier Phase 2 PRs #10/#11/#12/#17/#18. Frontend work on `Tazor` was merged from `origin/master`, conflicts resolved, slim toggle / centred sign-in button / read-only Administration docs verified; lint and build clean. These streams are complete and must not be redone. |
+| 2.13 | 2026-11-19 | `backend/remaining-work` (`c7218a7`, `c8bd4cc`, `67e9c38`) | Remaining backend work. ADR-034/035/036 recorded before code. FR-057 governance export + `obs:hide` tombstone (hide from all views, clear isolated source PII, audit; originals preserved); ADR-031 case-side `promote_from_cluster`/`merge`/`split`/`cross_case` with ADR-035 single-actor IV/OA/SA authority, cross-org 404, self-review guard, same-transaction audit; ADR-036 Phase 2 contract hardening (error category, `Retry-After`, `Idempotency-Key` media replay via migration `0006`, split-phase contract docs). Verified: ruff clean, single head `0006`, upgrade/downgrade SQL valid, 123 passed / 4 skipped. Pending PR into `master`. |
