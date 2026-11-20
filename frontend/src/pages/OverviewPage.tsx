@@ -7,7 +7,8 @@ import { SignInPrompt } from '../components/SignInPrompt';
 import { useAuth } from '../auth/authContext';
 import { useApiResource } from '../hooks/useApiResource';
 import { getHealth } from '../api/health';
-import { listObservations } from '../api/observations';
+import { exportObservations, listObservations } from '../api/observations';
+import { downloadCsv, downloadJson } from '../api/exportFile';
 import type { ObservationSummary } from '../api/types';
 
 function formatTime(value: string | null | undefined): string {
@@ -83,6 +84,39 @@ export function OverviewPage() {
                   aria-describedby="obs-filter-hint"
                 />
                 <p id="obs-filter-hint" className="field-hint">Filters only the records already returned by the server.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={rows.length === 0}
+                  onClick={() =>
+                    downloadCsv(
+                      'ecowatch-reports.csv',
+                      ['id', 'organisationId', 'observationType', 'sourceType', 'description', 'observedAt', 'receivedAt', 'timePrecision', 'locationPrecision', 'publicLat', 'publicLon'],
+                      rows.map((r) => [r.id, r.organisationId, r.observationType, r.sourceType, r.description, r.observedAt, r.receivedAt, r.timePrecision, r.locationPrecision, r.publicLocation?.lat ?? '', r.publicLocation?.lon ?? '']),
+                    )
+                  }
+                >
+                  Export Reports (CSV)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={rows.length === 0}
+                  onClick={() => {
+                    const orgId = rows[0]?.organisationId;
+                    if (!orgId) {
+                      downloadJson('ecowatch-reports.json', rows);
+                      return;
+                    }
+                    void exportObservations(orgId)
+                      .then((full) => downloadJson('ecowatch-reports-archive.json', full))
+                      .catch(() => downloadJson('ecowatch-reports.json', rows));
+                  }}
+                >
+                  Export Reports (JSON)
+                </button>
               </div>
             </div>
 

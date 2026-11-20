@@ -15,3 +15,7 @@ export function listObservations(cursor?: string | null): Promise<CursorPage<Obs
 export function getObservation(observationId: string): Promise<ObservationDetail> {
   return request<ObservationDetail>(`${BASE}/observations/${encodeURIComponent(observationId)}`);
 }
+
+export function exportObservations(organisationId: string): Promise<unknown> {
+  return request<unknown>(`${BASE}/observations/export?organisationId=${encodeURIComponent(organisationId)}`);
+}

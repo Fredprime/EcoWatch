@@ -24,6 +24,7 @@ import {
   proposeRelationship,
   queueAnalysisRun,
 } from '../api/phase3';
+import { downloadCsv, downloadJson } from '../api/exportFile';
 import type {
   AnalysisOutputResponse,
   AnalysisRunResponse,
@@ -241,6 +242,51 @@ export function AnalysisPage() {
         </div>
       ) : (
         <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
+          <div className="card" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Export analysis data</h2>
+              <p className="muted" style={{ margin: '0.25rem 0 0' }}>Download loaded entities, relationships, analysis runs, and outputs in your permitted scope.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() =>
+                  downloadJson('ecowatch-analysis.json', {
+                    exportedAt: new Date().toISOString(),
+                    entities: entities.state.status === 'success' ? entities.state.data.items : [],
+                    relationships: relationships.state.status === 'success' ? relationships.state.data.items : [],
+                    analysisRuns: runs.state.status === 'success' ? runs.state.data.items : [],
+                    selectedRunOutputs: outputs.state.status === 'success' ? outputs.state.data.items : [],
+                  })
+                }
+              >
+                Export Analysis (JSON)
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const entRows = entities.state.status === 'success'
+                    ? entities.state.data.items.map((e) => ['entity', e.id, e.entityType, e.name, e.geometry ?? '', e.description ?? ''])
+                    : [];
+                  const relRows = relationships.state.status === 'success'
+                    ? relationships.state.data.items.map((r) => ['relationship', r.id, r.relationshipType, r.reviewState, r.uncertainty, r.evidenceSummary])
+                    : [];
+                  const runRows = runs.state.status === 'success'
+                    ? runs.state.data.items.map((run) => ['analysis_run', run.id, run.status, run.methodName, run.createdAt, run.question])
+                    : [];
+                  downloadCsv(
+                    'ecowatch-analysis.csv',
+                    ['recordType', 'id', 'categoryOrType', 'nameOrState', 'extra', 'summaryOrDescription'],
+                    [...entRows, ...relRows, ...runRows],
+                  );
+                }}
+              >
+                Export Analysis (CSV)
+              </button>
+            </div>
+          </div>
           <div className="card">
             <h2>Stored entity geometry</h2>
             <LazyWktMap
