@@ -4,6 +4,7 @@ import { Notice } from '../components/Notice';
 import { EmptyState } from '../components/EmptyState';
 import { ResourceState } from '../components/ResourceState';
 import { ActionPanel, RecordPicker } from '../components/Phase3Views';
+import { formatTime } from '../components/phase3Format';
 import { useApiResource } from '../hooks/useApiResource';
 import {
   assignMembership,
@@ -14,11 +15,6 @@ import {
   listOrganisations,
 } from '../api/admin';
 import { errorMessage } from '../api/client';
-
-function formatTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
 
 export function AdminPage() {
   const loadOrganisations = useCallback(() => listOrganisations(), []);

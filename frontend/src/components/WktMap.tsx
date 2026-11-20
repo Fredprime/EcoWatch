@@ -35,38 +35,45 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
     const accent = token('--color-accent', '#1f6f8b');
 
     const configuredStyleUrl = import.meta.env.VITE_MAP_STYLE_URL?.trim();
-    const map = new maplibregl.Map({
-      container: host,
-      style: configuredStyleUrl || {
-        version: 8 as const,
-        sources: {},
-        layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': background } },
-        ],
-      },
-      attributionControl: false,
-    });
-    map.on('error', () => setFailed(true));
-    map.on('load', () => {
-      map.addSource('stored-geometry', {
+    let map: maplibregl.Map | null = null;
+    try {
+      map = new maplibregl.Map({
+        container: host,
+        style: configuredStyleUrl || {
+          version: 8 as const,
+          sources: {},
+          layers: [
+            { id: 'background', type: 'background', paint: { 'background-color': background } },
+          ],
+        },
+        attributionControl: false,
+      });
+    } catch {
+      setFailed(true);
+      return;
+    }
+    const activeMap = map;
+    activeMap.on('error', () => setFailed(true));
+    activeMap.on('load', () => {
+      activeMap.addSource('stored-geometry', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features } as unknown as FeatureCollection,
       });
-      map.addLayer({
+      activeMap.addLayer({
         id: 'stored-areas',
         type: 'fill',
         source: 'stored-geometry',
         filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
         paint: { 'fill-color': accent, 'fill-opacity': 0.25 },
       });
-      map.addLayer({
+      activeMap.addLayer({
         id: 'stored-lines',
         type: 'line',
         source: 'stored-geometry',
         filter: ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
         paint: { 'line-color': accent, 'line-width': 2 },
       });
-      map.addLayer({
+      activeMap.addLayer({
         id: 'stored-points',
         type: 'circle',
         source: 'stored-geometry',
@@ -78,16 +85,16 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
         const [firstLon, firstLat] = positions[0];
         const singlePoint = positions.every(([lon, lat]) => lon === firstLon && lat === firstLat);
         if (singlePoint) {
-          map.setCenter([firstLon, firstLat]);
-          map.setZoom(9);
+          activeMap.setCenter([firstLon, firstLat]);
+          activeMap.setZoom(9);
         } else {
           const bounds = new maplibregl.LngLatBounds();
           for (const [lon, lat] of positions) bounds.extend([lon, lat]);
-          map.fitBounds(bounds, { padding: 40, maxZoom: 12 });
+          activeMap.fitBounds(bounds, { padding: 40, maxZoom: 12 });
         }
       }
     });
-    return () => map.remove();
+    return () => activeMap.remove();
   }, [features, positions]);
 
   if (features.length === 0) {
@@ -96,15 +103,14 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
 
   return (
     <div>
-      <div ref={hostRef} className="spatial-map" role="img" aria-label={ariaLabel} />
+      {failed ? (
+        <SvgWktFallback features={features} positions={positions} ariaLabel={ariaLabel} />
+      ) : (
+        <div ref={hostRef} className="spatial-map" role="img" aria-label={ariaLabel} />
+      )}
       {skipped > 0 && (
         <p className="notice notice-warn" role="note">
           {skipped} stored geometry value(s) could not be drawn. Those records remain in the list below.
-        </p>
-      )}
-      {failed && (
-        <p className="notice notice-danger" role="alert">
-          The map could not be initialised. The list/detail view below is unchanged.
         </p>
       )}
       <p className="muted">
@@ -112,5 +118,127 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
         {features.map((feature) => feature.properties.label).join(', ')}.
       </p>
     </div>
+  );
+}
+
+function SvgWktFallback({
+  features,
+  positions,
+  ariaLabel,
+}: {
+  features: WktFeature[];
+  positions: Array<[number, number]>;
+  ariaLabel: string;
+}) {
+  const width = 600;
+  const height = 320;
+  const pad = 28;
+
+  const lons = positions.map(([lon]) => lon);
+  const lats = positions.map(([, lat]) => lat);
+  const rawMinLon = Math.min(...lons, 0);
+  const rawMaxLon = Math.max(...lons, 0);
+  const rawMinLat = Math.min(...lats, 0);
+  const rawMaxLat = Math.max(...lats, 0);
+  const spanLon = Math.max(rawMaxLon - rawMinLon, 0.25);
+  const spanLat = Math.max(rawMaxLat - rawMinLat, 0.25);
+  const minLon = rawMinLon - spanLon * 0.08;
+  const minLat = rawMinLat - spanLat * 0.08;
+  const scale = Math.min((width - pad * 2) / (spanLon * 1.16), (height - pad * 2) / (spanLat * 1.16));
+  const offsetX = (width - spanLon * 1.16 * scale) / 2;
+  const offsetY = (height - spanLat * 1.16 * scale) / 2;
+  const project = ([lon, lat]: [number, number]): [number, number] => [
+    offsetX + (lon - minLon) * scale,
+    height - (offsetY + (lat - minLat) * scale),
+  ];
+  const ringPoints = (ring: Array<[number, number]>) =>
+    ring.map((pt) => project(pt).map((n) => n.toFixed(1)).join(',')).join(' ');
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="spatial-map"
+      role="img"
+      aria-label={ariaLabel}
+      style={{ background: 'var(--color-surface-alt, #e9eee8)', display: 'block', width: '100%' }}
+    >
+      {features.map((feature, index) => {
+        const g = feature.geometry;
+        const label = feature.properties.label;
+        if (g.type === 'Polygon') {
+          return (
+            <polygon
+              key={index}
+              points={ringPoints(g.coordinates[0] ?? [])}
+              fill="var(--color-accent, #1f6f8b)"
+              fillOpacity={0.22}
+              stroke="var(--color-accent, #1f6f8b)"
+              strokeWidth={1.75}
+            >
+              <title>{label}</title>
+            </polygon>
+          );
+        }
+        if (g.type === 'MultiPolygon') {
+          return g.coordinates.map((poly, pIdx) => (
+            <polygon
+              key={`${index}-${pIdx}`}
+              points={ringPoints(poly[0] ?? [])}
+              fill="var(--color-accent, #1f6f8b)"
+              fillOpacity={0.22}
+              stroke="var(--color-accent, #1f6f8b)"
+              strokeWidth={1.75}
+            >
+              <title>{label}</title>
+            </polygon>
+          ));
+        }
+        if (g.type === 'LineString') {
+          return (
+            <polyline
+              key={index}
+              points={ringPoints(g.coordinates)}
+              fill="none"
+              stroke="var(--color-accent, #1f6f8b)"
+              strokeWidth={2}
+            >
+              <title>{label}</title>
+            </polyline>
+          );
+        }
+        if (g.type === 'MultiLineString') {
+          return g.coordinates.map((line, lIdx) => (
+            <polyline
+              key={`${index}-${lIdx}`}
+              points={ringPoints(line)}
+              fill="none"
+              stroke="var(--color-accent, #1f6f8b)"
+              strokeWidth={2}
+            >
+              <title>{label}</title>
+            </polyline>
+          ));
+        }
+        if (g.type === 'Point') {
+          const [cx, cy] = project(g.coordinates);
+          return (
+            <circle key={index} cx={cx} cy={cy} r={6} fill="var(--color-accent, #1f6f8b)">
+              <title>{label}</title>
+            </circle>
+          );
+        }
+        if (g.type === 'MultiPoint') {
+          return g.coordinates.map((pt, ptIdx) => {
+            const [cx, cy] = project(pt);
+            return (
+              <circle key={`${index}-${ptIdx}`} cx={cx} cy={cy} r={6} fill="var(--color-accent, #1f6f8b)">
+                <title>{label}</title>
+              </circle>
+            );
+          });
+        }
+        return null;
+      })}
+    </svg>
   );
 }

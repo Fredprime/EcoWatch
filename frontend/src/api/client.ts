@@ -1,5 +1,11 @@
 import type { ErrorResponse } from './types';
 
+const API_BASE = (
+  (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_API_BASE_URL ?? ''
+)
+  .trim()
+  .replace(/\/+$/, '');
+
 type UnauthorizedHandler = () => void;
 
 let authToken: string | null = null;
@@ -52,7 +58,8 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   if (typeof init.body === 'string') headers.set('Content-Type', 'application/json');
   if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
 
-  const response = await fetch(path, { ...init, headers });
+  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const response = await fetch(url, { ...init, headers });
   const body = await parseBody(response);
 
   if (response.status === 401) onUnauthorized?.();

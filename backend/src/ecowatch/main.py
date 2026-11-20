@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from ecowatch.api.router import apiRouter
@@ -58,6 +59,14 @@ def create_app(settingsOverride: Settings | None = None) -> FastAPI:
     application.add_middleware(RequestLimitsAndHeadersMiddleware, settings=settings)
     application.add_middleware(GZipMiddleware, minimum_size=settings.gzipMinimumSize)
     application.add_middleware(RequestIdMiddleware, logger=logger)
+    corsOrigins = [origin.strip() for origin in settings.corsOrigins.split(",") if origin.strip()]
+    if corsOrigins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=corsOrigins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     register_exception_handlers(application)
     application.include_router(apiRouter)
     return application

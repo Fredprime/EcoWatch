@@ -63,6 +63,21 @@ def require_text(value: str | None, fieldName: str) -> None:
         )
 
 
+def clean_required_text(value: str) -> str:
+    """Trim and reject blank required text for Pydantic field validators."""
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError("Value must not be blank")
+    return cleaned
+
+
+def geometry_text(value: object) -> str | None:
+    """Normalise a stored geometry value to WKT text."""
+    if value is None:
+        return None
+    return value if isinstance(value, str) else str(value)
+
+
 def require_identifier(value: object | None, fieldName: str) -> None:
     """Reject a missing required identifier."""
     if value is None:

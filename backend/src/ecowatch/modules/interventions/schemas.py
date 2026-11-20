@@ -9,21 +9,8 @@ from pydantic import Field, field_validator
 from ecowatch.core.schemas import CamelModel
 from ecowatch.core.spatial import validate_wkt_geometry
 from ecowatch.modules.interventions.enums import InterventionStatus
-
-
-def _required(value: str) -> str:
-    """Trim and reject blank required text."""
-    cleaned = value.strip()
-    if not cleaned:
-        raise ValueError("Value must not be blank")
-    return cleaned
-
-
-def _geometry_text(value: Any) -> str | None:
-    """Normalise a stored geometry value to WKT text."""
-    if value is None:
-        return None
-    return value if isinstance(value, str) else str(value)
+from ecowatch.modules.phase3Contracts import clean_required_text as _required
+from ecowatch.modules.phase3Contracts import geometry_text as _geometry_text
 
 
 class CreateInterventionRequest(CamelModel):

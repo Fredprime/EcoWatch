@@ -30,6 +30,10 @@ class _PostGISGeography(UserDefinedType):
     def get_col_spec(self, **_kw: Any) -> str:
         return f"GEOGRAPHY({self.geometryType}, {self.srid})"
 
+    def column_expression(self, col: Any) -> Any:
+        """Return WKT text instead of raw PostGIS EWKB hex on SELECT."""
+        return func.ST_AsText(col)
+
 
 def GeographyType(geometryType: str = "POINT", srid: int = 4326) -> Any:
     """Return PostGIS GEOGRAPHY on PostgreSQL and TEXT (WKT) on SQLite."""
