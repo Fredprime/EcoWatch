@@ -4,13 +4,16 @@ import type {
   AuditEventSummary,
   CreateOrganisationRequest,
   CreateUserRequest,
+  CreateVocabularyTermRequest,
   CursorPage,
   JobSummaryResponse,
   MembershipResponse,
   OrganisationSummary,
   UpdateOrganisationRequest,
   UpdateUserRequest,
+  UpdateVocabularyTermRequest,
   UserResponse,
+  VocabularyTerm,
 } from './types';
 
 const BASE = '/api/v1';
@@ -75,4 +78,34 @@ export function listAuditEvents(): Promise<CursorPage<AuditEventSummary>> {
 
 export function getJobsSummary(): Promise<JobSummaryResponse> {
   return request<JobSummaryResponse>(`${BASE}/jobs/summary`);
+}
+
+export function listVocabularyTerms(vocabularyKey?: string): Promise<CursorPage<VocabularyTerm>> {
+  const query = new URLSearchParams({ limit: '50' });
+  if (vocabularyKey) query.set('vocabularyKey', vocabularyKey);
+  return request<CursorPage<VocabularyTerm>>(`${BASE}/vocabularies/terms?${query}`);
+}
+
+export function createVocabularyTerm(
+  payload: CreateVocabularyTermRequest,
+): Promise<VocabularyTerm> {
+  return request<VocabularyTerm>(`${BASE}/vocabularies/terms`, jsonBody(payload));
+}
+
+export function updateVocabularyTerm(
+  termId: string,
+  payload: UpdateVocabularyTermRequest,
+): Promise<VocabularyTerm> {
+  return request<VocabularyTerm>(`${BASE}/vocabularies/terms/${encodeURIComponent(termId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deactivateVocabularyTerm(termId: string): Promise<VocabularyTerm> {
+  return request<VocabularyTerm>(
+    `${BASE}/vocabularies/terms/${encodeURIComponent(termId)}/deactivate`,
+    { method: 'POST' },
+  );
 }

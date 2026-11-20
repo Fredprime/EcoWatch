@@ -302,6 +302,31 @@ export interface JobSummaryResponse {
   byType: JobTypeSummary[];
 }
 
+/** Configuration-only controlled vocabulary terms (system_admin governed). */
+export interface VocabularyTerm {
+  id: string;
+  vocabularyKey: string;
+  code: string;
+  label: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateVocabularyTermRequest {
+  vocabularyKey: string;
+  code: string;
+  label: string;
+  description?: string | null;
+}
+
+export interface UpdateVocabularyTermRequest {
+  label?: string | null;
+  description?: string | null;
+  isActive?: boolean;
+}
+
 /** Phase 3 read DTOs (ADR-037). Geometry WKT and storage keys are server metadata. */
 
 export interface EnvironmentalEntityResponse {

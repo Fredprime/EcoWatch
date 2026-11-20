@@ -10,25 +10,30 @@ import {
   assignMembership,
   createOrganisation,
   createUser,
+  deactivateVocabularyTerm,
   getJobsSummary,
   listAuditEvents,
   listOrganisations,
   listUsers,
+  listVocabularyTerms,
   updateOrganisation,
   updateUser,
+  updateVocabularyTerm,
 } from '../api/admin';
 import { errorMessage } from '../api/client';
-import type { OrganisationSummary, UserResponse } from '../api/types';
+import type { OrganisationSummary, UserResponse, VocabularyTerm } from '../api/types';
 
 export function AdminPage() {
   const loadOrganisations = useCallback(() => listOrganisations(), []);
   const loadUsersResource = useCallback(() => listUsers(), []);
   const loadAudit = useCallback(() => listAuditEvents(), []);
   const loadJobs = useCallback(() => getJobsSummary(), []);
+  const loadVocabulary = useCallback(() => listVocabularyTerms(), []);
   const organisations = useApiResource(loadOrganisations, 'admin:organisations');
   const users = useApiResource(loadUsersResource, 'admin:users');
   const audit = useApiResource(loadAudit, 'admin:audit');
   const jobs = useApiResource(loadJobs, 'admin:jobs');
+  const vocabulary = useApiResource(loadVocabulary, 'admin:vocabularies');
 
   const [orgName, setOrgName] = useState('');
   const [orgType, setOrgType] = useState('REGULATOR');
@@ -119,6 +124,21 @@ export function AdminPage() {
     try {
       await updateOrganisation(org.id, { isActive: !org.isActive });
       organisations.reload();
+      audit.reload();
+    } catch (err) {
+      setLifecycleError(errorMessage(err));
+    }
+  }
+
+  async function toggleTerm(term: VocabularyTerm) {
+    setLifecycleError(null);
+    try {
+      if (term.isActive) {
+        await deactivateVocabularyTerm(term.id);
+      } else {
+        await updateVocabularyTerm(term.id, { isActive: true });
+      }
+      vocabulary.reload();
       audit.reload();
     } catch (err) {
       setLifecycleError(errorMessage(err));
@@ -244,6 +264,59 @@ export function AdminPage() {
                               aria-label={`${user.isActive ? 'Deactivate' : 'Activate'} ${user.email}`}
                             >
                               {user.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            }
+          </ResourceState>
+        </div>
+
+        <div className="card">
+          <h2>Controlled vocabularies</h2>
+          <p className="muted">
+            Configuration terms only. They never classify observations or produce findings.
+          </p>
+          <ResourceState state={vocabulary.state}>
+            {(page) =>
+              page.items.length === 0 ? (
+                <EmptyState
+                  title="No vocabulary terms are configured."
+                  detail="System administrators create terms; this view only changes active state."
+                />
+              ) : (
+                <div className="table-wrap" role="region" aria-label="Controlled vocabulary terms table" tabIndex={0}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Key</th>
+                        <th scope="col">Code</th>
+                        <th scope="col">Label</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Active</th>
+                        <th scope="col">Lifecycle</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {page.items.map((term) => (
+                        <tr key={term.id}>
+                          <th scope="row">{term.vocabularyKey}</th>
+                          <td>{term.code}</td>
+                          <td>{term.label}</td>
+                          <td>{term.description ?? 'None'}</td>
+                          <td>{term.isActive ? 'Yes' : 'No'}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => void toggleTerm(term)}
+                              aria-label={`${term.isActive ? 'Deactivate' : 'Activate'} ${term.label}`}
+                            >
+                              {term.isActive ? 'Deactivate' : 'Activate'}
                             </button>
                           </td>
                         </tr>

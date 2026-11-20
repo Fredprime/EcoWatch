@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
 from ecowatch.core.schemas import CursorPage
+from ecowatch.core.storage import StorageProvider
+from ecowatch.modules.catalogue.models import Dataset, DatasetVersion
 from ecowatch.modules.identity.permissions import Permission, Principal
 from ecowatch.modules.intelligence import enums, models, rules
 from ecowatch.modules.intelligence.schemas import (
@@ -285,6 +288,118 @@ class IntelligenceService:
             run.status = enums.AnalysisStatus.RUNNING.value
             run.startedAt = utc_now()
             self._session.flush()
+        return run
+
+    def _load_input_records(
+        self, run: models.AnalysisRun, storage: StorageProvider
+    ) -> list[dict[str, Any]]:
+        """Read and parse the stored rows of every in-scope input dataset version."""
+        fieldName = "inputDatasetVersionIds"
+        if not run.inputDatasetVersionIds:
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR,
+                "Analysis run has no input dataset versions.",
+                field=fieldName,
+            )
+        records: list[dict[str, Any]] = []
+        for rawId in run.inputDatasetVersionIds:
+            try:
+                versionId = UUID(str(rawId))
+            except (ValueError, TypeError, AttributeError) as error:
+                raise DomainError(
+                    ErrorCode.VALIDATION_ERROR,
+                    "An input dataset version identifier is invalid.",
+                    field=fieldName,
+                ) from error
+            version = self._session.get(DatasetVersion, versionId)
+            dataset = (
+                self._session.get(Dataset, version.datasetId) if version is not None else None
+            )
+            if version is None or dataset is None or dataset.organisationId != run.organisationId:
+                raise DomainError(
+                    ErrorCode.VALIDATION_ERROR,
+                    "An input dataset version is unavailable or out of scope.",
+                    field=fieldName,
+                )
+            if not version.storageKey:
+                raise DomainError(
+                    ErrorCode.VALIDATION_ERROR,
+                    "An input dataset version has no stored data.",
+                    field=fieldName,
+                )
+            try:
+                data = storage.get_bytes(version.storageKey)
+            except Exception as error:
+                raise DomainError(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Stored input dataset data could not be read.",
+                    field=fieldName,
+                ) from error
+            records.extend(rules.parse_stored_dataset_records(data, version.storageKey))
+        if not records:
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR,
+                "Input datasets contain no records.",
+                field=fieldName,
+            )
+        return records
+
+    def execute_analysis_run(
+        self, analysisRunId: UUID, storage: StorageProvider
+    ) -> models.AnalysisRun:
+        """Worker handler: summarize stored input values and record a derived output.
+
+        A run with insufficient or unreadable inputs is failed with an explicit
+        reason; no output is invented. Failures are committed here so the worker's
+        rollback cannot discard the recorded reason.
+        """
+        run = self._session.get(models.AnalysisRun, analysisRunId)
+        if run is None:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Analysis run not found.",
+                statusCode=404,
+                field="analysisRunId",
+            )
+        if run.status == enums.AnalysisStatus.SUCCEEDED.value:
+            return run
+        if run.status not in (
+            enums.AnalysisStatus.QUEUED.value,
+            enums.AnalysisStatus.RUNNING.value,
+        ):
+            raise DomainError(
+                ErrorCode.CONFLICT,
+                "Analysis run cannot execute from its current status.",
+                field="analysisRunId",
+            )
+        self.mark_analysis_run_running(analysisRunId)
+        try:
+            records = self._load_input_records(run, storage)
+            summary = rules.build_stored_value_summary(
+                records,
+                declaredMethodName=run.methodName,
+                declaredMethodVersion=run.methodVersion,
+            )
+        except DomainError as error:
+            run.status = enums.AnalysisStatus.FAILED.value
+            run.failureReason = error.message
+            self._session.commit()
+            raise
+        output = models.AnalysisOutput(
+            analysisRunId=run.id,
+            outputType=enums.AnalysisOutputType.TABLE.value,
+            summary=json.dumps(summary, sort_keys=True, separators=(",", ":")),
+            storageKey=None,
+            isDerived=True,
+            derivedFromObservationIds=[],
+            interpretationState=enums.InterpretationState.PENDING_REVIEW.value,
+            limitations=f"{run.limitations} | {rules.SUMMARY_LIMITATIONS_CAVEAT}",
+        )
+        self._session.add(output)
+        run.status = enums.AnalysisStatus.SUCCEEDED.value
+        run.completedAt = utc_now()
+        run.failureReason = None
+        self._session.commit()
         return run
 
     def record_analysis_output(

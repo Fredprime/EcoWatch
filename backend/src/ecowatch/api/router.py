@@ -22,6 +22,7 @@ from ecowatch.modules.notifications.router import router as notificationsRouter
 from ecowatch.modules.observations.router import router as observationsRouter
 from ecowatch.modules.prioritisation.router import router as prioritisationRouter
 from ecowatch.modules.verification.router import router as verificationRouter
+from ecowatch.modules.vocabularies.router import router as vocabulariesRouter
 
 
 class HealthResponse(CamelModel):
@@ -88,5 +89,6 @@ v1Router.include_router(intelligenceRouter)
 v1Router.include_router(prioritisationRouter)
 v1Router.include_router(interventionsRouter)
 v1Router.include_router(verificationRouter)
+v1Router.include_router(vocabulariesRouter)
 
 apiRouter.include_router(v1Router)

@@ -36,12 +36,15 @@ from ecowatch.modules.cases.schemas import (
     UpdateCaseObservationRequest,
     UpdateCaseRequest,
 )
+from ecowatch.modules.identity.models import User
 from ecowatch.modules.identity.permissions import (
     Permission,
     Principal,
     Role,
     ensure_not_self_submitted,
 )
+from ecowatch.modules.identity.repository import IdentityRepository
+from ecowatch.modules.verification import rules
 
 _INITIAL_CASE_STATUSES = frozenset({CaseStatus.NEW_UNREVIEWED, CaseStatus.INITIAL_REVIEW})
 
@@ -774,6 +777,8 @@ class CaseService:
                 payload=payload,
             )
             auditDetails["fieldRecordReference"] = case.fieldRecordReference
+            auditDetails["specialistApproverUserId"] = str(case.specialistApproverUserId)
+            auditDetails["authorityApproverUserId"] = str(case.authorityApproverUserId)
 
         if targetStatus == CaseStatus.MERGED:
             targetCase = self._validate_merge_target(case, payload.mergedIntoCaseId)
@@ -834,6 +839,30 @@ class CaseService:
             )
         return targetCase
 
+    def _roles_in_org(self, userId: uuid.UUID | None, organisationId: uuid.UUID) -> frozenset[Role]:
+        """Return active roles a recorded approver holds in the case organisation."""
+        if userId is None:
+            return frozenset()
+        user = self._session.get(User, userId)
+        if user is None or not user.isActive:
+            return frozenset()
+        memberships = IdentityRepository(self._session).list_active_memberships_for_user(userId)
+        return frozenset(
+            Role(item.role) for item in memberships if item.organisationId == organisationId
+        )
+
+    def _case_owner_ids(self, case: Case) -> frozenset[uuid.UUID]:
+        """Return case creator, lead, and linked-observation submitters excluded from approval."""
+        ownerIds = {case.createdByUserId}
+        if case.leadInvestigatorId is not None:
+            ownerIds.add(case.leadInvestigatorId)
+        obsIds = [link.observationId for link in self._repo.list_case_observations(case.id)]
+        for row in self._repo.list_observation_rows(obsIds):
+            submitterId = row.get("submitted_by_user_id")
+            if submitterId is not None:
+                ownerIds.add(submitterId)
+        return frozenset(ownerIds)
+
     def _complete_field_verified_transition(
         self,
         *,
@@ -843,9 +872,7 @@ class CaseService:
         payload: TransitionCaseStatusRequest,
     ) -> None:
         orgRoles = principal.roles_for_org(case.organisationId)
-        hasEs = Role.ENVIRONMENTAL_SPECIALIST in orgRoles
-        hasOa = Role.ORGANISATION_ADMIN in orgRoles
-        if not hasEs and not hasOa:
+        if not orgRoles & {Role.ENVIRONMENTAL_SPECIALIST, Role.ORGANISATION_ADMIN}:
             raise DomainError(
                 ErrorCode.FORBIDDEN,
                 "field_verified requires environmental_specialist and organisation_admin approval",
@@ -863,21 +890,23 @@ class CaseService:
             )
         case.fieldRecordReference = fieldRef
 
-        specId = case.specialistApprovalUserId
-        authId = case.authorityApprovalUserId
-        if specId is not None and authId is None and hasOa and specId != userId:
-            authId = userId
-        elif authId is not None and specId is None and hasEs and authId != userId:
-            specId = userId
-
-        if specId is None or authId is None or specId == authId:
-            raise DomainError(
-                ErrorCode.TWO_KEY_APPROVAL_REQUIRED,
-                "Two-key approval from distinct ES and OA users is required for field_verified",
-                statusCode=status.HTTP_409_CONFLICT,
-            )
-        case.specialistApprovalUserId = specId
-        case.authorityApprovalUserId = authId
+        specialistId = payload.specialistApproverUserId
+        authorityId = payload.authorityApproverUserId
+        rules.assert_two_key_pair(
+            specialistApproverUserId=specialistId,
+            authorityApproverUserId=authorityId,
+            actorUserId=userId,
+            specialistRoles=self._roles_in_org(specialistId, case.organisationId),
+            authorityRoles=self._roles_in_org(authorityId, case.organisationId),
+            interventionOwnerUserIds=self._case_owner_ids(case),
+            errorCode=ErrorCode.TWO_KEY_APPROVAL_REQUIRED,
+        )
+        approvedAt = utc_now()
+        case.specialistApproverUserId = specialistId
+        case.authorityApproverUserId = authorityId
+        case.twoKeyApprovedAt = approvedAt
+        case.specialistApprovalUserId = specialistId
+        case.authorityApprovalUserId = authorityId
 
     def link_observation(
         self,
