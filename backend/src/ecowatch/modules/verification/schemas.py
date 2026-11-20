@@ -8,15 +8,8 @@ from typing import Any
 from pydantic import Field, field_validator
 
 from ecowatch.core.schemas import CamelModel
+from ecowatch.modules.phase3Contracts import clean_required_text as _required
 from ecowatch.modules.verification.enums import ExpectedDirection, MeasurementQualifier
-
-
-def _required(value: str) -> str:
-    """Trim and reject blank required text."""
-    cleaned = value.strip()
-    if not cleaned:
-        raise ValueError("Value must not be blank")
-    return cleaned
 
 
 def _decimal_text(value: Decimal | None) -> float | None:

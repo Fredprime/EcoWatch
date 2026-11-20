@@ -73,6 +73,7 @@ class Settings(BaseModel):
     workerPollIntervalSeconds: float = Field(default=2.0, ge=0.2)
     workerBatchSize: int = Field(default=5, ge=1, le=50)
     workerMaxAttempts: int = Field(default=5, ge=1, le=20)
+    corsOrigins: str = Field(default="")
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> Self:
@@ -127,6 +128,7 @@ class Settings(BaseModel):
             "workerPollIntervalSeconds": "ECOWATCH_WORKER_POLL_INTERVAL_SECONDS",
             "workerBatchSize": "ECOWATCH_WORKER_BATCH_SIZE",
             "workerMaxAttempts": "ECOWATCH_WORKER_MAX_ATTEMPTS",
+            "corsOrigins": "ECOWATCH_CORS_ORIGINS",
         }
         values = {
             attrName: envMap[envKey]
