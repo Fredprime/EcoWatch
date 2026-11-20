@@ -35,7 +35,7 @@ def _execute_job(session: Session, storage: StorageProvider, job: ProcessingJob)
         from ecowatch.modules.intelligence.service import IntelligenceService
 
         analysisRunId = uuid.UUID(str(job.payload["analysisRunId"]))
-        IntelligenceService(session).mark_analysis_run_running(analysisRunId)
+        IntelligenceService(session).execute_analysis_run(analysisRunId, storage)
         return
     raise ValueError(f"Unsupported job type: {job.jobType}")
 

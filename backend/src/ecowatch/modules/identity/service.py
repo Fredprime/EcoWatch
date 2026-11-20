@@ -25,6 +25,7 @@ from ecowatch.modules.identity.schemas import (
     LogoutResponse,
     MembershipResponse,
     OrganisationResponse,
+    RevokedTokenPurgeResponse,
     UpdateOrganisationRequest,
     UpdateUserRequest,
     UserResponse,
@@ -119,6 +120,40 @@ class IdentityService:
         )
         self._session.commit()
         return LogoutResponse(revoked=True)
+
+    def purge_expired_revoked_tokens(
+        self,
+        principal: Principal,
+        *,
+        limit: int = 100,
+        requestId: str | None = None,
+    ) -> RevokedTokenPurgeResponse:
+        """Purge a bounded batch of expired revocations (system_admin only) and audit it."""
+        if not principal.is_system_admin:
+            raise DomainError(
+                ErrorCode.FORBIDDEN,
+                "Only system_admin may purge revoked tokens",
+                statusCode=status.HTTP_403_FORBIDDEN,
+            )
+        if principal.userId is None:
+            raise DomainError(
+                ErrorCode.UNAUTHORIZED,
+                "Authentication required",
+                statusCode=status.HTTP_401_UNAUTHORIZED,
+            )
+        deletedCount = self._repo.purge_expired_revoked_tokens(limit=limit)
+        record_audit_event(
+            self._session,
+            actorUserId=principal.userId,
+            actorRole=principal.primary_role_label,
+            action="auth.revoked_tokens_purged",
+            targetType="system",
+            targetId=principal.userId,
+            details={"deletedCount": deletedCount},
+            requestId=requestId,
+        )
+        self._session.commit()
+        return RevokedTokenPurgeResponse(deletedCount=deletedCount)
 
     def get_me(self, principal: Principal) -> AuthMeResponse:
         """Return the authenticated user's profile and active organisation memberships."""

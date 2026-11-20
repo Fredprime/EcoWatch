@@ -421,10 +421,11 @@ def test_cases_many_to_many_status_transitions_timeline_and_public_summary(
             "status": "field_verified",
             "statusRationale": "Confirmed in field",
             "fieldRecordReference": "FLD-2026-009",
+            "specialistApproverUserId": str(specialist.id),
         },
         headers=specHeaders,
     )
-    assert singleKeyFail.status_code == 409
+    assert singleKeyFail.status_code == 400
     assert singleKeyFail.json()["code"] == "TWO_KEY_APPROVAL_REQUIRED"
 
     esApprove = client.post(
@@ -448,11 +449,19 @@ def test_cases_many_to_many_status_transitions_timeline_and_public_summary(
 
     verifiedResp = client.post(
         f"/api/v1/cases/{caseOneId}/status",
-        json={"status": "field_verified", "statusRationale": "Two-key verification complete"},
+        json={
+            "status": "field_verified",
+            "statusRationale": "Two-key verification complete",
+            "specialistApproverUserId": str(specialist.id),
+            "authorityApproverUserId": str(orgAdmin.id),
+        },
         headers=oaHeaders,
     )
     assert verifiedResp.status_code == 200
     assert verifiedResp.json()["status"] == "field_verified"
+    assert verifiedResp.json()["specialistApproverUserId"] == str(specialist.id)
+    assert verifiedResp.json()["authorityApproverUserId"] == str(orgAdmin.id)
+    assert verifiedResp.json()["twoKeyApprovedAt"] is not None
 
     blockedRecovery = client.post(
         f"/api/v1/cases/{caseOneId}/status",

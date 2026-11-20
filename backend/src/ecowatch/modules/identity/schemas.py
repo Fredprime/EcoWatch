@@ -59,6 +59,12 @@ class LogoutResponse(CamelModel):
     revoked: bool = True
 
 
+class RevokedTokenPurgeResponse(CamelModel):
+    """Number of expired revocation rows removed by an admin-triggered purge."""
+
+    deletedCount: int = Field(ge=0)
+
+
 class CreateUserRequest(CamelModel):
     """System-admin payload to create a user account."""
 

@@ -22,6 +22,7 @@ from ecowatch.modules.evidence.models import (
     ScanStatus,
 )
 from ecowatch.modules.evidence.repository import EvidenceRepository
+from ecowatch.modules.evidence.rules import image_dimensions_within_bounds
 from ecowatch.modules.evidence.scanner import (
     IMAGE_MIME_TYPES,
     create_exif_stripped_preview,
@@ -285,6 +286,23 @@ class EvidenceService:
             metaStatus, metadata = extract_image_metadata(rawBytes)
             asset.metadataExtractionStatus = metaStatus.value
             asset.extractedMetadata = metadata
+
+            withinBounds, boundsReason = image_dimensions_within_bounds(metadata)
+            if not withinBounds:
+                asset.scanStatus = ScanStatus.QUARANTINED.value
+                record_audit_event(
+                    self._session,
+                    actorUserId=None,
+                    actorRole="system",
+                    organisationId=asset.organisationId,
+                    action="evidence.scanned",
+                    targetType="evidence_asset",
+                    targetId=asset.id,
+                    reason=boundsReason,
+                    details={"scanStatus": asset.scanStatus, "check": "image_dimension_bounds"},
+                )
+                self._session.flush()
+                return
 
             existingTypes = {
                 d.derivativeType for d in self._repo.list_derivatives_for_asset(asset.id)

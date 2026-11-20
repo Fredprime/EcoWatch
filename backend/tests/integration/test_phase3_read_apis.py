@@ -108,39 +108,6 @@ def _seed(
     ids["relationship"] = response.json()["id"]
 
     response = client.post(
-        "/api/v1/intelligence/analyses",
-        headers=headers,
-        json={
-            "organisationId": org,
-            "question": "Did bare soil increase?",
-            "analysisType": "land_cover_change",
-            "methodName": "NDVIThreshold",
-            "methodVersion": "1.0",
-            "inputDatasetVersionIds": [str(uuid.uuid4())],
-            "crs": "EPSG:4326",
-            "parameters": {"threshold": 0.2},
-            "limitations": "Cloud cover in one month.",
-        },
-    )
-    assert response.status_code == 202, response.text
-    ids["run"] = response.json()["id"]
-    # Advance the real queued job before recording an output (the write path requires it).
-    assert run_once(dbSession, storageProvider) == 1
-
-    response = client.post(
-        f"/api/v1/intelligence/analyses/{ids['run']}/outputs",
-        headers=headers,
-        json={
-            "organisationId": org,
-            "outputType": "map",
-            "summary": "Bare soil estimate for the catchment.",
-            "limitations": "Cloud cover limits the comparison.",
-        },
-    )
-    assert response.status_code == 201, response.text
-    ids["output"] = response.json()["id"]
-
-    response = client.post(
         "/api/v1/catalogue/datasets",
         headers=headers,
         json={
@@ -175,6 +142,34 @@ def _seed(
     )
     assert response.status_code == 201, response.text
     ids["version"] = response.json()["id"]
+
+    # Give the stored version real bytes so the worker's real execution succeeds.
+    versionRow = dbSession.get(catalogue_models.DatasetVersion, uuid.UUID(ids["version"]))
+    assert versionRow is not None
+    storageKey = f"datasets/{uuid.uuid4().hex}.csv"
+    versionRow.storageKey = storageKey
+    storageProvider.put_bytes(storageKey, b"site,reading\nA,1.5\nB,2.5\n")
+    dbSession.commit()
+
+    response = client.post(
+        "/api/v1/intelligence/analyses",
+        headers=headers,
+        json={
+            "organisationId": org,
+            "question": "Did bare soil increase?",
+            "analysisType": "land_cover_change",
+            "methodName": "NDVIThreshold",
+            "methodVersion": "1.0",
+            "inputDatasetVersionIds": [ids["version"]],
+            "crs": "EPSG:4326",
+            "parameters": {"threshold": 0.2},
+            "limitations": "Cloud cover in one month.",
+        },
+    )
+    assert response.status_code == 202, response.text
+    ids["run"] = response.json()["id"]
+    # Advance the real queued job; the worker writes one derived output for the run.
+    assert run_once(dbSession, storageProvider) == 1
 
     response = client.post(
         "/api/v1/prioritisation/assessments",

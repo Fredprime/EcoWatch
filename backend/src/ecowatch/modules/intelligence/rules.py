@@ -2,12 +2,25 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.modules.intelligence import enums
+
+SUMMARY_METHOD_NAME = "stored-value-descriptive-summary"
+SUMMARY_METHOD_VERSION = "1.0"
+MAX_STORED_DATASET_BYTES = 25 * 1024 * 1024
+MAX_SUMMARY_RECORDS = 100_000
+SUMMARY_LIMITATIONS_CAVEAT = (
+    "Mechanical descriptive summary of stored dataset values only; awaiting human "
+    "interpretation. This output states no pollution source, causal link, harm, "
+    "severity, verification or legal conclusion."
+)
 
 
 def require_enum(
@@ -187,3 +200,138 @@ def assert_temporal_scope(
             "temporalStartAt must not be after temporalEndAt.",
             field="temporalEndAt",
         )
+
+
+def parse_stored_dataset_records(data: bytes, storageKey: str) -> list[dict[str, Any]]:
+    """Parse bounded CSV or JSON dataset bytes into row mappings, or fail explicitly.
+
+    Content is treated strictly as data: no evaluation, no path use. Only UTF-8
+    arrays of objects (optionally under a top-level "records" key) or CSV rows are
+    accepted, so a partial or unsupported payload never yields a fabricated summary.
+    """
+    fieldName = "inputDatasetVersionIds"
+    if not data:
+        raise DomainError(
+            ErrorCode.VALIDATION_ERROR, "Stored dataset has no content.", field=fieldName
+        )
+    if len(data) > MAX_STORED_DATASET_BYTES:
+        raise DomainError(
+            ErrorCode.VALIDATION_ERROR,
+            "Stored dataset exceeds the maximum supported size.",
+            field=fieldName,
+        )
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise DomainError(
+            ErrorCode.VALIDATION_ERROR,
+            "Stored dataset is not UTF-8 text.",
+            field=fieldName,
+        ) from error
+
+    stripped = text.lstrip()
+    try:
+        if stripped.startswith(("{", "[")):
+            parsed: Any = json.loads(text)
+            if isinstance(parsed, dict):
+                parsed = parsed.get("records")
+            if not isinstance(parsed, list):
+                raise ValueError("JSON dataset must be an array of objects")
+        else:
+            parsed = list(csv.DictReader(io.StringIO(text)))
+    except (json.JSONDecodeError, csv.Error, ValueError) as error:
+        raise DomainError(
+            ErrorCode.VALIDATION_ERROR,
+            f"Stored dataset at {storageKey} could not be parsed as CSV or JSON.",
+            field=fieldName,
+        ) from error
+
+    if len(parsed) > MAX_SUMMARY_RECORDS:
+        raise DomainError(
+            ErrorCode.VALIDATION_ERROR,
+            "Stored dataset exceeds the maximum supported row count.",
+            field=fieldName,
+        )
+    if not parsed:
+        raise DomainError(
+            ErrorCode.VALIDATION_ERROR,
+            "Stored dataset contains no records.",
+            field=fieldName,
+        )
+
+    records: list[dict[str, Any]] = []
+    for row in parsed:
+        if not isinstance(row, dict):
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR,
+                "Stored dataset contains a record that is not an object.",
+                field=fieldName,
+            )
+        records.append({str(key): value for key, value in row.items()})
+    return records
+
+
+def build_stored_value_summary(
+    records: list[dict[str, Any]],
+    *,
+    declaredMethodName: str,
+    declaredMethodVersion: str,
+) -> dict[str, Any]:
+    """Build a deterministic, interpretation-free summary of stored record values."""
+    columns = sorted({key for row in records for key in row})
+    columnSummaries: dict[str, Any] = {}
+    missingPresent = False
+    numericPresent = False
+    for column in columns:
+        values = [row.get(column) for row in records]
+        missing = sum(
+            1
+            for value in values
+            if value is None or (isinstance(value, str) and not value.strip())
+        )
+        numeric: list[float] = []
+        for value in values:
+            if isinstance(value, bool) or value is None:
+                continue
+            if isinstance(value, (int, float)):
+                numeric.append(float(value))
+            elif isinstance(value, str) and value.strip():
+                try:
+                    numeric.append(float(value.strip()))
+                except ValueError:
+                    continue
+        missingPresent = missingPresent or missing > 0
+        numericPresent = numericPresent or len(numeric) > 0
+        summary: dict[str, Any] = {
+            "count": len(values) - missing,
+            "missingCount": missing,
+            "numericCount": len(numeric),
+        }
+        if numeric:
+            summary["min"] = min(numeric)
+            summary["max"] = max(numeric)
+            summary["mean"] = round(sum(numeric) / len(numeric), 6)
+        columnSummaries[column] = summary
+
+    return {
+        "computationMethod": {
+            "name": SUMMARY_METHOD_NAME,
+            "version": SUMMARY_METHOD_VERSION,
+        },
+        "declaredMethod": {
+            "name": declaredMethodName,
+            "version": declaredMethodVersion,
+        },
+        "note": (
+            "Mechanical summary of stored input dataset values. It is not the "
+            "declared scientific method result and is not evidence of any source, "
+            "causal link, harm, severity, verification or legal conclusion."
+        ),
+        "recordCount": len(records),
+        "columnCount": len(columns),
+        "qualityFlags": {
+            "missingValuesPresent": missingPresent,
+            "numericValuesPresent": numericPresent,
+        },
+        "columns": columnSummaries,
+    }

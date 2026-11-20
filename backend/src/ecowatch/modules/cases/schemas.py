@@ -141,6 +141,9 @@ class TransitionCaseStatusRequest(CamelModel):
     referralRecord: dict[str, Any] | None = None
     fieldRecordReference: str | None = Field(default=None, max_length=200)
     mergedIntoCaseId: uuid.UUID | None = None
+    # Shared by all transitions; both keys are mandatory only for field_verified.
+    specialistApproverUserId: uuid.UUID | None = None
+    authorityApproverUserId: uuid.UUID | None = None
 
     @field_validator("statusRationale", "fieldRecordReference")
     @classmethod
@@ -251,6 +254,9 @@ class CaseResponse(CamelModel):
     fieldRecordReference: str | None = None
     specialistApprovalUserId: uuid.UUID | None = None
     authorityApprovalUserId: uuid.UUID | None = None
+    specialistApproverUserId: uuid.UUID | None = None
+    authorityApproverUserId: uuid.UUID | None = None
+    twoKeyApprovedAt: datetime | None = None
     mergedIntoCaseId: uuid.UUID | None = None
     accessClass: str
     isPublicSummaryApproved: bool
