@@ -85,6 +85,14 @@ class CreateOrganisationRequest(CamelModel):
     isActive: bool = True
 
 
+class UpdateUserRequest(CamelModel):
+    """System-admin patch for a user account; omitted fields stay unchanged."""
+
+    displayName: str | None = Field(default=None, min_length=1, max_length=120)
+    systemRole: SystemRole | None = None
+    isActive: bool | None = None
+
+
 class OrganisationResponse(CamelModel):
     """Public representation of an organisation."""
 
@@ -94,6 +102,14 @@ class OrganisationResponse(CamelModel):
     isActive: bool
     createdAt: datetime
     updatedAt: datetime
+
+
+class UpdateOrganisationRequest(CamelModel):
+    """System-admin patch for an organisation; omitted fields stay unchanged."""
+
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    orgType: str | None = Field(default=None, min_length=2, max_length=64)
+    isActive: bool | None = None
 
 
 class AssignMembershipRequest(CamelModel):

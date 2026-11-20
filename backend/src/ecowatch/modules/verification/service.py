@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
 from ecowatch.core.schemas import CursorPage
-from ecowatch.modules.identity.permissions import Permission, Principal
+from ecowatch.modules.identity.models import User
+from ecowatch.modules.identity.permissions import Permission, Principal, Role
+from ecowatch.modules.identity.repository import IdentityRepository
+from ecowatch.modules.interventions.models import Intervention
 from ecowatch.modules.phase3Contracts import record_event, require_permission, require_text
 from ecowatch.modules.phase3Reads import list_page, read_scope, scope_statement
 from ecowatch.modules.verification import enums, models, rules
@@ -29,6 +32,40 @@ class VerificationService:
 
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def _roles_in_org(self, userId: UUID | None, organisationId: UUID) -> frozenset[Role]:
+        """Return the active roles a recorded approver holds in one organisation."""
+        if userId is None:
+            return frozenset()
+        user = self._session.get(User, userId)
+        if user is None or not user.isActive:
+            return frozenset()
+        memberships = IdentityRepository(self._session).list_active_memberships_for_user(
+            userId
+        )
+        return frozenset(
+            Role(item.role)
+            for item in memberships
+            if item.organisationId == organisationId
+        )
+
+    def _intervention_owner_ids(
+        self, interventionId: UUID | None, organisationId: UUID
+    ) -> frozenset[UUID]:
+        """Return the lead and proposer of an in-scope intervention."""
+        if interventionId is None:
+            return frozenset()
+        intervention = self._session.get(Intervention, interventionId)
+        if intervention is None or intervention.organisationId != organisationId:
+            return frozenset()
+        return frozenset(
+            userId
+            for userId in (
+                intervention.authorisedLeadUserId,
+                intervention.proposedByUserId,
+            )
+            if userId is not None
+        )
 
     def create_indicator_definition(
         self,
@@ -288,6 +325,8 @@ class VerificationService:
         *,
         organisationId: UUID,
         assessmentId: UUID,
+        specialistApproverUserId: UUID,
+        authorityApproverUserId: UUID,
         criteriaVersion: str,
         criteriaApproved: bool,
         comparisonMethod: str,
@@ -296,7 +335,7 @@ class VerificationService:
         seasonalContextDocumented: str,
         requestId: str | None = None,
     ) -> models.VerificationAssessment:
-        """Verify recovery only with approved criteria and a specialist reviewer."""
+        """Verify recovery only with approved criteria and two distinct keys."""
         require_permission(principal, Permission.VERIFICATION_APPROVE, organisationId)
         record = self._session.get(models.VerificationAssessment, assessmentId)
         if record is None or record.organisationId != organisationId:
@@ -309,7 +348,18 @@ class VerificationService:
         rules.assert_recovery_verification_allowed(
             criteriaVersion=criteriaVersion,
             criteriaApproved=criteriaApproved,
-            reviewerRoles=frozenset(principal.roles_for_org(organisationId)),
+            specialistApproverUserId=specialistApproverUserId,
+            authorityApproverUserId=authorityApproverUserId,
+            actorUserId=principal.userId,
+            specialistRoles=self._roles_in_org(
+                specialistApproverUserId, organisationId
+            ),
+            authorityRoles=self._roles_in_org(
+                authorityApproverUserId, organisationId
+            ),
+            interventionOwnerUserIds=self._intervention_owner_ids(
+                record.interventionId, organisationId
+            ),
             baselineMeasurementIds=record.baselineMeasurementIds,
             followUpMeasurementIds=record.followUpMeasurementIds,
             comparisonMethod=comparisonMethod,
@@ -317,11 +367,15 @@ class VerificationService:
             confoundersDocumented=confoundersDocumented,
             seasonalContextDocumented=seasonalContextDocumented,
         )
+        approvedAt = utc_now()
         record.conclusion = enums.OutcomeConclusion.RECOVERY_VERIFIED.value
         record.criteriaVersion = criteriaVersion.strip()
         record.status = enums.AssessmentStatus.FINAL.value
         record.reviewedByUserId = principal.userId
-        record.reviewedAt = utc_now()
+        record.reviewedAt = approvedAt
+        record.specialistApproverUserId = specialistApproverUserId
+        record.authorityApproverUserId = authorityApproverUserId
+        record.twoKeyApprovedAt = approvedAt
         self._session.flush()
         record_event(
             self._session,
@@ -330,6 +384,10 @@ class VerificationService:
             action="verification.recovery.verified",
             targetType="verificationAssessment",
             targetId=record.id,
+            detail={
+                "specialistApproverUserId": str(specialistApproverUserId),
+                "authorityApproverUserId": str(authorityApproverUserId),
+            },
             requestId=requestId,
         )
         self._session.commit()
@@ -340,20 +398,41 @@ class VerificationService:
         principal: Principal,
         *,
         organisationId: UUID,
+        specialistApproverUserId: UUID,
+        authorityApproverUserId: UUID,
         publishedText: str,
         verificationAssessmentId: UUID | None = None,
         caseId: UUID | None = None,
         requestId: str | None = None,
     ) -> models.Publication:
-        """Publish an approved summary with a recorded authorised role."""
+        """Publish an approved summary with two recorded approvers."""
         require_permission(principal, Permission.PUBLICATION_WRITE, organisationId)
         approvedRole = principal.primary_role_label
         approvedAt = utc_now()
+        ownerIds: frozenset[UUID] = frozenset()
+        if verificationAssessmentId is not None:
+            assessment = self._session.get(
+                models.VerificationAssessment, verificationAssessmentId
+            )
+            if assessment is not None and assessment.organisationId == organisationId:
+                ownerIds = self._intervention_owner_ids(
+                    assessment.interventionId, organisationId
+                )
         rules.assert_publication_allowed(
             publishedText=publishedText,
             approvedByUserId=principal.userId,
             approvedRole=approvedRole,
             approvedAt=approvedAt,
+            specialistApproverUserId=specialistApproverUserId,
+            authorityApproverUserId=authorityApproverUserId,
+            actorUserId=principal.userId,
+            specialistRoles=self._roles_in_org(
+                specialistApproverUserId, organisationId
+            ),
+            authorityRoles=self._roles_in_org(
+                authorityApproverUserId, organisationId
+            ),
+            interventionOwnerUserIds=ownerIds,
         )
         record = models.Publication(
             organisationId=organisationId,
@@ -363,6 +442,9 @@ class VerificationService:
             approvedByUserId=principal.userId,
             approvedRole=approvedRole,
             approvedAt=approvedAt,
+            specialistApproverUserId=specialistApproverUserId,
+            authorityApproverUserId=authorityApproverUserId,
+            twoKeyApprovedAt=approvedAt,
         )
         self._session.add(record)
         self._session.flush()
@@ -373,6 +455,10 @@ class VerificationService:
             action="verification.publication.approved",
             targetType="publication",
             targetId=record.id,
+            detail={
+                "specialistApproverUserId": str(specialistApproverUserId),
+                "authorityApproverUserId": str(authorityApproverUserId),
+            },
             requestId=requestId,
         )
         self._session.commit()

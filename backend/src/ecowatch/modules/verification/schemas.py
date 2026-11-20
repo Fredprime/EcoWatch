@@ -91,9 +91,11 @@ class FinaliseAssessmentRequest(CamelModel):
 
 
 class RecoveryVerificationRequest(CamelModel):
-    """Dedicated gated path for an authorised recovery verification."""
+    """Dedicated gated path for a two-key recovery verification."""
 
     organisationId: uuid.UUID
+    specialistApproverUserId: uuid.UUID
+    authorityApproverUserId: uuid.UUID
     criteriaVersion: str = Field(min_length=1, max_length=100)
     criteriaApproved: bool
     comparisonMethod: str = Field(min_length=1, max_length=10000)
@@ -114,9 +116,11 @@ class RecoveryVerificationRequest(CamelModel):
 
 
 class PublishSummaryRequest(CamelModel):
-    """Approved public summary with stored approver, role, timestamp, and text."""
+    """Approved public summary with two-key approval, timestamp, and exact text."""
 
     organisationId: uuid.UUID
+    specialistApproverUserId: uuid.UUID
+    authorityApproverUserId: uuid.UUID
     publishedText: str = Field(min_length=1, max_length=10000)
     verificationAssessmentId: uuid.UUID | None = None
     caseId: uuid.UUID | None = None
@@ -204,6 +208,9 @@ class AssessmentResponse(CamelModel):
     status: str
     reviewedByUserId: uuid.UUID | None = None
     reviewedAt: datetime | None = None
+    specialistApproverUserId: uuid.UUID | None = None
+    authorityApproverUserId: uuid.UUID | None = None
+    twoKeyApprovedAt: datetime | None = None
     createdAt: datetime
     updatedAt: datetime
 
@@ -219,6 +226,9 @@ class PublicationResponse(CamelModel):
     approvedByUserId: uuid.UUID
     approvedRole: str
     approvedAt: datetime
+    specialistApproverUserId: uuid.UUID | None = None
+    authorityApproverUserId: uuid.UUID | None = None
+    twoKeyApprovedAt: datetime | None = None
     retractedAt: datetime | None = None
     retractionReason: str | None = None
     createdAt: datetime

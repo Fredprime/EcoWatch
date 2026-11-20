@@ -136,11 +136,79 @@ def assert_outcome_separation(
         )
 
 
+def assert_two_key_pair(
+    *,
+    specialistApproverUserId: object | None,
+    authorityApproverUserId: object | None,
+    actorUserId: object | None,
+    specialistRoles: frozenset[Role],
+    authorityRoles: frozenset[Role],
+    interventionOwnerUserIds: frozenset[object],
+    errorCode: ErrorCode,
+) -> None:
+    """Require two distinct role-qualified approvers, one of them the actor.
+
+    Recovery verification and publication are two-key conclusions. The specialist
+    key must hold environmental_specialist and the authority key must hold
+    organisation_admin. Neither key may be the intervention owner, and the acting
+    caller must supply one of the two keys rather than nominating two other people.
+    """
+    if specialistApproverUserId is None or authorityApproverUserId is None:
+        raise DomainError(
+            errorCode,
+            "Two approvers are required: an environmental specialist and an "
+            "organisation authority.",
+            field="approverUserIds",
+        )
+    if specialistApproverUserId == authorityApproverUserId:
+        raise DomainError(
+            errorCode,
+            "The two approvers must be different users.",
+            field="approverUserIds",
+        )
+    if actorUserId is None or actorUserId not in {
+        specialistApproverUserId,
+        authorityApproverUserId,
+    }:
+        raise DomainError(
+            ErrorCode.FORBIDDEN,
+            "The acting caller must be one of the two recorded approvers.",
+            statusCode=403,
+            field="approverUserIds",
+        )
+    if Role.ENVIRONMENTAL_SPECIALIST not in specialistRoles:
+        raise DomainError(
+            errorCode,
+            "The specialist approver must hold environmental_specialist in this organisation.",
+            field="specialistApproverUserId",
+        )
+    if Role.ORGANISATION_ADMIN not in authorityRoles:
+        raise DomainError(
+            errorCode,
+            "The authority approver must hold organisation_admin in this organisation.",
+            field="authorityApproverUserId",
+        )
+    if (
+        specialistApproverUserId in interventionOwnerUserIds
+        or authorityApproverUserId in interventionOwnerUserIds
+    ):
+        raise DomainError(
+            errorCode,
+            "The intervention owner cannot approve a conclusion about that intervention.",
+            field="approverUserIds",
+        )
+
+
 def assert_recovery_verification_allowed(
     *,
     criteriaVersion: str | None,
     criteriaApproved: bool,
-    reviewerRoles: frozenset[Role],
+    specialistApproverUserId: object | None,
+    authorityApproverUserId: object | None,
+    actorUserId: object | None,
+    specialistRoles: frozenset[Role],
+    authorityRoles: frozenset[Role],
+    interventionOwnerUserIds: frozenset[object],
     baselineMeasurementIds: list[str] | None,
     followUpMeasurementIds: list[str] | None,
     comparisonMethod: str | None,
@@ -148,7 +216,7 @@ def assert_recovery_verification_allowed(
     confoundersDocumented: str | None,
     seasonalContextDocumented: str | None,
 ) -> None:
-    """Gate recovery verification behind approved criteria and a specialist reviewer."""
+    """Gate recovery verification behind approved criteria and two distinct keys."""
     if criteriaVersion is None or not criteriaVersion.strip():
         raise DomainError(
             ErrorCode.RECOVERY_NOT_VERIFIABLE,
@@ -161,12 +229,15 @@ def assert_recovery_verification_allowed(
             "Recovery criteria are not approved; recovery cannot be verified.",
             field="criteriaApproved",
         )
-    if Role.ENVIRONMENTAL_SPECIALIST not in reviewerRoles:
-        raise DomainError(
-            ErrorCode.RECOVERY_NOT_VERIFIABLE,
-            "Recovery verification requires an environmental specialist reviewer.",
-            field="reviewerRoles",
-        )
+    assert_two_key_pair(
+        specialistApproverUserId=specialistApproverUserId,
+        authorityApproverUserId=authorityApproverUserId,
+        actorUserId=actorUserId,
+        specialistRoles=specialistRoles,
+        authorityRoles=authorityRoles,
+        interventionOwnerUserIds=interventionOwnerUserIds,
+        errorCode=ErrorCode.RECOVERY_NOT_VERIFIABLE,
+    )
     if not baselineMeasurementIds:
         raise DomainError(
             ErrorCode.RECOVERY_NOT_VERIFIABLE,
@@ -244,8 +315,14 @@ def assert_publication_allowed(
     approvedByUserId: object | None,
     approvedRole: str | Role | None,
     approvedAt: datetime | None,
+    specialistApproverUserId: object | None,
+    authorityApproverUserId: object | None,
+    actorUserId: object | None,
+    specialistRoles: frozenset[Role],
+    authorityRoles: frozenset[Role],
+    interventionOwnerUserIds: frozenset[object],
 ) -> None:
-    """Require authorised human approval before publishing a public summary."""
+    """Require two-key human approval before publishing a public summary."""
     if publishedText is None or not publishedText.strip():
         raise DomainError(
             ErrorCode.VALIDATION_ERROR,
@@ -262,7 +339,6 @@ def assert_publication_allowed(
     allowed = {
         Role.ENVIRONMENTAL_SPECIALIST,
         Role.ORGANISATION_ADMIN,
-        Role.SYSTEM_ADMIN,
     }
     if approvedRoleValue not in allowed:
         raise DomainError(
@@ -276,6 +352,15 @@ def assert_publication_allowed(
             "A publication requires an approval timestamp.",
             field="approvedAt",
         )
+    assert_two_key_pair(
+        specialistApproverUserId=specialistApproverUserId,
+        authorityApproverUserId=authorityApproverUserId,
+        actorUserId=actorUserId,
+        specialistRoles=specialistRoles,
+        authorityRoles=authorityRoles,
+        interventionOwnerUserIds=interventionOwnerUserIds,
+        errorCode=ErrorCode.VALIDATION_ERROR,
+    )
 
 
 def assert_criteria_documented(criteriaVersion: str | None) -> None:

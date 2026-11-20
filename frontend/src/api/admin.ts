@@ -8,6 +8,8 @@ import type {
   JobSummaryResponse,
   MembershipResponse,
   OrganisationSummary,
+  UpdateOrganisationRequest,
+  UpdateUserRequest,
   UserResponse,
 } from './types';
 
@@ -24,8 +26,37 @@ export function createOrganisation(
   return request<OrganisationSummary>(`${BASE}/organisations`, jsonBody(payload));
 }
 
+export function updateOrganisation(
+  organisationId: string,
+  payload: UpdateOrganisationRequest,
+): Promise<OrganisationSummary> {
+  return request<OrganisationSummary>(
+    `${BASE}/organisations/${encodeURIComponent(organisationId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function listUsers(): Promise<CursorPage<UserResponse>> {
+  return request<CursorPage<UserResponse>>(`${BASE}/users?limit=50`);
+}
+
 export function createUser(payload: CreateUserRequest): Promise<UserResponse> {
   return request<UserResponse>(`${BASE}/users`, jsonBody(payload));
+}
+
+export function updateUser(
+  userId: string,
+  payload: UpdateUserRequest,
+): Promise<UserResponse> {
+  return request<UserResponse>(`${BASE}/users/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function assignMembership(

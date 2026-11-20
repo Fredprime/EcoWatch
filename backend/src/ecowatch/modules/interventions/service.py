@@ -12,11 +12,12 @@ from sqlalchemy.orm import Session
 from ecowatch.core.errors import DomainError, ErrorCode
 from ecowatch.core.models import utc_now
 from ecowatch.core.schemas import CursorPage
-from ecowatch.modules.identity.permissions import Permission, Principal
+from ecowatch.modules.identity.permissions import Permission, Principal, Role
 from ecowatch.modules.interventions import enums, models, rules
 from ecowatch.modules.interventions.schemas import InterventionResponse, MilestoneResponse
 from ecowatch.modules.phase3Contracts import record_event, require_permission, require_text
 from ecowatch.modules.phase3Reads import list_page, load_scoped_parent, read_scope, scope_statement
+from ecowatch.modules.verification.models import VerificationAssessment
 
 
 class InterventionsService:
@@ -66,6 +67,7 @@ class InterventionsService:
             rationale=rationale,
             responsibleOrganisationId=responsibleOrganisationId,
             authorisedLeadUserId=authorisedLeadUserId,
+            proposedByUserId=principal.userId,
             approvalReference=approvalReference,
             location=location,
             affectedAreaNotes=affectedAreaNotes,
@@ -206,17 +208,13 @@ class InterventionsService:
             targetValue,
             verificationAssessmentRef=verificationAssessmentRef,
         )
-        record.status = targetValue.value
+        if targetValue is enums.InterventionStatus.APPROVED:
+            self._assert_can_approve(principal, organisationId, record)
         if targetValue is enums.InterventionStatus.RECOVERY_VERIFIED:
-            try:
-                record.verificationAssessmentId = UUID(verificationAssessmentRef or "")
-            except ValueError as error:
-                raise DomainError(
-                    ErrorCode.NOT_FOUND,
-                    "The verification assessment reference must be a valid UUID.",
-                    statusCode=404,
-                    field="verificationAssessmentRef",
-                ) from error
+            record.verificationAssessmentId = self._verified_assessment_id(
+                record, organisationId, verificationAssessmentRef
+            )
+        record.status = targetValue.value
         self._session.flush()
         record_event(
             self._session,
@@ -230,6 +228,69 @@ class InterventionsService:
         )
         self._session.commit()
         return record
+
+    def _assert_can_approve(
+        self, principal: Principal, organisationId: UUID, record: models.Intervention
+    ) -> None:
+        """Only an organisation authority who did not propose or lead the work may approve."""
+        if Role.ORGANISATION_ADMIN not in principal.roles_for_org(organisationId):
+            raise DomainError(
+                ErrorCode.FORBIDDEN,
+                "Only organisation_admin may approve an intervention.",
+                statusCode=403,
+                field="targetStatus",
+            )
+        if principal.userId in {
+            record.proposedByUserId,
+            record.authorisedLeadUserId,
+        }:
+            raise DomainError(
+                ErrorCode.SELF_REVIEW_FORBIDDEN,
+                "The proposer or accountable lead cannot approve their own intervention.",
+                statusCode=403,
+                field="targetStatus",
+            )
+
+    def _verified_assessment_id(
+        self,
+        record: models.Intervention,
+        organisationId: UUID,
+        verificationAssessmentRef: str | None,
+    ) -> UUID:
+        """Accept only a final, two-key recovery assessment for this intervention."""
+        try:
+            assessmentId = UUID(verificationAssessmentRef or "")
+        except ValueError as error:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "The verification assessment reference must be a valid UUID.",
+                statusCode=404,
+                field="verificationAssessmentRef",
+            ) from error
+        assessment = self._session.get(VerificationAssessment, assessmentId)
+        if (
+            assessment is None
+            or assessment.organisationId != organisationId
+            or assessment.interventionId != record.id
+        ):
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Verification assessment not found for this intervention.",
+                statusCode=404,
+                field="verificationAssessmentRef",
+            )
+        if (
+            assessment.conclusion != "recovery_verified"
+            or assessment.status != "final"
+            or assessment.specialistApproverUserId is None
+            or assessment.authorityApproverUserId is None
+        ):
+            raise DomainError(
+                ErrorCode.RECOVERY_NOT_VERIFIABLE,
+                "A final two-key recovery verification is required.",
+                field="verificationAssessmentRef",
+            )
+        return assessmentId
 
     def _get_intervention(
         self, organisationId: UUID, interventionId: UUID

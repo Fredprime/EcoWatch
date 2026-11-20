@@ -43,6 +43,12 @@ class Intervention(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("users.id"),
         nullable=False,
     )
+    proposedByUserId: Mapped[uuid.UUID | None] = mapped_column(
+        "proposed_by_user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
     approvalReference: Mapped[str | None] = mapped_column(
         "approval_reference", Text, nullable=True
     )

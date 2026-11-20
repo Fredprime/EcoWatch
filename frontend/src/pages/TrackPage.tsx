@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { ApiError, errorMessage } from '../api/client';
 import { lookupReceipt } from '../api/collection';
 import type { ReceiptLookupResponse } from '../api/types';
+import { CopyButton } from '../components/CopyButton';
 
 function formatTime(value: string): string {
   const date = new Date(value);
@@ -73,6 +74,15 @@ export function TrackPage() {
             <section className="card" aria-labelledby="receipt-title">
               <h2 id="receipt-title">Server receipt</h2>
               <p role="status">A durable receipt is confirmed for observation {receipt.observationId}.</p>
+              <div className="tracking-reference">
+                <span><strong>Tracking code used:</strong>{' '}</span>
+                <code>{trackingCode.trim()}</code>
+                <CopyButton
+                  value={trackingCode.trim()}
+                  label="Copy tracking code"
+                  ariaLabel="Copy tracking code"
+                />
+              </div>
               <dl className="public-details">
                 <dt>Observation type</dt>
                 <dd>{receipt.observationType}</dd>

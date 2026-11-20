@@ -13,14 +13,20 @@ import {
   getJobsSummary,
   listAuditEvents,
   listOrganisations,
+  listUsers,
+  updateOrganisation,
+  updateUser,
 } from '../api/admin';
 import { errorMessage } from '../api/client';
+import type { OrganisationSummary, UserResponse } from '../api/types';
 
 export function AdminPage() {
   const loadOrganisations = useCallback(() => listOrganisations(), []);
+  const loadUsersResource = useCallback(() => listUsers(), []);
   const loadAudit = useCallback(() => listAuditEvents(), []);
   const loadJobs = useCallback(() => getJobsSummary(), []);
   const organisations = useApiResource(loadOrganisations, 'admin:organisations');
+  const users = useApiResource(loadUsersResource, 'admin:users');
   const audit = useApiResource(loadAudit, 'admin:audit');
   const jobs = useApiResource(loadJobs, 'admin:jobs');
 
@@ -45,6 +51,7 @@ export function AdminPage() {
   const [memberBusy, setMemberBusy] = useState(false);
   const [memberStatus, setMemberStatus] = useState<string | null>(null);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
 
   const orgOptions =
     organisations.state.status === 'success'
@@ -87,11 +94,34 @@ export function AdminPage() {
       setUserPassword('');
       setUserStatus(`User ${created.email} created (ID: ${created.id}).`);
       setMemberUserId(created.id);
+      users.reload();
       audit.reload();
     } catch (err) {
       setUserError(errorMessage(err));
     } finally {
       setUserBusy(false);
+    }
+  }
+
+  async function toggleUser(user: UserResponse) {
+    setLifecycleError(null);
+    try {
+      await updateUser(user.id, { isActive: !user.isActive });
+      users.reload();
+      audit.reload();
+    } catch (err) {
+      setLifecycleError(errorMessage(err));
+    }
+  }
+
+  async function toggleOrganisation(org: OrganisationSummary) {
+    setLifecycleError(null);
+    try {
+      await updateOrganisation(org.id, { isActive: !org.isActive });
+      organisations.reload();
+      audit.reload();
+    } catch (err) {
+      setLifecycleError(errorMessage(err));
     }
   }
 
@@ -146,6 +176,7 @@ export function AdminPage() {
                         <th scope="col">Type</th>
                         <th scope="col">Active</th>
                         <th scope="col">Created</th>
+                        <th scope="col">Lifecycle</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -155,6 +186,66 @@ export function AdminPage() {
                           <td>{org.orgType.replaceAll('_', ' ')}</td>
                           <td>{org.isActive ? 'Yes' : 'No'}</td>
                           <td>{formatTime(org.createdAt)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => void toggleOrganisation(org)}
+                              aria-label={`${org.isActive ? 'Deactivate' : 'Activate'} ${org.name}`}
+                            >
+                              {org.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            }
+          </ResourceState>
+        </div>
+
+        <div className="card">
+          <h2>Users</h2>
+          <p className="muted">Accounts visible to system administrators. Passwords are never returned.</p>
+          {lifecycleError && <p className="notice notice-danger" role="alert">{lifecycleError}</p>}
+          <ResourceState state={users.state}>
+            {(page) =>
+              page.items.length === 0 ? (
+                <EmptyState
+                  title="No user accounts in your permitted scope."
+                  detail="Accounts appear here only when the server returns them for your role."
+                />
+              ) : (
+                <div className="table-wrap" role="region" aria-label="Users table" tabIndex={0}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Email</th>
+                        <th scope="col">Display name</th>
+                        <th scope="col">System role</th>
+                        <th scope="col">Active</th>
+                        <th scope="col">Lifecycle</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {page.items.map((user) => (
+                        <tr key={user.id}>
+                          <th scope="row">{user.email}</th>
+                          <td>{user.displayName}</td>
+                          <td>{user.systemRole ? user.systemRole.replaceAll('_', ' ') : 'None'}</td>
+                          <td>{user.isActive ? 'Yes' : 'No'}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => void toggleUser(user)}
+                              aria-label={`${user.isActive ? 'Deactivate' : 'Activate'} ${user.email}`}
+                            >
+                              {user.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

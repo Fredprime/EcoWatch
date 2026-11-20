@@ -273,11 +273,16 @@ def test_interventions_endpoints_lifecycle(
     assert completed.status_code == 200, completed.text
     assert completed.json()["status"] == "completed"
 
+    authority = create_temp_user(
+        dbSession, memberships=[(organisationId, Role.ORGANISATION_ADMIN)]
+    )
+    authorityHeaders = auth_headers(authProvider, authority)
+
     finalStatus = None
     for target in ("approved", "scheduled", "in_progress", "activity_completed"):
         transitioned = client.post(
             f"{base}/interventions/{interventionId}/transition",
-            headers=headers,
+            headers=authorityHeaders if target == "approved" else headers,
             json={
                 "organisationId": str(organisationId),
                 "targetStatus": target,
@@ -295,6 +300,12 @@ def test_verification_endpoints_measurements_assessment_and_publication(
     client: TestClient, dbSession: Session, authProvider: LocalTokenAuthProvider
 ) -> None:
     organisationId, headers = _authenticate(dbSession, authProvider)
+    authority = create_temp_user(
+        dbSession, memberships=[(organisationId, Role.ORGANISATION_ADMIN)]
+    )
+    specialistId = authProvider.verify_token(
+        headers["Authorization"].split(" ", 1)[1]
+    ).userId
     unitId = _create_temp_unit(dbSession)
     base = "/api/v1/verification"
 
@@ -366,6 +377,8 @@ def test_verification_endpoints_measurements_assessment_and_publication(
         headers=headers,
         json={
             "organisationId": str(organisationId),
+            "specialistApproverUserId": str(specialistId),
+            "authorityApproverUserId": str(authority.id),
             "criteriaVersion": "criteria-2026-01",
             "criteriaApproved": True,
             "comparisonMethod": "Matched site comparison",
@@ -382,6 +395,8 @@ def test_verification_endpoints_measurements_assessment_and_publication(
         headers=headers,
         json={
             "organisationId": str(organisationId),
+            "specialistApproverUserId": str(specialistId),
+            "authorityApproverUserId": str(authority.id),
             "publishedText": "Turbidity improved at the monitored site.",
             "verificationAssessmentId": assessmentBody["id"],
         },

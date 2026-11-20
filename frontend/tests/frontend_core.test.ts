@@ -7,7 +7,9 @@ import { parseWkt, featuresFromWkt, allPositions } from '../src/components/wkt.t
 import { rolesFor, hasAnyRole, CORRELATION_REVIEW_ROLES } from '../src/auth/roles.ts';
 import { displayText, formatTime } from '../src/components/phase3Format.ts';
 import { ApiError } from '../src/api/client.ts';
-import type { AuthMeResponse } from '../src/api/types.ts';
+import type { AuthMeResponse, IntakeReceiptResponse } from '../src/api/types.ts';
+import { CopyButton } from '../src/components/CopyButton.tsx';
+import { ReceiptDialog } from '../src/components/ReceiptDialog.tsx';
 import { Notice } from '../src/components/Notice.tsx';
 import { EmptyState } from '../src/components/EmptyState.tsx';
 import { ActionPanel, ReadOnlyListCard, RecordPicker } from '../src/components/Phase3Views.tsx';
@@ -151,4 +153,37 @@ test('UI components render accessible roles, labels, empty states, and tables', 
   assert.match(actionHtml, /Create record/);
   assert.match(actionHtml, /Created ok/);
   assert.match(actionHtml, /Save/);
+});
+
+test('receipt confirmation shows a copyable tracking reference', () => {
+  const receipt: IntakeReceiptResponse = {
+    observationId: 'obs-1',
+    organisationId: 'org-1',
+    receivedAt: '2026-11-20T09:00:00Z',
+    observationType: 'water',
+    timePrecision: 'approximate',
+    locationPrecision: 'area',
+    currentVersion: 1,
+    trackingCode: 'ECO-TRACK-123',
+    idempotentReplay: false,
+  };
+
+  const copyHtml = renderToStaticMarkup(
+    createElement(CopyButton, {
+      value: receipt.trackingCode,
+      label: 'Copy tracking reference',
+      ariaLabel: 'Copy tracking reference',
+    }),
+  );
+  assert.match(copyHtml, /type="button"/);
+  assert.match(copyHtml, /Copy tracking reference/);
+
+  const dialogHtml = renderToStaticMarkup(
+    createElement(ReceiptDialog, { open: true, receipt, onClose: () => {} }),
+  );
+  assert.match(dialogHtml, /<dialog/);
+  assert.match(dialogHtml, /aria-labelledby="receipt-dialog-title"/);
+  assert.match(dialogHtml, /Report received/);
+  assert.match(dialogHtml, /ECO-TRACK-123/);
+  assert.match(dialogHtml, /Copy tracking reference/);
 });

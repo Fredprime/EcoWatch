@@ -260,10 +260,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PRIORITISATION_WRITE,
             Permission.INTERVENTION_READ,
             Permission.INTERVENTION_WRITE,
+            # system_admin operates the platform; scientific authority stays with
+            # environmental_specialist and organisation_admin (PERMISSIONS_MATRIX §1.8).
             Permission.VERIFICATION_READ,
-            Permission.VERIFICATION_WRITE,
-            Permission.VERIFICATION_APPROVE,
-            Permission.PUBLICATION_WRITE,
         }
     ),
 }
