@@ -2,7 +2,7 @@
 
 **Status:** Living document. Code is the source of truth; this list tracks gaps found by reading the
 current `master` tree, not older planning documents.
-**Branch:** `feat/remaining-gaps-and-report-ux`
+**Branch:** `feat/remaining-gaps-and-report-ux` (PR #40 open into `master`)
 **Last updated:** 2026-11-20
 
 ## How to use this file

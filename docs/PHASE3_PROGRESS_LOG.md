@@ -308,8 +308,8 @@ unavailable locally.
 ### Update 2026-11-20 — remaining gaps, two-key governance and report UX
 
 - **Current branch:** `feat/remaining-gaps-and-report-ux` off `master` (`ca450a9`).
-  The detailed work list is `docs/REMAINING_WORK_TODO.md`; the branch is pending PR into
-  `master`. Earlier Phase 3 branches and PRs remain historical and must not be redone.
+  The detailed work list is `docs/REMAINING_WORK_TODO.md`; PR **#40** into `master` is open
+  for owner review. Earlier Phase 3 branches and PRs remain historical and must not be redone.
 - **Why this branch exists:** the owner reported that contributors could not copy their tracking
   ID and wanted a confirmation popup after a successful report. While fixing those, the code was
   treated as the source of truth for the remaining governance gaps; stale documentation was
@@ -383,7 +383,7 @@ unavailable locally.
    ADR-034's tombstone-only reading of FR-057 erasure (originals retained per
    hard boundary), ADR-035's single-actor reading of case-action authority, and
    the ADR-036 scope boundary (no WebSocket, no server-side sync-state column).
-8. **Current follow-up PR (`feat/remaining-gaps-and-report-ux` → `master`) owner decisions:**
+8. **Current follow-up PR #40 (`feat/remaining-gaps-and-report-ux` → `master`) owner decisions:**
    confirm the breaking request contract in ADR-041 (both approver UUIDs are required), that
    `system_admin` is no longer a scientific approver, and that admin lifecycle changes in
    ADR-042 are audited UI conveniences over server-side enforcement. Owner merges and redeploys;
