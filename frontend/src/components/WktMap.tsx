@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { FeatureCollection } from 'geojson';
 import { allPositions, type WktFeature } from './wkt';
+
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 interface WktMapProps {
   features: WktFeature[];
@@ -12,9 +15,8 @@ interface WktMapProps {
 }
 
 /**
- * Renders only stored WKT geometry on a locally built blank style (ADR-038).
- * There is no tile source, basemap URL, API key or external request. The
- * accessible list/detail view for the same records stays on the page.
+ * Renders stored WKT geometry over an OpenStreetMap raster basemap (or a custom
+ * `VITE_MAP_STYLE_URL`), with an SVG fallback if WebGL cannot be initialised.
  */
 export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -27,7 +29,6 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
   useEffect(() => {
     const host = hostRef.current;
     if (!host || features.length === 0) return;
-    setFailed(false);
 
     const styles = getComputedStyle(document.documentElement);
     const token = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback;
@@ -41,20 +42,30 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
         container: host,
         style: configuredStyleUrl || {
           version: 8 as const,
-          sources: {},
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors',
+            },
+          },
           layers: [
             { id: 'background', type: 'background', paint: { 'background-color': background } },
+            { id: 'osm-tiles', type: 'raster', source: 'osm' },
           ],
         },
-        attributionControl: false,
+        attributionControl: { compact: true },
       });
     } catch {
-      setFailed(true);
+      queueMicrotask(() => setFailed(true));
       return;
     }
     const activeMap = map;
+    activeMap.addControl(new maplibregl.NavigationControl(), 'top-right');
     activeMap.on('error', () => setFailed(true));
     activeMap.on('load', () => {
+      setFailed(false);
       activeMap.addSource('stored-geometry', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features } as unknown as FeatureCollection,
@@ -64,22 +75,53 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
         type: 'fill',
         source: 'stored-geometry',
         filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
-        paint: { 'fill-color': accent, 'fill-opacity': 0.25 },
+        paint: { 'fill-color': accent, 'fill-opacity': 0.22 },
+      });
+      activeMap.addLayer({
+        id: 'stored-area-outlines',
+        type: 'line',
+        source: 'stored-geometry',
+        filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
+        paint: { 'line-color': accent, 'line-width': 2 },
       });
       activeMap.addLayer({
         id: 'stored-lines',
         type: 'line',
         source: 'stored-geometry',
         filter: ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
-        paint: { 'line-color': accent, 'line-width': 2 },
+        paint: { 'line-color': accent, 'line-width': 2.5 },
       });
       activeMap.addLayer({
         id: 'stored-points',
         type: 'circle',
         source: 'stored-geometry',
         filter: ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false],
-        paint: { 'circle-color': accent, 'circle-radius': 6 },
+        paint: {
+          'circle-color': accent,
+          'circle-radius': 7,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
       });
+
+      const interactiveLayers = ['stored-areas', 'stored-lines', 'stored-points'];
+      for (const layerId of interactiveLayers) {
+        activeMap.on('mouseenter', layerId, () => {
+          activeMap.getCanvas().style.cursor = 'pointer';
+        });
+        activeMap.on('mouseleave', layerId, () => {
+          activeMap.getCanvas().style.cursor = '';
+        });
+        activeMap.on('click', layerId, (event) => {
+          const hit = event.features?.[0];
+          const label = hit?.properties?.label;
+          if (!label) return;
+          new maplibregl.Popup({ closeButton: true })
+            .setLngLat(event.lngLat)
+            .setText(String(label))
+            .addTo(activeMap);
+        });
+      }
 
       if (positions.length > 0) {
         const [firstLon, firstLat] = positions[0];
@@ -114,7 +156,7 @@ export function WktMap({ features, skipped, emptyNote, ariaLabel }: WktMapProps)
         </p>
       )}
       <p className="muted">
-        Stored geometry only — no basemap, tile service or external request. Shown:{' '}
+        Stored geometry over OpenStreetMap basemap (click a marker or boundary for details). Shown:{' '}
         {features.map((feature) => feature.properties.label).join(', ')}.
       </p>
     </div>
