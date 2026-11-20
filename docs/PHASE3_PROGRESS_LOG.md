@@ -1,6 +1,6 @@
 # Phase 3 Progress Log
 
-**Last updated:** 2026-11-19
+**Last updated:** 2026-11-20
 **Purpose:** Durable, curated record of the Phase 3 integration work so a future
 session can resume without re-discovering decisions, commands, results and open
 items. Read this before making further Phase 3 changes.
@@ -13,9 +13,10 @@ items. Read this before making further Phase 3 changes.
 
 1. Read `AGENTS.md`, then this file.
 2. `git status -sb` and `git log --oneline -5`.
-3. Confirm the branch is `feat/Randy_Branch` and the working tree is understood.
-4. Check PR #9 state:
-   `https://github.com/Fredprime/EcoWatch/pull/9`.
+3. Confirm the current branch and working tree. The active follow-up branch is
+   `feat/remaining-gaps-and-report-ux`; older Phase 3 work landed on `feat/Randy_Branch`.
+4. Check the current PR state from `gh pr list --head <branch> --base master` rather than
+   assuming an old PR number. PR #9 (`feat/Randy_Branch`) is historical and merged.
 5. Re-run the verification commands in the "Verification" section before making
    new claims about the branch.
 
@@ -95,8 +96,10 @@ interventions and verification.
 - Prediction is blocked without a validated model, validation report,
   representative data and target.
 - Milestones derive activity status only, never environmental outcome.
-- Recovery verification requires approved criteria and an environmental
-  specialist reviewer.
+- Recovery verification requires approved criteria and two role-qualified, distinct
+  human approvers: `environmental_specialist` plus `organisation_admin`, with neither
+  the intervention owner and the acting caller as one of the two keys (ADR-041).
+- Publication requires the same two-key approval and stores both approvers (ADR-041).
 - Activity, output, environmental outcome and recovery are separate concepts.
 - No agent output may declare a pollution source, illegal activity, causal link,
   harm, `field verified` or `recovery verified`.
@@ -144,16 +147,19 @@ Role grants:
 - `ENVIRONMENTAL_SPECIALIST`: all eight Phase 3 permissions
 - `INTERVENTION_MANAGER`: `INTERVENTION_WRITE`, `VERIFICATION_WRITE`
 - `ORGANISATION_ADMIN`: all eight Phase 3 permissions
-- `SYSTEM_ADMIN`: all eight Phase 3 permissions
+- `SYSTEM_ADMIN`: read/operational permissions only; no
+  `VERIFICATION_WRITE`, `VERIFICATION_APPROVE` or `PUBLICATION_WRITE` (ADR-041)
 
 ## Alembic / migration state
 
 - Phase 3 migration: `backend/alembic/versions/0003_phase3_schema.py`
-- Revision: `0003_phase3_schema`
-- Down revision: `0002_phase2_correlation`
-- Chain:
-  `base -> 0001_phase1_initial_schema -> 0002_phase2_correlation -> 0003_phase3_schema (head)`
-- The migration was originally `0002_phase3_schema.py`; renamed after merging
+- Historical Phase 3 revision at first merge: `0003_phase3_schema`, down revision
+  `0002_phase2_correlation`.
+- Current head on this branch: `0008_two_key_governance`; the full chain is
+  `0001_phase1_initial_schema -> 0002_phase2_correlation -> {0003_phase2_clusters,
+  0003_phase3_schema} -> 0004_merge_phase2_phase3 -> 0005_phase2_embeddings ->
+  0006_evidence_upload_idempotency -> 0007_token_revocation -> 0008_two_key_governance`.
+- The Phase 3 migration was originally `0002_phase3_schema.py`; renamed after merging
   Phase 2 from `master`.
 - `backend/alembic/env.py` imports all Phase 3 models and also imports
   `EvidenceRelationship` from the Phase 2 correlation module so Alembic sees
@@ -264,7 +270,7 @@ system Python 3.13 plus `PYTHONPATH` pointed at the venv's `site-packages` and
 `backend/src`. The 4 skips are PostGIS-gated tests; Docker/PostgreSQL is still
 unavailable locally.
 
-## Current state (2026-11-19)
+## Current state at 2026-11-19 (superseded by the 2026-11-20 update above)
 
 - PR #9 is merged into `master` as `c3aafd4`; `feat/Randy_Branch` has pulled the
   latest `master` through merge `aaaf3bf`.
@@ -299,6 +305,65 @@ unavailable locally.
 - The frontend is already merged and verified; keep the phone-check tunnel
   available and do not fold frontend changes into the backend PR.
 
+### Update 2026-11-20 — remaining gaps, two-key governance and report UX
+
+- **Current branch:** `feat/remaining-gaps-and-report-ux` off `master` (`ca450a9`).
+  The detailed work list is `docs/REMAINING_WORK_TODO.md`; PR **#40** into `master` is open
+  for owner review. Earlier Phase 3 branches and PRs remain historical and must not be redone.
+- **Why this branch exists:** the owner reported that contributors could not copy their tracking
+  ID and wanted a confirmation popup after a successful report. While fixing those, the code was
+  treated as the source of truth for the remaining governance gaps; stale documentation was
+  updated afterwards (ADR-041 and ADR-042).
+- **Report UX:** `frontend/src/components/CopyButton.tsx` copies via the clipboard API with a
+  hidden-textarea fallback; `ReceiptDialog.tsx` is a labelled native `<dialog>` showing the
+  server receipt, copyable tracking reference, precision fields and Done/Track actions. The
+  report receipt card and tracking lookup page also carry copy buttons. A front-end test renders
+  both controls and asserts the dialog/receipt markup.
+- **Two-key governance (ADR-041):** recovery verification and publication now require
+  `specialistApproverUserId` and `authorityApproverUserId`, role-qualified in the organisation,
+  distinct, neither the intervention owner, with the acting caller as one key. Both approvers
+  and `twoKeyApprovedAt` are stored and audited. `system_admin` keeps read/operational access
+  but loses scientific write/approve/publication grants. Intervention approval requires an
+  uninvolved `organisation_admin`; the proposer is recorded; the `recovery_verified` transition
+  accepts only a final two-key assessment for the same intervention.
+- **Admin lifecycle (ADR-042):** `GET /users`, `PATCH /users/{userId}` and
+  `PATCH /organisations/{orgId}` are `system_admin`-only, audited, omit password hashes, refuse
+  self-lockout, and are exposed in the Administration page as user/org activate-deactivate
+  controls.
+- **Migration:** `0008_two_key_governance` is the single head (`down_revision`
+  `0007_token_revocation`). It adds `proposed_by_user_id` to interventions and specialist,
+  authority and two-key timestamp columns to verification assessments and publications.
+- **Breaking request contract:** `RecoveryVerificationRequest` and `PublishSummaryRequest` now
+  require the two approver UUID fields. Old clients must be updated before redeploying the API.
+- **Verification on this branch (2026-11-20):**
+
+  ```bash
+  .venv/bin/ruff check backend
+  # All checks passed.
+
+  .venv/bin/pytest backend -q
+  # 143 passed, 4 skipped, 1 warning in 230.40s
+  # warning is the pre-existing httpx/starlette TestClient deprecation.
+
+  cd backend && ../.venv/bin/python -m alembic heads
+  # 0008_two_key_governance (head)
+
+  cd frontend
+  npm run lint
+  # Pre-existing src/components/WktMap.tsx set-state-in-effect warning only.
+
+  npm test
+  # 6 frontend core tests pass.
+
+  npm run build
+  # Passes.
+  ```
+
+- **Not claimed:** no analytical engine, malware scanner, trained semantic model, database-level
+  audit immutability, controlled-vocabulary admin API, case `field_verified` two-key gate,
+  token-revocation purge job, real-device offline validation or release-gate sign-off. These stay
+  in `docs/REMAINING_WORK_TODO.md` §4.
+
 ## Open items
 
 1. ~~Obtain owner approval for the Phase 3 permissions matrix.~~ Resolved by
@@ -318,6 +383,11 @@ unavailable locally.
    ADR-034's tombstone-only reading of FR-057 erasure (originals retained per
    hard boundary), ADR-035's single-actor reading of case-action authority, and
    the ADR-036 scope boundary (no WebSocket, no server-side sync-state column).
+8. **Current follow-up PR #40 (`feat/remaining-gaps-and-report-ux` → `master`) owner decisions:**
+   confirm the breaking request contract in ADR-041 (both approver UUIDs are required), that
+   `system_admin` is no longer a scientific approver, and that admin lifecycle changes in
+   ADR-042 are audited UI conveniences over server-side enforcement. Owner merges and redeploys;
+   no production action is taken from this branch.
 
 ## Relevant files
 

@@ -146,6 +146,21 @@ class VerificationAssessment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     reviewedAt: Mapped[datetime | None] = mapped_column(
         "reviewed_at", DateTime(timezone=True), nullable=True
     )
+    specialistApproverUserId: Mapped[uuid.UUID | None] = mapped_column(
+        "specialist_approver_user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    authorityApproverUserId: Mapped[uuid.UUID | None] = mapped_column(
+        "authority_approver_user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    twoKeyApprovedAt: Mapped[datetime | None] = mapped_column(
+        "two_key_approved_at", DateTime(timezone=True), nullable=True
+    )
 
 
 class Publication(Base, UUIDPrimaryKeyMixin):
@@ -176,6 +191,21 @@ class Publication(Base, UUIDPrimaryKeyMixin):
     approvedRole: Mapped[str] = mapped_column("approved_role", String(50), nullable=False)
     approvedAt: Mapped[datetime] = mapped_column(
         "approved_at", DateTime(timezone=True), nullable=False
+    )
+    specialistApproverUserId: Mapped[uuid.UUID | None] = mapped_column(
+        "specialist_approver_user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    authorityApproverUserId: Mapped[uuid.UUID | None] = mapped_column(
+        "authority_approver_user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    twoKeyApprovedAt: Mapped[datetime | None] = mapped_column(
+        "two_key_approved_at", DateTime(timezone=True), nullable=True
     )
     retractedAt: Mapped[datetime | None] = mapped_column(
         "retracted_at", DateTime(timezone=True), nullable=True

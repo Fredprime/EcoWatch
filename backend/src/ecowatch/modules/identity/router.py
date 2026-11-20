@@ -27,6 +27,8 @@ from ecowatch.modules.identity.schemas import (
     LogoutResponse,
     MembershipResponse,
     OrganisationResponse,
+    UpdateOrganisationRequest,
+    UpdateUserRequest,
     UserResponse,
 )
 from ecowatch.modules.identity.service import IdentityService
@@ -83,6 +85,31 @@ def create_user(
     return IdentityService(db).create_user(principal, payload, requestId=requestId)
 
 
+@router.get("/users", response_model=CursorPage[UserResponse])
+def list_users(
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    principal: Principal = Depends(require_permission(Permission.ADMIN_MANAGE_SYSTEM)),
+    db: Session = Depends(get_db),
+) -> CursorPage[UserResponse]:
+    """List user accounts for a system admin (no password hashes are returned)."""
+    return IdentityService(db).list_users(principal, cursor=cursor, limit=limit)
+
+
+@router.patch("/users/{userId}", response_model=UserResponse)
+def update_user(
+    payload: UpdateUserRequest,
+    userId: uuid.UUID = Path(),
+    principal: Principal = Depends(require_permission(Permission.ADMIN_MANAGE_SYSTEM)),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> UserResponse:
+    """Update a user's profile, system role, or active state (system_admin only)."""
+    return IdentityService(db).update_user(
+        principal, userId, payload, requestId=requestId
+    )
+
+
 @router.post(
     "/organisations",
     response_model=OrganisationResponse,
@@ -107,6 +134,20 @@ def list_organisations(
 ) -> CursorPage[OrganisationResponse]:
     """List organisations accessible to the authenticated principal."""
     return IdentityService(db).list_organisations(principal, cursor=cursor, limit=limit)
+
+
+@router.patch("/organisations/{orgId}", response_model=OrganisationResponse)
+def update_organisation(
+    payload: UpdateOrganisationRequest,
+    orgId: uuid.UUID = Path(),
+    principal: Principal = Depends(require_permission(Permission.ADMIN_MANAGE_SYSTEM)),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> OrganisationResponse:
+    """Edit or deactivate an organisation (system_admin only)."""
+    return IdentityService(db).update_organisation(
+        principal, orgId, payload, requestId=requestId
+    )
 
 
 @router.post(

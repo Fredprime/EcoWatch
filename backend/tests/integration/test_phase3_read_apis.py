@@ -44,12 +44,12 @@ def _actor(
     role: Role = Role.ENVIRONMENTAL_SPECIALIST,
     *,
     systemRole: SystemRole | None = None,
-) -> tuple[uuid.UUID, dict[str, str]]:
+) -> tuple[uuid.UUID, dict[str, str], uuid.UUID]:
     """Create a temporary organisation and an authenticated principal."""
     org = create_temp_org(dbSession)
     memberships = [] if systemRole is not None else [(org.id, role)]
     user = create_temp_user(dbSession, memberships=memberships, systemRole=systemRole)
-    return org.id, auth_headers(authProvider, user)
+    return org.id, auth_headers(authProvider, user), user.id
 
 
 def _temp_unit(dbSession: Session) -> uuid.UUID:
@@ -69,6 +69,7 @@ def _seed(
     headers: dict[str, str],
     orgId: uuid.UUID,
     unitId: uuid.UUID,
+    specialistApproverUserId: uuid.UUID,
 ) -> dict[str, str]:
     """Create one temporary record of every Phase 3 type through the write APIs."""
     ids: dict[str, str] = {}
@@ -272,11 +273,16 @@ def _seed(
     assert response.status_code == 201, response.text
     ids["verification"] = response.json()["id"]
 
+    authority = create_temp_user(
+        dbSession, memberships=[(orgId, Role.ORGANISATION_ADMIN)]
+    )
     response = client.post(
         "/api/v1/verification/publications",
         headers=headers,
         json={
             "organisationId": org,
+            "specialistApproverUserId": str(specialistApproverUserId),
+            "authorityApproverUserId": str(authority.id),
             "publishedText": "Turbidity improved at the monitored site.",
             "verificationAssessmentId": ids["verification"],
         },
@@ -306,11 +312,11 @@ def test_read_apis_return_own_org_records_with_camel_case_page(
     storageProvider: StorageProvider,
 ) -> None:
     """A permitted caller sees their own records and the standard page envelope."""
-    orgId, headers = _actor(dbSession, authProvider)
-    otherOrgId, otherHeaders = _actor(dbSession, authProvider)
+    orgId, headers, actorId = _actor(dbSession, authProvider)
+    otherOrgId, otherHeaders, otherActorId = _actor(dbSession, authProvider)
     unitId = _temp_unit(dbSession)
-    ownIds = _seed(client, dbSession, storageProvider, headers, orgId, unitId)
-    _seed(client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId)
+    ownIds = _seed(client, dbSession, storageProvider, headers, orgId, unitId, actorId)
+    _seed(client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId, otherActorId)
 
     for name, path in TOP_LEVEL_LISTS:
         response = client.get(path, headers=headers)
@@ -335,11 +341,11 @@ def test_read_apis_let_system_admin_see_all_organisations(
     storageProvider: StorageProvider,
 ) -> None:
     """A system admin sees every organisation and may still filter by one."""
-    orgId, headers = _actor(dbSession, authProvider)
-    otherOrgId, otherHeaders = _actor(dbSession, authProvider)
+    orgId, headers, actorId = _actor(dbSession, authProvider)
+    otherOrgId, otherHeaders, otherActorId = _actor(dbSession, authProvider)
     unitId = _temp_unit(dbSession)
-    idsA = _seed(client, dbSession, storageProvider, headers, orgId, unitId)
-    idsB = _seed(client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId)
+    idsA = _seed(client, dbSession, storageProvider, headers, orgId, unitId, actorId)
+    idsB = _seed(client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId, otherActorId)
     adminHeaders = auth_headers(
         authProvider,
         create_temp_user(dbSession, systemRole=SystemRole.SYSTEM_ADMIN),
@@ -368,13 +374,13 @@ def test_read_apis_refuse_cross_org_filter_and_missing_permission(
     storageProvider: StorageProvider,
 ) -> None:
     """Cross-organisation filters and roles without the gate are refused server-side."""
-    orgId, headers = _actor(dbSession, authProvider)
-    otherOrgId, otherHeaders = _actor(dbSession, authProvider)
+    orgId, headers, actorId = _actor(dbSession, authProvider)
+    otherOrgId, otherHeaders, otherActorId = _actor(dbSession, authProvider)
     unitId = _temp_unit(dbSession)
-    _seed(client, dbSession, storageProvider, headers, orgId, unitId)
-    _seed(client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId)
+    _seed(client, dbSession, storageProvider, headers, orgId, unitId, actorId)
+    _seed(client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId, otherActorId)
 
-    unauthorisedId, unauthorisedHeaders = _actor(
+    unauthorisedId, unauthorisedHeaders, _ = _actor(
         dbSession, authProvider, Role.REGISTERED_CONTRIBUTOR
     )
     assert unauthorisedId != orgId
@@ -400,11 +406,13 @@ def test_read_apis_hide_out_of_scope_child_parents(
     storageProvider: StorageProvider,
 ) -> None:
     """Child lists return 404 for a parent in another organisation."""
-    orgId, headers = _actor(dbSession, authProvider)
-    otherOrgId, otherHeaders = _actor(dbSession, authProvider)
+    orgId, headers, actorId = _actor(dbSession, authProvider)
+    otherOrgId, otherHeaders, otherActorId = _actor(dbSession, authProvider)
     unitId = _temp_unit(dbSession)
-    otherIds = _seed(client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId)
-    _seed(client, dbSession, storageProvider, headers, orgId, unitId)
+    otherIds = _seed(
+        client, dbSession, storageProvider, otherHeaders, otherOrgId, unitId, otherActorId
+    )
+    _seed(client, dbSession, storageProvider, headers, orgId, unitId, actorId)
 
     for parentKey, path, _ in _child_lists(otherIds):
         response = client.get(path, headers=headers)
@@ -418,9 +426,9 @@ def test_read_api_pagination_uses_next_cursor(
     storageProvider: StorageProvider,
 ) -> None:
     """A bounded first page and its opaque cursor return the remaining record."""
-    orgId, headers = _actor(dbSession, authProvider)
+    orgId, headers, actorId = _actor(dbSession, authProvider)
     unitId = _temp_unit(dbSession)
-    first = _seed(client, dbSession, storageProvider, headers, orgId, unitId)["dataset"]
+    first = _seed(client, dbSession, storageProvider, headers, orgId, unitId, actorId)["dataset"]
     second = client.post(
         "/api/v1/catalogue/datasets",
         headers=headers,
@@ -472,7 +480,7 @@ def test_reviewer_can_read_intelligence_without_write_permission(
     authProvider: LocalTokenAuthProvider,
 ) -> None:
     """ADR-040: reviewer holds INTELLIGENCE_READ without INTELLIGENCE_WRITE."""
-    orgId, reviewerHeaders = _actor(
+    orgId, reviewerHeaders, _ = _actor(
         dbSession, authProvider, Role.REVIEWER
     )
 

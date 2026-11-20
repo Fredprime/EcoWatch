@@ -24,6 +24,22 @@ class IdentityRepository:
         normalized = email.strip().lower()
         return self._session.scalar(select(User).where(User.email == normalized))
 
+    def list_users(
+        self,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> tuple[list[User], str | None, bool]:
+        """Page through user accounts without exposing password hashes."""
+        return paginate_descending(
+            self._session,
+            select(User),
+            timeCol=User.createdAt,
+            idCol=User.id,
+            cursor=cursor,
+            limit=limit,
+        )
+
     def is_token_revoked(self, tokenId: uuid.UUID) -> bool:
         """Return True if a bearer token's jti has been explicitly revoked."""
         return self._session.get(RevokedToken, tokenId) is not None

@@ -95,6 +95,7 @@ class InterventionResponse(CamelModel):
     rationale: str | None = None
     responsibleOrganisationId: uuid.UUID
     authorisedLeadUserId: uuid.UUID
+    proposedByUserId: uuid.UUID | None = None
     approvalReference: str | None = None
     location: str | None = None
     affectedAreaNotes: str | None = None

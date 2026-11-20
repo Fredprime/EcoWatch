@@ -25,6 +25,8 @@ from ecowatch.modules.identity.schemas import (
     LogoutResponse,
     MembershipResponse,
     OrganisationResponse,
+    UpdateOrganisationRequest,
+    UpdateUserRequest,
     UserResponse,
 )
 
@@ -247,6 +249,151 @@ class IdentityService:
             nextCursor=nextCursor,
             hasMore=hasMore,
         )
+
+    def list_users(
+        self,
+        principal: Principal,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CursorPage[UserResponse]:
+        """List user accounts for a system admin, never exposing password hashes."""
+        if not principal.is_system_admin:
+            raise DomainError(
+                ErrorCode.FORBIDDEN,
+                "Only system_admin may list users",
+                statusCode=status.HTTP_403_FORBIDDEN,
+            )
+        items, nextCursor, hasMore = self._repo.list_users(cursor=cursor, limit=limit)
+        return CursorPage[UserResponse](
+            items=[UserResponse.model_validate(user) for user in items],
+            nextCursor=nextCursor,
+            hasMore=hasMore,
+        )
+
+    def update_user(
+        self,
+        principal: Principal,
+        userId: uuid.UUID,
+        payload: UpdateUserRequest,
+        *,
+        requestId: str | None = None,
+    ) -> UserResponse:
+        """Patch a user account (system_admin only), refusing self-lockout."""
+        if not principal.is_system_admin:
+            raise DomainError(
+                ErrorCode.FORBIDDEN,
+                "Only system_admin may update users",
+                statusCode=status.HTTP_403_FORBIDDEN,
+            )
+        user = self._repo.get_user_by_id(userId)
+        if user is None:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "User not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+            )
+        changed = payload.model_fields_set
+        isSelf = userId == principal.userId
+        if "isActive" in changed and payload.isActive is False and isSelf:
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR,
+                "A system_admin cannot deactivate their own account",
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                field="isActive",
+            )
+        if (
+            "systemRole" in changed
+            and payload.systemRole is None
+            and isSelf
+            and user.systemRole == SystemRole.SYSTEM_ADMIN.value
+        ):
+            raise DomainError(
+                ErrorCode.VALIDATION_ERROR,
+                "A system_admin cannot remove their own system role",
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                field="systemRole",
+            )
+
+        details: dict[str, object] = {}
+        if "displayName" in changed and payload.displayName is not None:
+            user.displayName = payload.displayName.strip()
+            details["displayNameChanged"] = True
+        if "systemRole" in changed:
+            user.systemRole = payload.systemRole.value if payload.systemRole else None
+            details["systemRole"] = user.systemRole
+        if "isActive" in changed and payload.isActive is not None:
+            user.isActive = payload.isActive
+            details["isActive"] = user.isActive
+        record_audit_event(
+            self._session,
+            actorUserId=principal.userId,
+            actorRole=principal.primary_role_label,
+            action="user.updated",
+            targetType="user",
+            targetId=user.id,
+            details=details,
+            requestId=requestId,
+        )
+        self._session.commit()
+        self._session.refresh(user)
+        return UserResponse.model_validate(user)
+
+    def update_organisation(
+        self,
+        principal: Principal,
+        organisationId: uuid.UUID,
+        payload: UpdateOrganisationRequest,
+        *,
+        requestId: str | None = None,
+    ) -> OrganisationResponse:
+        """Patch an organisation (system_admin only), including deactivation."""
+        if not principal.is_system_admin:
+            raise DomainError(
+                ErrorCode.FORBIDDEN,
+                "Only system_admin may update organisations",
+                statusCode=status.HTTP_403_FORBIDDEN,
+            )
+        org = self._repo.get_organisation_by_id(organisationId)
+        if org is None:
+            raise DomainError(
+                ErrorCode.NOT_FOUND,
+                "Organisation not found",
+                statusCode=status.HTTP_404_NOT_FOUND,
+            )
+        changed = payload.model_fields_set
+        details: dict[str, object] = {}
+        if "name" in changed and payload.name is not None:
+            duplicate = self._repo.get_organisation_by_name(payload.name)
+            if duplicate is not None and duplicate.id != org.id:
+                raise DomainError(
+                    ErrorCode.CONFLICT,
+                    "An organisation with this name already exists",
+                    statusCode=status.HTTP_409_CONFLICT,
+                    field="name",
+                )
+            org.name = payload.name.strip()
+            details["nameChanged"] = True
+        if "orgType" in changed and payload.orgType is not None:
+            org.orgType = payload.orgType.strip()
+            details["orgType"] = org.orgType
+        if "isActive" in changed and payload.isActive is not None:
+            org.isActive = payload.isActive
+            details["isActive"] = org.isActive
+        record_audit_event(
+            self._session,
+            actorUserId=principal.userId,
+            actorRole=principal.primary_role_label,
+            organisationId=org.id,
+            action="organisation.updated",
+            targetType="organisation",
+            targetId=org.id,
+            details=details,
+            requestId=requestId,
+        )
+        self._session.commit()
+        self._session.refresh(org)
+        return OrganisationResponse.model_validate(org)
 
     def assign_membership(
         self,

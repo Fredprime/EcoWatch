@@ -341,56 +341,95 @@ def testObservedChangeNeverClaimsRecovery() -> None:
     )
 
 
-def testRecoveryVerificationRequiresApprovedCriteriaAndSpecialist() -> None:
+def _twoKeyArgs() -> dict[str, object]:
+    return {
+        "specialistApproverUserId": uuid.uuid4(),
+        "authorityApproverUserId": uuid.uuid4(),
+        "actorUserId": None,
+        "specialistRoles": frozenset({Role.ENVIRONMENTAL_SPECIALIST}),
+        "authorityRoles": frozenset({Role.ORGANISATION_ADMIN}),
+        "interventionOwnerUserIds": frozenset(),
+    }
+
+
+def testRecoveryVerificationRequiresApprovedCriteriaAndTwoKeys() -> None:
+    keys = _twoKeyArgs()
+    keys["actorUserId"] = keys["specialistApproverUserId"]
+    base = {
+        **keys,
+        "baselineMeasurementIds": ["a"],
+        "followUpMeasurementIds": ["b"],
+        "comparisonMethod": "Matched site comparison",
+        "uncertaintyDocumented": "95% interval recorded.",
+        "confoundersDocumented": "Rainfall considered.",
+        "seasonalContextDocumented": "Dry season matched.",
+    }
+
     with pytest.raises(DomainError) as error:
         verificationRules.assert_recovery_verification_allowed(
-            criteriaVersion=None,
-            criteriaApproved=False,
-            reviewerRoles=frozenset({Role.ENVIRONMENTAL_SPECIALIST}),
-            baselineMeasurementIds=["a"],
-            followUpMeasurementIds=["b"],
-            comparisonMethod="Matched site comparison",
-            uncertaintyDocumented="95% interval recorded.",
-            confoundersDocumented="Rainfall considered.",
-            seasonalContextDocumented="Dry season matched.",
+            **{**base, "criteriaVersion": None, "criteriaApproved": False}
         )
     assert error.value.code is ErrorCode.RECOVERY_NOT_VERIFIABLE
 
-    with pytest.raises(DomainError):
+    with pytest.raises(DomainError) as error:
         verificationRules.assert_recovery_verification_allowed(
-            criteriaVersion="criteria-2026-01",
-            criteriaApproved=True,
-            reviewerRoles=frozenset({Role.INVESTIGATOR}),
-            baselineMeasurementIds=["a"],
-            followUpMeasurementIds=["b"],
-            comparisonMethod="Matched site comparison",
-            uncertaintyDocumented="95% interval recorded.",
-            confoundersDocumented="Rainfall considered.",
-            seasonalContextDocumented="Dry season matched.",
+            **{**base, "criteriaVersion": "criteria-2026-01", "criteriaApproved": True,
+               "authorityApproverUserId": keys["specialistApproverUserId"]}
         )
+    assert error.value.field == "approverUserIds"
+
+    with pytest.raises(DomainError) as error:
+        verificationRules.assert_recovery_verification_allowed(
+            **{**base, "criteriaVersion": "criteria-2026-01", "criteriaApproved": True,
+               "actorUserId": uuid.uuid4()}
+        )
+    assert error.value.code is ErrorCode.FORBIDDEN
+
+    with pytest.raises(DomainError) as error:
+        verificationRules.assert_recovery_verification_allowed(
+            **{**base, "criteriaVersion": "criteria-2026-01", "criteriaApproved": True,
+               "interventionOwnerUserIds": frozenset({keys["specialistApproverUserId"]})}
+        )
+    assert error.value.code is ErrorCode.RECOVERY_NOT_VERIFIABLE
 
     verificationRules.assert_recovery_verification_allowed(
-        criteriaVersion="criteria-2026-01",
-        criteriaApproved=True,
-        reviewerRoles=frozenset({Role.ENVIRONMENTAL_SPECIALIST}),
-        baselineMeasurementIds=["a"],
-        followUpMeasurementIds=["b"],
-        comparisonMethod="Matched site comparison",
-        uncertaintyDocumented="95% interval recorded.",
-        confoundersDocumented="Rainfall considered.",
-        seasonalContextDocumented="Dry season matched.",
+        **{**base, "criteriaVersion": "criteria-2026-01", "criteriaApproved": True}
     )
 
 
-def testPublicationRequiresAuthorisedApprover() -> None:
+def testPublicationRequiresTwoKeyApproval() -> None:
+    keys = _twoKeyArgs()
+    keys["actorUserId"] = keys["authorityApproverUserId"]
+    base = {
+        **keys,
+        "publishedText": "Turbidity improved at the monitored site.",
+        "approvedByUserId": uuid.uuid4(),
+        "approvedRole": Role.REGISTERED_CONTRIBUTOR,
+        "approvedAt": now,
+    }
+    with pytest.raises(DomainError) as error:
+        verificationRules.assert_publication_allowed(**base)
+    assert error.value.field == "approvedRole"
+
     with pytest.raises(DomainError) as error:
         verificationRules.assert_publication_allowed(
-            publishedText="Turbidity improved at the monitored site.",
-            approvedByUserId=uuid.uuid4(),
-            approvedRole=Role.REGISTERED_CONTRIBUTOR,
-            approvedAt=now,
+            **{**base, "approvedRole": Role.SYSTEM_ADMIN}
         )
     assert error.value.field == "approvedRole"
+
+    with pytest.raises(DomainError) as error:
+        verificationRules.assert_publication_allowed(
+            **{
+                **base,
+                "approvedRole": Role.ORGANISATION_ADMIN,
+                "specialistRoles": frozenset({Role.INVESTIGATOR}),
+            }
+        )
+    assert error.value.field == "specialistApproverUserId"
+
+    verificationRules.assert_publication_allowed(
+        **{**base, "approvedRole": Role.ORGANISATION_ADMIN}
+    )
 
 
 def testPermissionGuardHidesOtherOrganisationAndRejectsMissingPermission() -> None:

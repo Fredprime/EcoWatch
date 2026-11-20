@@ -567,6 +567,18 @@ export interface CreateUserRequest {
   isActive?: boolean;
 }
 
+export interface UpdateUserRequest {
+  displayName?: string | null;
+  systemRole?: string | null;
+  isActive?: boolean | null;
+}
+
+export interface UpdateOrganisationRequest {
+  name?: string | null;
+  orgType?: string | null;
+  isActive?: boolean | null;
+}
+
 export interface AssignMembershipRequest {
   userId: string;
   role: string;

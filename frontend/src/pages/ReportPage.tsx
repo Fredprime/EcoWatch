@@ -19,6 +19,8 @@ import type {
   TimePrecision,
 } from '../api/types';
 import type { QueuedReport } from '../api/offlineQueue';
+import { CopyButton } from '../components/CopyButton';
+import { ReceiptDialog } from '../components/ReceiptDialog';
 
 type FieldName = 'obsType' | 'description';
 type SubmitState = 'draft' | 'submitting' | 'queued' | 'received' | 'error';
@@ -80,6 +82,7 @@ export function ReportPage() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photosBusy, setPhotosBusy] = useState(false);
   const [queued, setQueued] = useState<QueuedReport | null>(null);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const summaryRef = useRef<HTMLDivElement | null>(null);
   const idempotencyRef = useRef<string | null>(null);
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -108,6 +111,7 @@ export function ReportPage() {
     const onSubmitted = (event: Event) => {
       setReceipt((event as CustomEvent<IntakeReceiptResponse>).detail);
       setSubmitState('received');
+      setShowReceiptDialog(true);
     };
     window.addEventListener(QUEUE_SUBMITTED_EVENT, onSubmitted);
     return () => window.removeEventListener(QUEUE_SUBMITTED_EVENT, onSubmitted);
@@ -273,6 +277,7 @@ export function ReportPage() {
     try {
       const result = await createObservation(payload);
       setReceipt(result);
+      setShowReceiptDialog(true);
       setSubmitState('received');
       setValues(initialValues);
       setSubmitAttempted(false);
@@ -358,10 +363,17 @@ export function ReportPage() {
           )}
           {receipt && (
             <div>
-              <p>
-                <strong>Tracking reference:</strong>{' '}
-                {receipt.trackingCode ?? 'No reference was returned for this replay.'}
-              </p>
+              <div className="tracking-reference">
+                <span><strong>Tracking reference:</strong>{' '}</span>
+                <code>{receipt.trackingCode ?? 'No reference was returned for this replay.'}</code>
+                {receipt.trackingCode && (
+                  <CopyButton
+                    value={receipt.trackingCode}
+                    label="Copy tracking reference"
+                    ariaLabel="Copy tracking reference"
+                  />
+                )}
+              </div>
               <p className="muted">
                 Observation {receipt.observationId} · server receipt {formatTime(receipt.receivedAt)} ·
                 version {receipt.currentVersion} · time precision {receipt.timePrecision} ·
@@ -618,6 +630,11 @@ export function ReportPage() {
       <p className="muted public-after-form">
         After submitting, keep the tracking reference private — you’ll use it to look up the server receipt.
       </p>
+      <ReceiptDialog
+        open={showReceiptDialog && receipt !== null}
+        receipt={receipt}
+        onClose={() => setShowReceiptDialog(false)}
+      />
     </div>
   );
 }
