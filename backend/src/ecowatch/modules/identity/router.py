@@ -27,6 +27,7 @@ from ecowatch.modules.identity.schemas import (
     LogoutResponse,
     MembershipResponse,
     OrganisationResponse,
+    RevokedTokenPurgeResponse,
     UpdateOrganisationRequest,
     UpdateUserRequest,
     UserResponse,
@@ -62,6 +63,19 @@ def logout(
     token = credentials.credentials if credentials is not None else ""
     return IdentityService(db).logout(
         principal, token, authProvider, requestId=requestId
+    )
+
+
+@router.post("/auth/revoked-tokens/purge", response_model=RevokedTokenPurgeResponse)
+def purge_revoked_tokens(
+    limit: int = Query(default=100, ge=1, le=500),
+    principal: Principal = Depends(require_permission(Permission.ADMIN_MANAGE_SYSTEM)),
+    db: Session = Depends(get_db),
+    requestId: str | None = Depends(get_request_id),
+) -> RevokedTokenPurgeResponse:
+    """Delete a bounded batch of expired token revocations (system_admin only)."""
+    return IdentityService(db).purge_expired_revoked_tokens(
+        principal, limit=limit, requestId=requestId
     )
 
 

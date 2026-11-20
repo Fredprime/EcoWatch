@@ -14,7 +14,12 @@ from ecowatch.modules.intelligence.models import AnalysisRun
 from ecowatch.modules.jobs.models import JobStatus, ProcessingJob
 from ecowatch.modules.jobs.worker import run_once
 from ecowatch.modules.observations.models import Unit
-from tests.conftest import auth_headers, create_temp_org, create_temp_user
+from tests.conftest import (
+    auth_headers,
+    create_temp_org,
+    create_temp_user,
+    make_stored_dataset_version,
+)
 
 NOW = datetime(2026, 11, 19, 9, 0, tzinfo=UTC)
 LATER = datetime(2026, 11, 20, 9, 0, tzinfo=UTC)
@@ -90,6 +95,7 @@ def test_intelligence_endpoints_entity_relationship_analysis_and_gate(
     storageProvider: StorageProvider,
 ) -> None:
     organisationId, headers = _authenticate(dbSession, authProvider)
+    versionId = make_stored_dataset_version(dbSession, storageProvider, organisationId)
     base = "/api/v1/intelligence"
 
     entity = client.post(
@@ -141,7 +147,7 @@ def test_intelligence_endpoints_entity_relationship_analysis_and_gate(
             "analysisType": "land_cover_change",
             "methodName": "NDVIThreshold",
             "methodVersion": "1.0",
-            "inputDatasetVersionIds": [str(uuid.uuid4())],
+            "inputDatasetVersionIds": [str(versionId)],
             "crs": "EPSG:4326",
             "parameters": {"threshold": 0.2},
             "limitations": "Cloud cover in one month.",
@@ -164,7 +170,7 @@ def test_intelligence_endpoints_entity_relationship_analysis_and_gate(
     assert run_once(dbSession, storageProvider) == 1
     run = dbSession.get(AnalysisRun, uuid.UUID(runId))
     assert run is not None
-    assert run.status == "running"
+    assert run.status == "succeeded"
     assert run.startedAt is not None
     processed = dbSession.get(ProcessingJob, jobs[0].id)
     assert processed is not None

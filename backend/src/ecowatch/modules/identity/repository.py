@@ -56,13 +56,22 @@ class IdentityRepository:
         self._session.flush()
         return record
 
-    def purge_expired_revoked_tokens(self, now: datetime | None = None) -> int:
-        """Delete expired rows from revoked_tokens and return removed row count."""
+    def purge_expired_revoked_tokens(
+        self, now: datetime | None = None, *, limit: int = 500
+    ) -> int:
+        """Delete at most `limit` expired revoked_tokens rows and return the count."""
         cutoff = now or utc_now()
         if cutoff.tzinfo is None:
             cutoff = cutoff.replace(tzinfo=UTC)
+        boundedLimit = max(1, min(limit, 500))
+        expiredIds = (
+            select(RevokedToken.tokenId)
+            .where(RevokedToken.expiresAt < cutoff)
+            .order_by(RevokedToken.expiresAt.asc(), RevokedToken.tokenId.asc())
+            .limit(boundedLimit)
+        )
         result = self._session.execute(
-            delete(RevokedToken).where(RevokedToken.expiresAt < cutoff)
+            delete(RevokedToken).where(RevokedToken.tokenId.in_(expiredIds))
         )
         return int(result.rowcount or 0)
 

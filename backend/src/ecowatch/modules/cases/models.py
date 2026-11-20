@@ -118,6 +118,21 @@ class Case(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("users.id"),
         nullable=True,
     )
+    specialistApproverUserId: Mapped[uuid.UUID | None] = mapped_column(
+        "specialist_approver_user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    authorityApproverUserId: Mapped[uuid.UUID | None] = mapped_column(
+        "authority_approver_user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    twoKeyApprovedAt: Mapped[datetime | None] = mapped_column(
+        "two_key_approved_at", DateTime(timezone=True), nullable=True
+    )
     mergedIntoCaseId: Mapped[uuid.UUID | None] = mapped_column(
         "merged_into_case_id", Uuid(as_uuid=True), ForeignKey("cases.id"), nullable=True
     )

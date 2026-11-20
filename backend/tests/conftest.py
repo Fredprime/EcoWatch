@@ -3,6 +3,7 @@
 import io
 import uuid
 from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ from ecowatch.core.storage import LocalFilesystemStorage
 from ecowatch.main import create_app
 from ecowatch.modules.audit.models import AuditEvent  # noqa: F401
 from ecowatch.modules.cases.models import Case, CaseObservation  # noqa: F401
+from ecowatch.modules.catalogue.models import Dataset, DatasetVersion
 from ecowatch.modules.correlation.models import (  # noqa: F401
     EvidenceRelationship,
 )
@@ -171,6 +173,43 @@ def auth_headers(authProvider: LocalTokenAuthProvider, user: User) -> dict[str, 
     """Build Authorization bearer header for a temporary test user."""
     token = authProvider.issue_token(user.id)
     return {"Authorization": f"Bearer {token}"}
+
+
+def make_stored_dataset_version(
+    dbSession: Session,
+    storageProvider: LocalFilesystemStorage,
+    organisationId: uuid.UUID,
+) -> uuid.UUID:
+    """Create a real dataset version with tiny stored CSV for analysis execution tests."""
+    dataset = Dataset(
+        organisationId=organisationId,
+        name=f"ds-{uuid.uuid4().hex[:8]}",
+        owner="EcoWatch",
+        licence="CC-BY-4.0",
+        attribution="EcoWatch",
+        permittedUse="Monitoring",
+        crs="EPSG:4326",
+    )
+    dbSession.add(dataset)
+    dbSession.flush()
+    key = f"datasets/{uuid.uuid4().hex}.csv"
+    version = DatasetVersion(
+        datasetId=dataset.id,
+        versionLabel="v1",
+        sourceAcquisitionAt=datetime(2026, 11, 19, 9, 0, tzinfo=UTC),
+        resolution="10m",
+        crs="EPSG:4326",
+        method="Field sampling",
+        licenceSnapshot="CC-BY-4.0",
+        attributionSnapshot="EcoWatch",
+        permittedUseSnapshot="Monitoring",
+        storageKey=key,
+    )
+    dbSession.add(version)
+    dbSession.flush()
+    storageProvider.put_bytes(key, b"site,reading\nA,1.5\nB,2.5\n")
+    dbSession.commit()
+    return version.id
 
 
 def make_jpeg_with_exif_bytes() -> bytes:
